@@ -3,8 +3,8 @@ package Mouse;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
-use 5.6.0;
+our $VERSION = '0.02';
+use 5.006;
 
 use Sub::Exporter;
 use Carp 'confess';
@@ -139,7 +139,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-Version 0.01 released 10 Jun 08
+Version 0.02 released 11 Jun 08
 
 =head1 SYNOPSIS
 
@@ -184,10 +184,13 @@ expert-level features.
 
 Compatibility with Moose has been the utmost concern. Fewer than 1% of the
 tests fail when run against Moose instead of Mouse. Mouse code coverage is also
-over 99%. Even the error messages are taken from Moose.
+over 99%. Even the error messages are taken from Moose. The Mouse code just
+runs the test suite 3x-4x faster.
 
 The idea is that, if you need the extra power, you should be able to run
-C<s/Mouse/Moose/g> on your codebase and have nothing break.
+C<s/Mouse/Moose/g> on your codebase and have nothing break. To that end,
+nothingmuch has written L<Squirrel> (part of this distribution) which will act
+as Mouse unless Moose is loaded, in which case it will act as Moose.
 
 Mouse also has the blessings of Moose's author, stevan.
 
