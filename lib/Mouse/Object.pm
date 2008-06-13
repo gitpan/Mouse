@@ -9,15 +9,39 @@ use Carp 'confess';
 
 sub new {
     my $class = shift;
-    my %args  = @_;
+    my %args;
+    if (scalar @_ == 1) {
+        if (defined $_[0]) {
+            (ref($_[0]) eq 'HASH')
+                || confess "Single parameters to new() must be a HASH ref";
+            %args = %{$_[0]};
+        }
+    }
+    else {
+        %args = @_;
+    }
+
     my $instance = bless {}, $class;
 
-    for my $attribute (values %{ $class->meta->get_attribute_map }) {
+    for my $attribute ($class->meta->compute_all_applicable_attributes) {
         my $from = $attribute->init_arg;
         my $key  = $attribute->name;
         my $default;
 
-        if (!exists($args{$from})) {
+        if (defined($from) && exists($args{$from})) {
+            $attribute->verify_type_constraint($args{$from})
+                if $attribute->has_type_constraint;
+
+            $instance->{$key} = $args{$from};
+
+            weaken($instance->{$key})
+                if ref($instance->{$key}) && $attribute->is_weak_ref;
+
+            if ($attribute->has_trigger) {
+                $attribute->trigger->($instance, $args{$from}, $attribute);
+            }
+        }
+        else {
             if ($attribute->has_default || $attribute->has_builder) {
                 unless ($attribute->is_lazy) {
                     my $default = $attribute->default;
@@ -41,20 +65,6 @@ sub new {
                 if ($attribute->is_required) {
                     confess "Attribute (".$attribute->name.") is required";
                 }
-            }
-        }
-
-        if (exists($args{$from})) {
-            $attribute->verify_type_constraint($args{$from})
-                if $attribute->has_type_constraint;
-
-            $instance->{$key} = $args{$from};
-
-            weaken($instance->{$key})
-                if ref($instance->{$key}) && $attribute->is_weak_ref;
-
-            if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args{$from}, $attribute);
             }
         }
     }

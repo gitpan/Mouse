@@ -18,8 +18,9 @@ no_index:
     - inc
     - t
 requires:
+  Class::Method::Modifiers: 1.00
   MRO::Compat: 0
   Scalar::Util: 0
   Sub::Exporter: 0
   perl: 5.6.0
-version: 0.02
+version: 0.03

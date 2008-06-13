@@ -3,12 +3,13 @@ package Mouse;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 use 5.006;
 
 use Sub::Exporter;
 use Carp 'confess';
 use Scalar::Util 'blessed';
+use Class::Method::Modifiers ();
 
 use Mouse::Meta::Attribute;
 use Mouse::Meta::Class;
@@ -49,6 +50,18 @@ do {
 
         blessed => sub {
             return \&blessed;
+        },
+
+        before => sub {
+            return \&Class::Method::Modifiers::before;
+        },
+
+        after => sub {
+            return \&Class::Method::Modifiers::after;
+        },
+
+        around => sub {
+            return \&Class::Method::Modifiers::around;
         },
     );
 
@@ -137,10 +150,6 @@ __END__
 
 Mouse - Moose minus the antlers
 
-=head1 VERSION
-
-Version 0.02 released 11 Jun 08
-
 =head1 SYNOPSIS
 
     package Point;
@@ -162,11 +171,10 @@ Version 0.02 released 11 Jun 08
 
     has 'z' => (is => 'rw', isa => 'Int');
 
-    # not implemented yet :)
-    #after 'clear' => sub {
-    #    my $self = shift;
-    #    $self->z(0);
-    #};
+    after 'clear' => sub {
+        my $self = shift;
+        $self->z(0);
+    };
 
 =head1 DESCRIPTION
 
@@ -195,10 +203,6 @@ as Mouse unless Moose is loaded, in which case it will act as Moose.
 Mouse also has the blessings of Moose's author, stevan.
 
 =head2 MISSING FEATURES
-
-=head3 Method modifiers
-
-Fixing this one next, with a reimplementation of L<Class::Method::Modifiers>.
 
 =head3 Roles
 
@@ -233,6 +237,21 @@ Returns this class' metaclass instance.
 =head2 extends superclasses
 
 Sets this class' superclasses.
+
+=head2 before (method|methods) => Code
+
+Installs a "before" method modifier. See L<Moose/before> or
+L<Class::Method::Modifiers/before>.
+
+=head2 after (method|methods) => Code
+
+Installs an "after" method modifier. See L<Moose/after> or
+L<Class::Method::Modifiers/after>.
+
+=head2 around (method|methods) => Code
+
+Installs an "around" method modifier. See L<Moose/around> or
+L<Class::Method::Modifiers/around>.
 
 =head2 has (name|names) => parameters
 

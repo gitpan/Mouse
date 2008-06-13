@@ -14,25 +14,26 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 e1c9b8d13f17d37ab01ac4c4ede78cbe12ac5f2e Changes
-SHA1 54403118d250a08edd06773117f387d3072eac62 MANIFEST
-SHA1 ad23fa0a4e370c9502a7d34276b3b6770015211f META.yml
-SHA1 d0b15e1e973457f96b5da5a3f070399d40690b8b Makefile.PL
-SHA1 b12f2bb1211425dcc97e892e96458035aa5ea228 inc/Module/Install.pm
-SHA1 91ca02405a938276a5976e2e1ad323dff12e938c inc/Module/Install/Base.pm
-SHA1 2f30bfa7ca37ba8a694774672af0cc1e74cd6a38 inc/Module/Install/Can.pm
-SHA1 e36961e8e53f294635809f7e06b0c3fb0246697b inc/Module/Install/Fetch.pm
-SHA1 8754dec8410b26bebec30d2f64e5ef7519fd373f inc/Module/Install/Makefile.pm
-SHA1 c7cf4a6b08ec11bfafe4d56c98f4ddb5201e8289 inc/Module/Install/Metadata.pm
-SHA1 c8bbc6a9e97f46d1e5491fbc1823c73c73aef346 inc/Module/Install/Win32.pm
-SHA1 b6f7c7d6933e1081a4e8b67751f6804610469b38 inc/Module/Install/WriteAll.pm
-SHA1 65d75939048d498c743466f5e930ec87ce928fd8 lib/Mouse.pm
+SHA1 5582fa497a40bf181526f2b951a9b7f9097a70a9 Changes
+SHA1 9bced221935aee42f8a605749a23719d461389a0 MANIFEST
+SHA1 b4ab2b6dde22546cfb3a9ff07313eee9e9a303fb META.yml
+SHA1 be662a0c1656a13442f1e27a85d31bdc3ebceb6f Makefile.PL
+SHA1 f0577f8f88a6703e9bca2d10196cfd293f3d6f2f inc/Module/Install.pm
+SHA1 5d574849849860b8cf06035cc6f1a306c66cb326 inc/Module/Install/Base.pm
+SHA1 c30f50bc2a1542dff17f84a54d9316f3c3c6299e inc/Module/Install/Can.pm
+SHA1 9b618efcd783f6ed4bab84fa22b31886fcc38d57 inc/Module/Install/Fetch.pm
+SHA1 cd14c8de2a67b0f14df9bc20c27f3edabd359d1b inc/Module/Install/Makefile.pm
+SHA1 a2162aec678d21988fce47ab805cf01773196292 inc/Module/Install/Metadata.pm
+SHA1 4ae5d56e11e640bd9520634dde6d563926f6d98a inc/Module/Install/Win32.pm
+SHA1 587cc94b52b640fe2d4972253b6369aa951e2210 inc/Module/Install/WriteAll.pm
+SHA1 8bcebd5a130d07058056a63718fdd0a6ede34ebd lib/Mouse.pm
 SHA1 2c53b4a5f0c721b4e0c8b48e563c860e762b8051 lib/Mouse/Meta/Attribute.pm
-SHA1 babf7f7b085d68db50f276414b9773d8ea72897b lib/Mouse/Meta/Class.pm
-SHA1 cef84538da1f68dfd93c38ee8c8cf1d61994d5bf lib/Mouse/Object.pm
+SHA1 6d183f545b6711e44c0465215646711ba26c1686 lib/Mouse/Meta/Class.pm
+SHA1 645a7af1c3499c59e6d216893cb6fe51cc1fceb4 lib/Mouse/Object.pm
 SHA1 611460960b509d9ddf9d31bc740fcea007bb099b lib/Mouse/TypeRegistry.pm
 SHA1 9d05d6d48f4ad47c9a5526f047ac8c0b7b9df8cc lib/Squirrel.pm
 SHA1 55595575dd264f49158f53d338b03b2964d22231 t/000-load.t
+SHA1 c22a74d92e36246b9589b75d4de65edeac83c147 t/000-recipes/001_point.t
 SHA1 87e71f415a91d6ac23ad63054f2aab8b42670521 t/001-strict.t
 SHA1 c9033117ce291c95b64921ae93caf94ad8d17043 t/002-warnings.t
 SHA1 1483069ee006c118558dc0319d614f8004e7e804 t/003-mouse-object.t
@@ -54,12 +55,15 @@ SHA1 0b6abce6c30d2202f2d1e67e711e539da10011a3 t/018-multiattr-has.t
 SHA1 e68ac7b07548007b5d67f1735bd613c1280f87ec t/019-handles.t
 SHA1 64f5aa52be078e74b4ca1fcdcbac6823bc01f37f t/020-load-class.t
 SHA1 aaf48cb2960ef6ecf518072a7b752d266df4f253 t/021-weak-ref.t
-SHA1 be0fca892fd82768a5511df2f5b3978d8036a318 t/022-init-arg.t
+SHA1 cfb5c1dd8895c40a54981894ce0c20e352e64132 t/022-init-arg.t
 SHA1 c3ccfc6cab5978e66988968fd85789602e9d437c t/023-builder.t
 SHA1 7558f244118b0a7228d9559f2925abd351c53b05 t/024-isa.t
 SHA1 e22a2b02bc932e14ca215bea9abe5834d1d91589 t/025-more-isa.t
 SHA1 205b5383b2ef615b1b2def108a73232933243efb t/026-auto-deref.t
-SHA1 6279889c071b03e164141f5bcbbf74dded9fb348 t/100-meta-class.t
+SHA1 87f09dfab8357a7e1f78ab633976ba462e68a033 t/027-modifiers.t
+SHA1 171113befd804d6bcc7d5d687f5bb8dd43f93669 t/028-subclass-attr.t
+SHA1 d9078d4bd1ce03489f3d2c2bbb0f18bbb70221cf t/029-new.t
+SHA1 1593a1a3d5fbf80860458f57e6e0e4c87765aab1 t/100-meta-class.t
 SHA1 060f6c94368c92a653de61469b741af51deedbfb t/101-meta-attribute.t
 SHA1 f28169e53bfbf6cf71bf00cef228e593a7ca0661 t/201-squirrel.t
 SHA1 91a38e4543db0ea4e4053229e3b57db59d44f4ca t/lib/Anti/Mouse.pm
@@ -67,7 +71,7 @@ SHA1 0c072795eae43702dc7f04267421c9a9b2dfdaac t/lib/Anti/MouseError.pm
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (Darwin)
 
-iD8DBQFIT2ldsxfQtHhyRPoRAmFvAJ9oxeM1726nF6mmC7rtFzdqQNqUvwCfSwg/
-TEw8Hf+tWzG1i70DD/5p4iU=
-=JZpn
+iD8DBQFIUdPUsxfQtHhyRPoRAtntAJ99YcxM0RBO44+vlCbqwl3hHdtdLwCfTINk
+e22Xxjav4hE8K0m8OhmAcjA=
+=gvac
 -----END PGP SIGNATURE-----

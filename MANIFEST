@@ -18,6 +18,7 @@ MANIFEST			This list of files
 META.yml
 SIGNATURE
 t/000-load.t
+t/000-recipes/001_point.t
 t/001-strict.t
 t/002-warnings.t
 t/003-mouse-object.t
@@ -44,6 +45,9 @@ t/023-builder.t
 t/024-isa.t
 t/025-more-isa.t
 t/026-auto-deref.t
+t/027-modifiers.t
+t/028-subclass-attr.t
+t/029-new.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t
