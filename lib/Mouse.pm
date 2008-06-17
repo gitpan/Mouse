@@ -3,7 +3,7 @@ package Mouse;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 use 5.006;
 
 use Sub::Exporter;
@@ -39,7 +39,12 @@ do {
                 $names = [$names] if !ref($names);
 
                 for my $name (@$names) {
-                    Mouse::Meta::Attribute->create($package, $name, @_);
+                    if ($name =~ s/^\+//) {
+                        Mouse::Meta::Attribute->clone_parent($package, $name, @_);
+                    }
+                    else {
+                        Mouse::Meta::Attribute->create($package, $name, @_);
+                    }
                 }
             };
         },

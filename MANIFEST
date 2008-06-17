@@ -16,7 +16,6 @@ lib/Squirrel.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
-SIGNATURE
 t/000-load.t
 t/000-recipes/001_point.t
 t/001-strict.t
@@ -48,8 +47,11 @@ t/026-auto-deref.t
 t/027-modifiers.t
 t/028-subclass-attr.t
 t/029-new.t
+t/030-has-plus.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t
+t/301-bugs-non-mouse.t
+t/301-bugs-non-mouse.t.t
 t/lib/Anti/Mouse.pm
 t/lib/Anti/MouseError.pm

@@ -10,9 +10,28 @@ sub new {
     my $class = shift;
     my %args  = @_;
 
-    $args{init_arg} = $args{name}
+    my $name = $args{name};
+
+    $args{init_arg} = $name
         unless exists $args{init_arg};
+
     $args{is} ||= '';
+
+    if ($args{lazy_build}) {
+        confess("You can not use lazy_build and default for the same attribute $name")
+            if exists $args{default};
+        $args{lazy}      = 1;
+        $args{required}  = 1;
+        $args{builder} ||= "_build_${name}";
+        if ($name =~ /^_/) {
+            $args{clearer}   ||= "_clear${name}";
+            $args{predicate} ||= "_has${name}";
+        } 
+        else {
+            $args{clearer}   ||= "clear_${name}";
+            $args{predicate} ||= "has_${name}";
+        }
+    }
 
     bless \%args, $class;
 }
@@ -23,6 +42,7 @@ sub _is_metadata      { $_[0]->{is}              }
 sub is_required       { $_[0]->{required}        }
 sub default           { $_[0]->{default}         }
 sub is_lazy           { $_[0]->{lazy}            }
+sub is_lazy_build     { $_[0]->{lazy_build}      }
 sub predicate         { $_[0]->{predicate}       }
 sub clearer           { $_[0]->{clearer}         }
 sub handles           { $_[0]->{handles}         }
@@ -40,6 +60,11 @@ sub has_handles         { exists $_[0]->{handles}         }
 sub has_type_constraint { exists $_[0]->{type_constraint} }
 sub has_trigger         { exists $_[0]->{trigger}         }
 sub has_builder         { exists $_[0]->{builder}         }
+
+sub _create_args {
+    $_[0]->{_create_args} = $_[1] if @_ > 1;
+    $_[0]->{_create_args}
+}
 
 sub generate_accessor {
     my $attribute = shift;
@@ -155,25 +180,17 @@ sub generate_handles {
 sub create {
     my ($self, $class, $name, %args) = @_;
 
-    confess "You cannot have lazy attribute ($name) without specifying a default value for it"
-        if $args{lazy} && !exists($args{default}) && !exists($args{builder});
+    $args{name} = $name;
+    $args{class} = $class;
 
-    confess "References are not allowed as default values, you must wrap the default of '$name' in a CODE reference (ex: sub { [] } and not [])"
-        if ref($args{default})
-        && ref($args{default}) ne 'CODE';
-
-    confess "You cannot auto-dereference without specifying a type constraint on attribute $name"
-        if $args{auto_deref} && !exists($args{isa});
-
-    confess "You cannot auto-dereference anything other than a ArrayRef or HashRef on attribute $name"
-        if $args{auto_deref}
-        && $args{isa} ne 'ArrayRef'
-        && $args{isa} ne 'HashRef';
+    $self->validate_args($name, %args);
 
     $args{type_constraint} = delete $args{isa}
         if exists $args{isa};
 
-    my $attribute = $self->new(%args, name => $name, class => $class);
+    my $attribute = $self->new(%args);
+    $attribute->_create_args(\%args);
+
     my $meta = $class->meta;
 
     $meta->add_attribute($attribute);
@@ -204,6 +221,29 @@ sub create {
     }
 
     return $attribute;
+}
+
+sub validate_args {
+    my $self = shift;
+    my $name = shift;
+    my %args = @_;
+
+    confess "You cannot have lazy attribute ($name) without specifying a default value for it"
+        if $args{lazy} && !exists($args{default}) && !exists($args{builder});
+
+    confess "References are not allowed as default values, you must wrap the default of '$name' in a CODE reference (ex: sub { [] } and not [])"
+        if ref($args{default})
+        && ref($args{default}) ne 'CODE';
+
+    confess "You cannot auto-dereference without specifying a type constraint on attribute $name"
+        if $args{auto_deref} && !exists($args{isa});
+
+    confess "You cannot auto-dereference anything other than a ArrayRef or HashRef on attribute $name"
+        if $args{auto_deref}
+        && $args{isa} ne 'ArrayRef'
+        && $args{isa} ne 'HashRef';
+
+    return 1;
 }
 
 sub find_type_constraint {
@@ -246,6 +286,29 @@ sub _canonicalize_handles {
     else {
         confess "Unable to canonicalize the 'handles' option with $handles";
     }
+}
+
+sub clone_parent {
+    my $self  = shift;
+    my $class = shift;
+    my $name  = shift;
+    my %args  = ($self->get_parent_args($class, $name), @_);
+
+    $self->create($class, $name, %args);
+}
+
+sub get_parent_args {
+    my $self  = shift;
+    my $class = shift;
+    my $name  = shift;
+
+    for my $super ($class->meta->linearized_isa) {
+        my $super_attr = $super->can("meta") && $super->meta->get_attribute($name)
+            or next;
+        return %{ $super_attr->_create_args };
+    }
+
+    confess "Could not find an attribute by the name of '$name' to inherit from";
 }
 
 1;
