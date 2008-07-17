@@ -2,24 +2,15 @@
 package Mouse::Object;
 use strict;
 use warnings;
-use MRO::Compat;
 
+use MRO::Compat;
 use Scalar::Util qw/blessed weaken/;
 use Carp 'confess';
 
 sub new {
     my $class = shift;
-    my %args;
-    if (scalar @_ == 1) {
-        if (defined $_[0]) {
-            (ref($_[0]) eq 'HASH')
-                || confess "Single parameters to new() must be a HASH ref";
-            %args = %{$_[0]};
-        }
-    }
-    else {
-        %args = @_;
-    }
+
+    my $args = $class->BUILDARGS(@_);
 
     my $instance = bless {}, $class;
 
@@ -28,17 +19,36 @@ sub new {
         my $key  = $attribute->name;
         my $default;
 
-        if (defined($from) && exists($args{$from})) {
-            $attribute->verify_type_constraint($args{$from})
-                if $attribute->has_type_constraint;
+        if (defined($from) && exists($args->{$from})) {
+            if ($attribute->has_trigger && $attribute->trigger->{before}) {
+                $attribute->trigger->{before}->($instance, $args->{$from}, $attribute);
+            }
 
-            $instance->{$key} = $args{$from};
+            if ($attribute->has_trigger && $attribute->trigger->{around}) {
+                $attribute->trigger->{around}->(sub {
+                    $args->{$from} = $_[1];
 
-            weaken($instance->{$key})
-                if ref($instance->{$key}) && $attribute->is_weak_ref;
+                    $attribute->verify_type_constraint($args->{$from})
+                        if $attribute->has_type_constraint;
 
-            if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args{$from}, $attribute);
+                    $instance->{$key} = $args->{$from};
+
+                    weaken($instance->{$key})
+                        if ref($instance->{$key}) && $attribute->is_weak_ref;
+                }, $instance, $args->{$from}, $attribute);
+            }
+            else {
+                $attribute->verify_type_constraint($args->{$from})
+                    if $attribute->has_type_constraint;
+
+                $instance->{$key} = $args->{$from};
+
+                weaken($instance->{$key})
+                    if ref($instance->{$key}) && $attribute->is_weak_ref;
+            }
+
+            if ($attribute->has_trigger && $attribute->trigger->{after}) {
+                $attribute->trigger->{after}->($instance, $args->{$from}, $attribute);
             }
         }
         else {
@@ -69,9 +79,26 @@ sub new {
         }
     }
 
-    $instance->BUILDALL(\%args);
+    $instance->BUILDALL($args);
 
     return $instance;
+}
+
+sub BUILDARGS {
+    my $class = shift;
+
+    if (scalar @_ == 1) {
+        if (defined $_[0]) {
+            (ref($_[0]) eq 'HASH')
+                || confess "Single parameters to new() must be a HASH ref";
+            return {%{$_[0]}};
+        } else {
+            return {};
+        }
+    }
+    else {
+        return {@_};
+    }
 }
 
 sub DESTROY { shift->DEMOLISHALL }
@@ -129,6 +156,11 @@ end of L</new>.
 
 You may put any business logic initialization in BUILD methods. You don't
 need to redispatch or return any specific value.
+
+=head2 BUILDARGS
+
+Lets you override the arguments that C<new> takes. Return a hashref of
+parameters.
 
 =head2 DEMOLISHALL
 

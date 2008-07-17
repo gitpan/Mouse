@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Carp 'confess';
-use Scalar::Util 'blessed';
+use Scalar::Util qw/blessed weaken/;
 
 sub new {
     my $class = shift;
@@ -17,41 +17,25 @@ sub new {
 
     $args{is} ||= '';
 
-    if ($args{lazy_build}) {
-        confess("You can not use lazy_build and default for the same attribute $name")
-            if exists $args{default};
-        $args{lazy}      = 1;
-        $args{required}  = 1;
-        $args{builder} ||= "_build_${name}";
-        if ($name =~ /^_/) {
-            $args{clearer}   ||= "_clear${name}";
-            $args{predicate} ||= "_has${name}";
-        } 
-        else {
-            $args{clearer}   ||= "clear_${name}";
-            $args{predicate} ||= "has_${name}";
-        }
-    }
-
     bless \%args, $class;
 }
 
-sub name              { $_[0]->{name}            }
-sub class             { $_[0]->{class}           }
-sub _is_metadata      { $_[0]->{is}              }
-sub is_required       { $_[0]->{required}        }
-sub default           { $_[0]->{default}         }
-sub is_lazy           { $_[0]->{lazy}            }
-sub is_lazy_build     { $_[0]->{lazy_build}      }
-sub predicate         { $_[0]->{predicate}       }
-sub clearer           { $_[0]->{clearer}         }
-sub handles           { $_[0]->{handles}         }
-sub is_weak_ref       { $_[0]->{weak_ref}        }
-sub init_arg          { $_[0]->{init_arg}        }
-sub type_constraint   { $_[0]->{type_constraint} }
-sub trigger           { $_[0]->{trigger}         }
-sub builder           { $_[0]->{builder}         }
-sub should_auto_deref { $_[0]->{auto_deref}      }
+sub name              { $_[0]->{name}             }
+sub associated_class  { $_[0]->{associated_class} }
+sub _is_metadata      { $_[0]->{is}               }
+sub is_required       { $_[0]->{required}         }
+sub default           { $_[0]->{default}          }
+sub is_lazy           { $_[0]->{lazy}             }
+sub is_lazy_build     { $_[0]->{lazy_build}       }
+sub predicate         { $_[0]->{predicate}        }
+sub clearer           { $_[0]->{clearer}          }
+sub handles           { $_[0]->{handles}          }
+sub is_weak_ref       { $_[0]->{weak_ref}         }
+sub init_arg          { $_[0]->{init_arg}         }
+sub type_constraint   { $_[0]->{type_constraint}  }
+sub trigger           { $_[0]->{trigger}          }
+sub builder           { $_[0]->{builder}          }
+sub should_auto_deref { $_[0]->{auto_deref}       }
 
 sub has_default         { exists $_[0]->{default}         }
 sub has_predicate       { exists $_[0]->{predicate}       }
@@ -72,10 +56,14 @@ sub generate_accessor {
     my $name       = $attribute->name;
     my $key        = $name;
     my $default    = $attribute->default;
-    my $trigger    = $attribute->trigger;
     my $type       = $attribute->type_constraint;
     my $constraint = $attribute->find_type_constraint;
     my $builder    = $attribute->builder;
+
+    my $trigger = $attribute->trigger;
+    my $before  = $trigger->{before};
+    my $after   = $trigger->{after};
+    my $around  = $trigger->{around};
 
     my $accessor = 'sub {
         my $self = shift;';
@@ -84,21 +72,36 @@ sub generate_accessor {
         $accessor .= 'if (@_) {
             local $_ = $_[0];';
 
-        if ($constraint) {
-            $accessor .= 'do {
-                my $display = defined($_) ? overload::StrVal($_) : "undef";
-                Carp::confess("Attribute ($name) does not pass the type constraint because: Validation failed for \'$type\' failed with value $display") unless $constraint->();
-            };'
+        if ($before) {
+            $accessor .= '$before->($self, $_, $attribute);';
         }
 
-        $accessor .= '$self->{$key} = $_;';
-
-        if ($attribute->is_weak_ref) {
-            $accessor .= 'Scalar::Util::weaken($self->{$key}) if ref($self->{$key});';
+        if ($around) {
+            $accessor .= '$around->(sub {
+                my $self = shift;
+                $_ = $_[0];
+            ';
         }
 
-        if ($trigger) {
-            $accessor .= '$trigger->($self, $_, $attribute);';
+            if ($constraint) {
+                $accessor .= 'unless ($constraint->()) {
+                        my $display = defined($_) ? overload::StrVal($_) : "undef";
+                        Carp::confess("Attribute ($name) does not pass the type constraint because: Validation failed for \'$type\' failed with value $display");
+                }'
+            }
+
+            $accessor .= '$self->{$key} = $_;';
+
+            if ($attribute->is_weak_ref) {
+                $accessor .= 'Scalar::Util::weaken($self->{$key}) if ref($self->{$key});';
+            }
+
+        if ($around) {
+            $accessor .= '}, $self, $_, $attribute);';
+        }
+
+        if ($after) {
+            $accessor .= '$after->($self, $_, $attribute);';
         }
 
         $accessor .= '}';
@@ -181,25 +184,24 @@ sub create {
     my ($self, $class, $name, %args) = @_;
 
     $args{name} = $name;
-    $args{class} = $class;
+    $args{associated_class} = $class;
 
-    $self->validate_args($name, %args);
+    %args = $self->canonicalize_args($name, %args);
+    $self->validate_args($name, \%args);
 
     $args{type_constraint} = delete $args{isa}
         if exists $args{isa};
 
     my $attribute = $self->new(%args);
+
     $attribute->_create_args(\%args);
 
-    my $meta = $class->meta;
-
-    $meta->add_attribute($attribute);
+    $class->add_attribute($attribute);
 
     # install an accessor
     if ($attribute->_is_metadata eq 'rw' || $attribute->_is_metadata eq 'ro') {
         my $accessor = $attribute->generate_accessor;
-        no strict 'refs';
-        *{ $class . '::' . $name } = $accessor;
+        $class->add_method($name => $accessor);
     }
 
     for my $method (qw/predicate clearer/) {
@@ -207,41 +209,78 @@ sub create {
         if ($attribute->$predicate) {
             my $generator = "generate_$method";
             my $coderef = $attribute->$generator;
-            no strict 'refs';
-            *{ $class . '::' . $attribute->$method } = $coderef;
+            $class->add_method($attribute->$method => $coderef);
         }
     }
 
     if ($attribute->has_handles) {
         my $method_map = $attribute->generate_handles;
         for my $method_name (keys %$method_map) {
-            no strict 'refs';
-            *{ $class . '::' . $method_name } = $method_map->{$method_name};
+            $class->add_method($method_name => $method_map->{$method_name});
         }
     }
 
     return $attribute;
 }
 
-sub validate_args {
+sub canonicalize_args {
     my $self = shift;
     my $name = shift;
     my %args = @_;
 
+    if ($args{lazy_build}) {
+        $args{lazy}      = 1;
+        $args{required}  = 1;
+        $args{builder}   = "_build_${name}"
+            if !exists($args{builder});
+        if ($name =~ /^_/) {
+            $args{clearer}   = "_clear${name}" if !exists($args{clearer});
+            $args{predicate} = "_has${name}" if !exists($args{predicate});
+        }
+        else {
+            $args{clearer}   = "clear_${name}" if !exists($args{clearer});
+            $args{predicate} = "has_${name}" if !exists($args{predicate});
+        }
+    }
+
+    return %args;
+}
+
+sub validate_args {
+    my $self = shift;
+    my $name = shift;
+    my $args = shift;
+
+    confess "You can not use lazy_build and default for the same attribute ($name)"
+        if $args->{lazy_build} && exists $args->{default};
+
     confess "You cannot have lazy attribute ($name) without specifying a default value for it"
-        if $args{lazy} && !exists($args{default}) && !exists($args{builder});
+        if $args->{lazy}
+        && !exists($args->{default})
+        && !exists($args->{builder});
 
     confess "References are not allowed as default values, you must wrap the default of '$name' in a CODE reference (ex: sub { [] } and not [])"
-        if ref($args{default})
-        && ref($args{default}) ne 'CODE';
+        if ref($args->{default})
+        && ref($args->{default}) ne 'CODE';
 
-    confess "You cannot auto-dereference without specifying a type constraint on attribute $name"
-        if $args{auto_deref} && !exists($args{isa});
+    confess "You cannot auto-dereference without specifying a type constraint on attribute ($name)"
+        if $args->{auto_deref} && !exists($args->{isa});
 
-    confess "You cannot auto-dereference anything other than a ArrayRef or HashRef on attribute $name"
-        if $args{auto_deref}
-        && $args{isa} ne 'ArrayRef'
-        && $args{isa} ne 'HashRef';
+    confess "You cannot auto-dereference anything other than a ArrayRef or HashRef on attribute ($name)"
+        if $args->{auto_deref}
+        && $args->{isa} ne 'ArrayRef'
+        && $args->{isa} ne 'HashRef';
+
+    if ($args->{trigger}) {
+        if (ref($args->{trigger}) eq 'CODE') {
+            $args->{trigger} = {
+                after => $args->{trigger},
+            };
+        }
+
+        confess "Trigger must be a CODE or HASH ref on attribute ($name)"
+            if ref($args->{trigger}) ne 'HASH';
+    }
 
     return 1;
 }
@@ -302,7 +341,7 @@ sub get_parent_args {
     my $class = shift;
     my $name  = shift;
 
-    for my $super ($class->meta->linearized_isa) {
+    for my $super ($class->linearized_isa) {
         my $super_attr = $super->can("meta") && $super->meta->get_attribute($name)
             or next;
         return %{ $super_attr->_create_args };
@@ -332,7 +371,7 @@ installed. Some error checking is done.
 
 =head2 name -> AttributeName
 
-=head2 class -> OwnerClass
+=head2 associated_class -> OwnerClass
 
 =head2 is_required -> Bool
 
@@ -370,6 +409,8 @@ installed. Some error checking is done.
 
 =head2 has_builder -> Bool
 
+=head2 is_lazy_build => Bool
+
 =head2 should_auto_deref -> Bool
 
 Informational methods.
@@ -399,6 +440,26 @@ this attribute's type constraint;
 
 Checks that the given value passes this attribute's type constraint. Returns 1
 on success, otherwise C<confess>es.
+
+=head2 canonicalize_args Name, %args -> %args
+
+Canonicalizes some arguments to create. In particular, C<lazy_build> is
+canonicalized into C<lazy>, C<builder>, etc.
+
+=head2 validate_args Name, \%args -> 1 | ERROR
+
+Checks that the arguments to create the attribute (ie those specified by
+C<has>) are valid.
+
+=head2 clone_parent OwnerClass, AttributeName, %args -> Mouse::Meta::Attribute
+
+Creates a new attribute in OwnerClass, inheriting options from parent classes.
+Accessors and helper methods are installed. Some error checking is done.
+
+=head2 get_parent_args OwnerClass, AttributeName -> Hash
+
+Returns the options that the parent class of C<OwnerClass> used for attribute
+C<AttributeName>.
 
 =cut
 

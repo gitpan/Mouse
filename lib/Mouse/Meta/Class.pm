@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Scalar::Util 'blessed';
+use Carp 'confess';
 
 use MRO::Compat;
 
@@ -29,7 +30,7 @@ do {
 
 sub new {
     my $class = shift;
-    my %args = @_;
+    my %args  = @_;
 
     $args{attributes} = {};
     $args{superclasses} = do {
@@ -51,6 +52,17 @@ sub superclasses {
     }
 
     @{ $self->{superclasses} };
+}
+
+sub add_method {
+    my $self = shift;
+    my $name = shift;
+    my $code = shift;
+
+    my $pkg = $self->name;
+
+    no strict 'refs';
+    *{ $pkg . '::' . $name } = $code;
 }
 
 sub add_attribute {
@@ -82,6 +94,37 @@ sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     { $_[0]->{attributes}->{$_[1]} }
 
 sub linearized_isa { @{ mro::get_linear_isa($_[0]->name) } }
+
+sub clone_object {
+    my $class    = shift;
+    my $instance = shift;
+
+    (blessed($instance) && $instance->isa($class->name))
+        || confess "You must pass an instance of the metaclass (" . $class->name . "), not ($instance)";
+
+    $class->clone_instance($instance, @_);
+}
+
+sub clone_instance {
+    my ($class, $instance, %params) = @_;
+
+    (blessed($instance))
+        || confess "You can only clone instances, ($instance) is not a blessed instance";
+
+    my $clone = bless { %$instance }, ref $instance;
+
+    foreach my $attr ($class->compute_all_applicable_attributes()) {
+        if ( defined( my $init_arg = $attr->init_arg ) ) {
+            if (exists $params{$init_arg}) {
+                $clone->{ $attr->name } = $params{$init_arg};
+            }
+        }
+    }
+
+    return $clone;
+
+}
+
 
 1;
 
@@ -136,6 +179,15 @@ Returns the L<Mouse::Meta::Attribute> with the given name.
 =head2 linearized_isa -> [ClassNames]
 
 Returns the list of classes in method dispatch order, with duplicates removed.
+
+=head2 clone_object Instance -> Instance
+
+Clones the given C<Instance> which must be an instance governed by this
+metaclass.
+
+=head2 clone_instance Instance, Parameters -> Instance
+
+Clones the given C<Instance> and sets any additional parameters.
 
 =cut
 

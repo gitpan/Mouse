@@ -1,9 +1,9 @@
-#!perl
+#!/usr/bin/env perl
 package Mouse;
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 use 5.006;
 
 use Sub::Exporter;
@@ -33,17 +33,20 @@ do {
         },
 
         has => sub {
+            my $caller = $CALLER;
+
             return sub {
-                my $package = caller;
+                my $meta = $caller->meta;
+
                 my $names = shift;
                 $names = [$names] if !ref($names);
 
                 for my $name (@$names) {
                     if ($name =~ s/^\+//) {
-                        Mouse::Meta::Attribute->clone_parent($package, $name, @_);
+                        Mouse::Meta::Attribute->clone_parent($meta, $name, @_);
                     }
                     else {
-                        Mouse::Meta::Attribute->create($package, $name, @_);
+                        Mouse::Meta::Attribute->create($meta, $name, @_);
                     }
                 }
             };
@@ -67,6 +70,20 @@ do {
 
         around => sub {
             return \&Class::Method::Modifiers::around;
+        },
+
+        with => sub {
+            my $caller = $CALLER;
+
+            return sub {
+                my $role  = shift;
+                my $class = $caller->meta;
+
+                confess "Mouse::Role only supports 'with' on individual roles at a time" if @_;
+
+                Mouse::load_class($role);
+                $role->meta->apply($class);
+            };
         },
     );
 
@@ -197,7 +214,7 @@ expert-level features.
 
 Compatibility with Moose has been the utmost concern. Fewer than 1% of the
 tests fail when run against Moose instead of Mouse. Mouse code coverage is also
-over 99%. Even the error messages are taken from Moose. The Mouse code just
+over 97%. Even the error messages are taken from Moose. The Mouse code just
 runs the test suite 3x-4x faster.
 
 The idea is that, if you need the extra power, you should be able to run
@@ -211,8 +228,9 @@ Mouse also has the blessings of Moose's author, stevan.
 
 =head3 Roles
 
-Fixing this one slightly less soon. stevan has suggested an implementation
-strategy. Mouse currently mostly ignores methods.
+We're working on fixing this one! stevan has suggested an implementation
+strategy. Mouse currently ignores methods, so that needs to be fixed next.
+Roles that consist entirely of attributes may be usable in this very version.
 
 =head3 Complex types
 
@@ -322,11 +340,20 @@ L</handles>, such as regular expression and coderef, are not yet supported.
 
 Lets you automatically weaken any reference stored in the attribute.
 
-=item trigger => Coderef
+=item trigger => CodeRef | HashRef
 
-Any time the attribute's value is set (either through the accessor or the
-constructor), the trigger is called on it. The trigger receives as arguments
-the instance, the new value, and the attribute instance.
+Triggers are like method modifiers for setting attribute values. You can have
+a "before" and an "after" trigger, each of which receive as arguments the instance, the new value, and the attribute metaclass. Historically, triggers have
+only been "after" modifiers, so if you use a coderef for the C<trigger> option,
+it will maintain that compatibility. Like method modifiers, you can't really
+affect the act of setting the attribute value, and the return values of the 
+modifiers are ignored.
+
+There's also an "around" trigger which you can use to change the value that
+is being set on the attribute, or even prevent the attribute from being
+updated. The around trigger receives as arguments a code reference to invoke
+to set the attribute's value (which expects as arguments the instance and
+the new value), the instance, the new value, and the attribute metaclass.
 
 =item builder => Str
 
