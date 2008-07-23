@@ -14,9 +14,9 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 b55fc29d4d20b6c632004210e85b31742a2b6843 Changes
+SHA1 d77e80c4cce5e3369b0ec13ad48e7362f544138f Changes
 SHA1 89c34fafbc5589a2ceaef069901c6908f0e2a9f5 MANIFEST
-SHA1 a2b0f01859685cd29ad5f1d4b518ac43f434d0dd META.yml
+SHA1 335359d8f94217d2bb2bb920142e2bb69f405cb4 META.yml
 SHA1 0e65a1cdaad3f0e6d7433de996385cb49b4f7222 Makefile.PL
 SHA1 f0577f8f88a6703e9bca2d10196cfd293f3d6f2f inc/Module/Install.pm
 SHA1 5d574849849860b8cf06035cc6f1a306c66cb326 inc/Module/Install/Base.pm
@@ -26,9 +26,9 @@ SHA1 cd14c8de2a67b0f14df9bc20c27f3edabd359d1b inc/Module/Install/Makefile.pm
 SHA1 a2162aec678d21988fce47ab805cf01773196292 inc/Module/Install/Metadata.pm
 SHA1 4ae5d56e11e640bd9520634dde6d563926f6d98a inc/Module/Install/Win32.pm
 SHA1 587cc94b52b640fe2d4972253b6369aa951e2210 inc/Module/Install/WriteAll.pm
-SHA1 dc80a63ab75fad5aec9b0e7272cd3faae37f3882 lib/Mouse.pm
-SHA1 fb1efa8312ab493630c755a475326373d60effc3 lib/Mouse/Meta/Attribute.pm
-SHA1 7dd0fdd4e92bd83fbe65ebe710d31833a5c219f5 lib/Mouse/Meta/Class.pm
+SHA1 82d38667f9a9a01650ce3c8a7a05e1874d326b65 lib/Mouse.pm
+SHA1 dd64888aa962c46ddaaa8a4ad9b11c07db1b92bf lib/Mouse/Meta/Attribute.pm
+SHA1 689fb6855cb15c0e5435f549ff36bdccab0348ac lib/Mouse/Meta/Class.pm
 SHA1 3e6576c01ec63d84e6b02517a4892972462a41be lib/Mouse/Meta/Role.pm
 SHA1 5a37a25a53f8c9fac7cf3c24ce0fd26eb6c607d5 lib/Mouse/Object.pm
 SHA1 584a954b0120ac144ca0fe65513e36a976cd4442 lib/Mouse/Role.pm
@@ -52,7 +52,7 @@ SHA1 5e85e6d35f5d03c014f610cac035676d2155cd7a t/012-predicate.t
 SHA1 39a66c96917c2527f1deff41c91e364a0266a6f7 t/013-clearer.t
 SHA1 0e560fde3e2c77f62bbd7c7f3977cdd57e7906d5 t/014-build.t
 SHA1 033c560abe877e23fdc4a9f08bc5d23effd14fbf t/015-demolish.t
-SHA1 bd0ea7a69768deac3a431f2cd477d6379535ac95 t/016-trigger.t
+SHA1 a0a2e7e81a1e276efb7173cdbac562590111ca64 t/016-trigger.t
 SHA1 27dd3a6273d0af8d0ac0e6d6299c7071fc95a02b t/017-default-reference.t
 SHA1 0b6abce6c30d2202f2d1e67e711e539da10011a3 t/018-multiattr-has.t
 SHA1 e68ac7b07548007b5d67f1735bd613c1280f87ec t/019-handles.t
@@ -71,7 +71,7 @@ SHA1 8b1dd39e9d620b6f3d62c4997d6b768ff3773644 t/031-clone.t
 SHA1 bcf6dd6814486bc12df83cb8e94cfe4eb1d41c2f t/032-buildargs.t
 SHA1 1593a1a3d5fbf80860458f57e6e0e4c87765aab1 t/100-meta-class.t
 SHA1 f0a424e0a9d9b9ee446413c284bfb833e18adaca t/101-meta-attribute.t
-SHA1 f28169e53bfbf6cf71bf00cef228e593a7ca0661 t/201-squirrel.t
+SHA1 b686298591ef3d2164aace5bee1c2e0c45f54aef t/201-squirrel.t
 SHA1 7ad3ba36f765a409e7a993204f13d783bd0efc63 t/202-squirrel-role.t
 SHA1 50fcda4b9cc4d6fb122c0776b815e9dd357782a2 t/301-bugs-non-mouse.t
 SHA1 276e98b356cb7271e500d484271b030342bd7645 t/400-define-role.t
@@ -82,7 +82,7 @@ SHA1 0c072795eae43702dc7f04267421c9a9b2dfdaac t/lib/Anti/MouseError.pm
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (Darwin)
 
-iD8DBQFIft6AsxfQtHhyRPoRAnjUAKCUXtIbqEGTIcuZ41IPtrPnk7Q7KgCeLtLb
-AH2SZl0zAtzWzwkuBMZi0+M=
-=v29C
+iD8DBQFIhsxrsxfQtHhyRPoRAuUDAJ9j8nxkC/YZzl0mw15KahXUDCio8gCfZI2P
+rrp/ESvsgW98525Un7Qln5w=
+=CCtu
 -----END PGP SIGNATURE-----

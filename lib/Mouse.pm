@@ -3,7 +3,7 @@ package Mouse;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 use 5.006;
 
 use Sub::Exporter;
@@ -340,20 +340,11 @@ L</handles>, such as regular expression and coderef, are not yet supported.
 
 Lets you automatically weaken any reference stored in the attribute.
 
-=item trigger => CodeRef | HashRef
+=item trigger => CodeRef
 
-Triggers are like method modifiers for setting attribute values. You can have
-a "before" and an "after" trigger, each of which receive as arguments the instance, the new value, and the attribute metaclass. Historically, triggers have
-only been "after" modifiers, so if you use a coderef for the C<trigger> option,
-it will maintain that compatibility. Like method modifiers, you can't really
-affect the act of setting the attribute value, and the return values of the 
-modifiers are ignored.
+Any time the attribute's value is set (either through the accessor or the constructor), the trigger is called on it. The trigger receives as arguments the instance, the new value, and the attribute instance.
 
-There's also an "around" trigger which you can use to change the value that
-is being set on the attribute, or even prevent the attribute from being
-updated. The around trigger receives as arguments a code reference to invoke
-to set the attribute's value (which expects as arguments the instance and
-the new value), the instance, the new value, and the attribute metaclass.
+Mouse 0.05 supported more complex triggers, but this behavior is now deprecated.
 
 =item builder => Str
 

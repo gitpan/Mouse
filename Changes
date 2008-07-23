@@ -1,5 +1,18 @@
 Revision history for Mouse
 
+0.06 Thu Jul 23 02:10:07 2008
+    * Deprecating before/after/around triggers! Switch back to coderef +
+      whatever you used to do. Moose is have it implemented it as an extension
+      trait.
+
+    * Mouse
+      - updated trigger doc (thanks perigrin)
+        - which will not see CPAN :( sorry perigrin!
+
+    * Mouse::Meta::Class
+      - add a make_immutable method which does nothing(!), for even more
+        Moose compat (nothingmuch's idea)
+
 0.05 Thu Jul 17 01:53:20 2008
     * Mouse::Role
       Mouse::Meta::Role
