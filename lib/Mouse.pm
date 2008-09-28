@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 use 5.006;
 
 use Carp 'confess';
@@ -196,12 +196,18 @@ Mouse aims to alleviate this by providing a subset of Moose's
 functionality, faster. In particular, L<Moose/has> is missing only a few
 expert-level features.
 
+We're also going as light on dependencies as possible. Most functions we use
+from L<Scalar::Util> are copied into this dist. L<Scalar::Util> is required if
+you'd like weak references; there's simply no way to do it from pure Perl.
+L<Class::Method::Modifiers> is required if you want support for L</before>,
+L</after>, and L</around>.
+
 =head2 MOOSE COMPAT
 
 Compatibility with Moose has been the utmost concern. Fewer than 1% of the
 tests fail when run against Moose instead of Mouse. Mouse code coverage is also
-over 97%. Even the error messages are taken from Moose. The Mouse code just
-runs the test suite 3x-4x faster.
+over 96%. Even the error messages are taken from Moose. The Mouse code just
+runs the test suite 4x faster.
 
 The idea is that, if you need the extra power, you should be able to run
 C<s/Mouse/Moose/g> on your codebase and have nothing break. To that end,
@@ -252,15 +258,21 @@ Sets this class' superclasses.
 Installs a "before" method modifier. See L<Moose/before> or
 L<Class::Method::Modifiers/before>.
 
+Use of this feature requires L<Class::Method::Modifiers>!
+
 =head2 after (method|methods) => Code
 
 Installs an "after" method modifier. See L<Moose/after> or
 L<Class::Method::Modifiers/after>.
 
+Use of this feature requires L<Class::Method::Modifiers>!
+
 =head2 around (method|methods) => Code
 
 Installs an "around" method modifier. See L<Moose/around> or
 L<Class::Method::Modifiers/around>.
+
+Use of this feature requires L<Class::Method::Modifiers>!
 
 =head2 has (name|names) => parameters
 
@@ -326,11 +338,13 @@ L</handles>, such as regular expression and coderef, are not yet supported.
 
 Lets you automatically weaken any reference stored in the attribute.
 
+Use of this feature requires L<Scalar::Util>!
+
 =item trigger => CodeRef
 
 Any time the attribute's value is set (either through the accessor or the constructor), the trigger is called on it. The trigger receives as arguments the instance, the new value, and the attribute instance.
 
-Mouse 0.05 supported more complex triggers, but this behavior is now deprecated.
+Mouse 0.05 supported more complex triggers, but this behavior is now removed.
 
 =item builder => Str
 
@@ -384,6 +398,8 @@ locally-defined method.
 =head1 AUTHOR
 
 Shawn M Moore, C<< <sartak at gmail.com> >>
+
+Yuval Kogman, C<< <nothingmuch at woobling.org> >>
 
 with plenty of code borrowed from L<Class::MOP> and L<Moose>
 

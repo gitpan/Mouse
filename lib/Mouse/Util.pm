@@ -9,20 +9,17 @@ our %dependencies = (
 
 #       VVVVV   CODE TAKEN FROM SCALAR::UTIL   VVVVV
         'blessed' => do {
-            do {
-                no strict 'refs';
-                *UNIVERSAL::a_sub_not_likely_to_be_here = sub {
-                    my $ref = ref($_[0]);
+            *UNIVERSAL::a_sub_not_likely_to_be_here = sub {
+                my $ref = ref($_[0]);
 
-                    # deviation from Scalar::Util
-                    # XS returns undef, PP returns GLOB.
-                    # let's make that more consistent by having PP return
-                    # undef if it's a GLOB. :/
+                # deviation from Scalar::Util
+                # XS returns undef, PP returns GLOB.
+                # let's make that more consistent by having PP return
+                # undef if it's a GLOB. :/
 
-                    # \*STDOUT would be allowed as an object in PP blessed
-                    # but not XS
-                    return $ref eq 'GLOB' ? undef : $ref;
-                };
+                # \*STDOUT would be allowed as an object in PP blessed
+                # but not XS
+                return $ref eq 'GLOB' ? undef : $ref;
             };
 
             sub {
@@ -122,17 +119,81 @@ our %dependencies = (
         },
 #       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
     },
+#       VVVVV   CODE TAKEN FROM TEST::EXCEPTION   VVVVV
+    'Test::Exception' => do {
+
+        my $Tester = Test::Builder->new;
+
+        my $is_exception = sub {
+            my $exception = shift;
+            return ref $exception || $exception ne '';
+        };
+
+        my $exception_as_string = sub {
+            my ( $prefix, $exception ) = @_;
+            return "$prefix normal exit" unless $is_exception->( $exception );
+            my $class = ref $exception;
+            $exception = "$class ($exception)"
+                    if $class && "$exception" !~ m/^\Q$class/;
+            chomp $exception;
+            return "$prefix $exception";
+        };
+        my $try_as_caller = sub {
+            my $coderef = shift;
+            eval { $coderef->() };
+            $@;
+        };
+
+        {
+            'throws_ok' => sub (&$;$) {
+                my ( $coderef, $expecting, $description ) = @_;
+                Carp::croak "throws_ok: must pass exception class/object or regex"
+                    unless defined $expecting;
+                $description = $exception_as_string->( "threw", $expecting )
+                    unless defined $description;
+                my $exception = $try_as_caller->($coderef);
+
+                my $regex = $Tester->maybe_regex( $expecting );
+                my $ok = $regex
+                    ? ( $exception =~ m/$regex/ )
+                    : eval {
+                        $exception->isa( ref $expecting ? ref $expecting : $expecting )
+                    };
+                $Tester->ok( $ok, $description );
+                unless ( $ok ) {
+                    $Tester->diag( $exception_as_string->( "expecting:", $expecting ) );
+                    $Tester->diag( $exception_as_string->( "found:", $exception ) );
+                };
+                $@ = $exception;
+                return $ok;
+            },
+            'lives_ok' => sub (&;$) {
+                my ( $coderef, $description ) = @_;
+                my $exception = $try_as_caller->( $coderef );
+                my $ok = $Tester->ok( ! $is_exception->( $exception ), $description );
+                $Tester->diag( $exception_as_string->( "died:", $exception ) ) unless $ok;
+                $@ = $exception;
+                return $ok;
+            },
+        },
+    },
 );
 
+our %loaded;
+
 our @EXPORT_OK = map { keys %$_ } values %dependencies;
+our %EXPORT_TAGS = (
+    all  => \@EXPORT_OK,
+    test => [qw/throws_ok lives_ok/],
+);
 
 for my $module_name (keys %dependencies) {
-    (my $file = "$module_name.pm") =~ s{::}{/}g;
-
     my $loaded = do {
         local $SIG{__DIE__} = 'DEFAULT';
-        eval "require '$file'; 1";
+        eval "require $module_name; 1";
     };
+
+    $loaded{$module_name} = $loaded;
 
     for my $method_name (keys %{ $dependencies{ $module_name } }) {
         my $producer = $dependencies{$module_name}{$method_name};
@@ -182,6 +243,12 @@ Mouse::Util - features, with or without their dependencies
 
 C<weaken> I<must> be implemented in XS. If the user tries to use C<weaken>
 without L<Scalar::Util>, an error is thrown.
+
+=head2 Test::Exception
+
+=head3 throws_ok
+
+=head3 lives_ok
 
 =cut
 
