@@ -3,10 +3,8 @@ package Mouse::Meta::Class;
 use strict;
 use warnings;
 
-use Scalar::Util 'blessed';
+use Mouse::Util qw/get_linear_isa blessed/;
 use Carp 'confess';
-
-use MRO::Compat;
 
 do {
     my %METACLASS_CACHE;
@@ -93,7 +91,7 @@ sub get_attribute_map { $_[0]->{attributes} }
 sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     { $_[0]->{attributes}->{$_[1]} }
 
-sub linearized_isa { @{ mro::get_linear_isa($_[0]->name) } }
+sub linearized_isa { @{ get_linear_isa($_[0]->name) } }
 
 sub clone_object {
     my $class    = shift;
@@ -126,6 +124,42 @@ sub clone_instance {
 }
 
 sub make_immutable {}
+sub is_immutable { 0 }
+
+sub attribute_metaclass { "Mouse::Meta::Class" }
+
+sub add_before_method_modifier {
+    my ($self, $name, $code) = @_;
+    require Class::Method::Modifiers;
+    Class::Method::Modifiers::_install_modifier(
+        $self->name,
+        'before',
+        $name,
+        $code,
+    );
+}
+
+sub add_around_method_modifier {
+    my ($self, $name, $code) = @_;
+    require Class::Method::Modifiers;
+    Class::Method::Modifiers::_install_modifier(
+        $self->name,
+        'around',
+        $name,
+        $code,
+    );
+}
+
+sub add_after_method_modifier {
+    my ($self, $name, $code) = @_;
+    require Class::Method::Modifiers;
+    Class::Method::Modifiers::_install_modifier(
+        $self->name,
+        'after',
+        $name,
+        $code,
+    );
+}
 
 1;
 

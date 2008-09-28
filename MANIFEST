@@ -14,6 +14,7 @@ lib/Mouse/Meta/Role.pm
 lib/Mouse/Object.pm
 lib/Mouse/Role.pm
 lib/Mouse/TypeRegistry.pm
+lib/Mouse/Util.pm
 lib/Squirrel.pm
 lib/Squirrel/Role.pm
 Makefile.PL
@@ -62,5 +63,7 @@ t/301-bugs-non-mouse.t
 t/400-define-role.t
 t/401-meta-role.t
 t/402-attribute-application.t
+t/403-method-modifiers.t
+t/500_moose_extends_mouse.t
 t/lib/Anti/Mouse.pm
 t/lib/Anti/MouseError.pm
