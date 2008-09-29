@@ -1,3 +1,4 @@
+author/generate-mouse-tiny.pl
 Changes
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
@@ -13,6 +14,7 @@ lib/Mouse/Meta/Class.pm
 lib/Mouse/Meta/Role.pm
 lib/Mouse/Object.pm
 lib/Mouse/Role.pm
+lib/Mouse/Tiny.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
 lib/Squirrel.pm
@@ -65,5 +67,8 @@ t/401-meta-role.t
 t/402-attribute-application.t
 t/403-method-modifiers.t
 t/500_moose_extends_mouse.t
+t/600-tiny-tiny.t
+t/601-tiny-mouse.t
+t/602-mouse-tiny.t
 t/lib/Anti/Mouse.pm
 t/lib/Anti/MouseError.pm
