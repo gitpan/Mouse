@@ -17,6 +17,7 @@ lib/Mouse/Role.pm
 lib/Mouse/Tiny.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
+lib/ouse.pm
 lib/Squirrel.pm
 lib/Squirrel/Role.pm
 Makefile.PL
