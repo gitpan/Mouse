@@ -14,7 +14,7 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 fdf000e147c658e0c71d4a67b53823a02d232948 Changes
+SHA1 254275c2c70622b878f16f372538ea115fec9896 Changes
 SHA1 a5e2f3617d68e03ef1cabecbfb2d7d056392e80e MANIFEST
 SHA1 335359d8f94217d2bb2bb920142e2bb69f405cb4 META.yml
 SHA1 8e9075a2329b302caa9794f77a3405cfb5dbae1f Makefile.PL
@@ -27,8 +27,8 @@ SHA1 da42b522e5a7ffbae0ceec900f3635ad9990c565 inc/Module/Install/Makefile.pm
 SHA1 ba005818ee9f97146bfa4e14e53c684e9e446902 inc/Module/Install/Metadata.pm
 SHA1 85e6b1cf5b7ca81bfb469a99389fa947d4b8a08e inc/Module/Install/Win32.pm
 SHA1 d32dff9f0d2f02023ca6d79a48d62fd855916351 inc/Module/Install/WriteAll.pm
-SHA1 741b0cfbaed069bd164f84ec28dae8b34a37debb lib/Mouse.pm
-SHA1 705e4fcc639495b4c5a647636d2f4f7198150914 lib/Mouse/Meta/Attribute.pm
+SHA1 f1d0ac1fbe33219835398da07e75dbb2d2bb8842 lib/Mouse.pm
+SHA1 577d0256db9a0c6efee6776aee5f0ee42b6ea398 lib/Mouse/Meta/Attribute.pm
 SHA1 a19e7efdb27e298daca58fe71b06c4d8e3f9eeae lib/Mouse/Meta/Class.pm
 SHA1 0236f03d46d8f3161c92114616e0b9928e724ef0 lib/Mouse/Meta/Role.pm
 SHA1 c9a9f91760837221bd9096b7ed91e089d8e4a4cc lib/Mouse/Object.pm
@@ -91,7 +91,7 @@ SHA1 0c072795eae43702dc7f04267421c9a9b2dfdaac t/lib/Anti/MouseError.pm
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (Darwin)
 
-iD8DBQFJB59EsxfQtHhyRPoRAlhiAJ0bD9V+nSVr+YJuJJThMaUnvgkuHACfQ/VT
-hZrrWxhol051+MU79b5H3Ug=
-=AO3E
+iD8DBQFJDdjBsxfQtHhyRPoRAlgLAJwKNNCmOgIx2HupvOyxSr7xUr0Q7wCdEQ0d
+bUgSJlQqd25RVCuXCkwBapY=
+=7/Kp
 -----END PGP SIGNATURE-----
