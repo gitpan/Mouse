@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 use 5.006;
 
 use Carp 'confess';
@@ -359,6 +359,11 @@ Allows you to automatically dereference ArrayRef and HashRef attributes in list
 context. In scalar context, the reference is returned (NOT the list length or
 bucket status). You must specify an appropriate type constraint to use
 auto_deref.
+
+=item lazy_build => 0|1
+
+Automatically define lazy => 1 as well as builder => "_build_$attr", clearer =>
+"clear_$attr', predicate => 'has_$attr' unless they are already defined.
 
 =back
 

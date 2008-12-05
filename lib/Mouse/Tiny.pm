@@ -7,6 +7,7 @@ eval q{
 
 # tell Perl we already have all of the Mouse files loaded:
 $INC{'Mouse.pm'} = __FILE__;
+$INC{'ouse.pm'} = __FILE__;
 $INC{'Mouse/Object.pm'} = __FILE__;
 $INC{'Mouse/Role.pm'} = __FILE__;
 $INC{'Mouse/TypeRegistry.pm'} = __FILE__;
@@ -140,7 +141,7 @@ BEGIN {
 #       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
         },
 #       VVVVV   CODE TAKEN FROM TEST::EXCEPTION   VVVVV
-        'Test::Exception' => do {
+        'Test::Exception 0.27' => do {
 
             my $Tester;
 
@@ -212,16 +213,18 @@ BEGIN {
         test => [qw/throws_ok lives_ok/],
     );
 
-    for my $module_name (keys %dependencies) {
+    for my $module (keys %dependencies) {
+        my ($module_name, $version) = split ' ', $module;
+
         my $loaded = do {
             local $SIG{__DIE__} = 'DEFAULT';
-            eval "require $module_name; 1";
+            eval "use $module (); 1";
         };
 
         $loaded{$module_name} = $loaded;
 
-        for my $method_name (keys %{ $dependencies{ $module_name } }) {
-            my $producer = $dependencies{$module_name}{$method_name};
+        for my $method_name (keys %{ $dependencies{ $module } }) {
+            my $producer = $dependencies{$module}{$method_name};
             my $implementation;
 
             if (ref($producer) eq 'HASH') {
@@ -246,7 +249,7 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-our $VERSION = '0.09';
+our $VERSION = '0.12';
 use 5.006;
 
 use Carp 'confess';
@@ -438,94 +441,114 @@ sub _create_args {
     $_[0]->{_create_args}
 }
 
+sub inlined_name {
+    my $self = shift;
+    my $name = $self->name;
+    my $key   = "'" . $name . "'";
+    return $key;
+}
+
 sub generate_accessor {
     my $attribute = shift;
 
-    my $name       = $attribute->name;
-    my $key        = $name;
-    my $default    = $attribute->default;
-    my $type       = $attribute->type_constraint;
-    my $constraint = $attribute->find_type_constraint;
-    my $builder    = $attribute->builder;
-    my $trigger    = $attribute->trigger;
+    my $name         = $attribute->name;
+    my $default      = $attribute->default;
+    my $type         = $attribute->type_constraint;
+    my $constraint   = $attribute->find_type_constraint;
+    my $builder      = $attribute->builder;
+    my $trigger      = $attribute->trigger;
+    my $is_weak      = $attribute->is_weak_ref;
+    my $should_deref = $attribute->should_auto_deref;
 
-    my $accessor = 'sub {
-        my $self = shift;';
+    my $self  = '$_[0]';
+    my $key   = $attribute->inlined_name;
 
+    my $accessor = "sub {\n";
     if ($attribute->_is_metadata eq 'rw') {
-        $accessor .= 'if (@_) {
-            local $_ = $_[0];';
+        $accessor .= 'if (scalar(@_) >= 2) {' . "\n";
+
+        my $value = '$_[1]';
 
         if ($constraint) {
-            $accessor .= 'unless ($constraint->()) {
+            $accessor .= 'local $_ = '.$value.';
+                unless ($constraint->()) {
                     my $display = defined($_) ? overload::StrVal($_) : "undef";
                     Carp::confess("Attribute ($name) does not pass the type constraint because: Validation failed for \'$type\' failed with value $display");
-            }'
+            }' . "\n"
         }
 
-        $accessor .= '$self->{$key} = $_;';
+        # if there's nothing left to do for the attribute we can return during
+        # this setter
+        $accessor .= 'return ' if !$is_weak && !$trigger && !$should_deref;
 
-        if ($attribute->is_weak_ref) {
-            $accessor .= 'weaken($self->{$key}) if ref($self->{$key});';
+        $accessor .= $self.'->{'.$key.'} = '.$value.';' . "\n";
+
+        if ($is_weak) {
+            $accessor .= 'weaken('.$self.'->{'.$key.'}) if ref('.$self.'->{'.$key.'});' . "\n";
         }
 
         if ($trigger) {
-            $accessor .= '$trigger->($self, $_, $attribute);';
+            $accessor .= '$trigger->('.$self.', '.$value.', $attribute);' . "\n";
         }
 
-        $accessor .= '}';
+        $accessor .= "}\n";
     }
     else {
-        $accessor .= 'confess "Cannot assign a value to a read-only accessor" if @_;';
+        $accessor .= 'confess "Cannot assign a value to a read-only accessor" if scalar(@_) >= 2;' . "\n";
     }
 
     if ($attribute->is_lazy) {
-        $accessor .= '$self->{$key} = ';
+        $accessor .= $self.'->{'.$key.'} = ';
 
         $accessor .= $attribute->has_builder
-                   ? '$self->$builder'
-                     : ref($default) eq 'CODE'
-                     ? '$default->($self)'
-                     : '$default';
-
-        $accessor .= ' if !exists($self->{$key});';
+                ? $self.'->$builder'
+                    : ref($default) eq 'CODE'
+                    ? '$default->('.$self.')'
+                    : '$default';
+        $accessor .= ' if !exists '.$self.'->{'.$key.'};' . "\n";
     }
 
-    if ($attribute->should_auto_deref) {
+    if ($should_deref) {
         if ($attribute->type_constraint eq 'ArrayRef') {
             $accessor .= 'if (wantarray) {
-                return @{ $self->{$key} || [] };
+                return @{ '.$self.'->{'.$key.'} || [] };
             }';
         }
         else {
             $accessor .= 'if (wantarray) {
-                return %{ $self->{$key} || {} };
+                return %{ '.$self.'->{'.$key.'} || {} };
             }';
         }
     }
 
-    $accessor .= 'return $self->{$key};
+    $accessor .= 'return '.$self.'->{'.$key.'};
     }';
 
-    return eval $accessor;
+    my $sub = eval $accessor;
+    confess $@ if $@;
+    return $sub;
 }
 
 sub generate_predicate {
     my $attribute = shift;
-    my $key = $attribute->name;
+    my $key = $attribute->inlined_name;
 
-    my $predicate = 'sub { exists($_[0]->{$key}) }';
+    my $predicate = 'sub { exists($_[0]->{'.$key.'}) }';
 
-    return eval $predicate;
+    my $sub = eval $predicate;
+    confess $@ if $@;
+    return $sub;
 }
 
 sub generate_clearer {
     my $attribute = shift;
-    my $key = $attribute->name;
+    my $key = $attribute->inlined_name;
 
-    my $predicate = 'sub { delete($_[0]->{$key}) }';
+    my $clearer = 'sub { delete($_[0]->{'.$key.'}) }';
 
-    return eval $predicate;
+    my $sub = eval $clearer;
+    confess $@ if $@;
+    return $sub;
 }
 
 sub generate_handles {
@@ -544,6 +567,7 @@ sub generate_handles {
         }';
 
         $method_map{$local_method} = eval $method;
+        confess $@ if $@;
     }
 
     return \%method_map;
@@ -1193,6 +1217,22 @@ sub optimized_constraints {
 
         Object     => sub { blessed($_) && blessed($_) ne 'Regexp' },
     };
+}
+
+
+use strict;
+use warnings;
+
+BEGIN {
+    my $package;
+    sub import { 
+        $package = $_[1] || 'Class';
+        if ($package =~ /^\+/) {
+            $package =~ s/^\+//;
+            eval "require $package; 1" or die;
+        }
+    }
+    use Filter::Simple sub { s/^/package $package;\nuse Mouse;\n/; }
 }
 
 }; #eval

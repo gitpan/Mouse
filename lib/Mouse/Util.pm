@@ -122,7 +122,7 @@ BEGIN {
 #       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
         },
 #       VVVVV   CODE TAKEN FROM TEST::EXCEPTION   VVVVV
-        'Test::Exception' => do {
+        'Test::Exception 0.27' => do {
 
             my $Tester;
 
@@ -182,6 +182,16 @@ BEGIN {
                     $@ = $exception;
                     return $ok;
                 },
+                'dies_ok' => sub (&;$) {
+                    my ( $coderef, $description ) = @_;
+                    my $exception = $try_as_caller->( $coderef );
+
+                    $Tester ||= Test::Builder->new;
+
+                    my $ok = $Tester->ok( $is_exception->( $exception ), $description );
+                    $@ = $exception;
+                    return $ok;
+                },
             },
         },
     );
@@ -191,19 +201,21 @@ BEGIN {
     our @EXPORT_OK = map { keys %$_ } values %dependencies;
     our %EXPORT_TAGS = (
         all  => \@EXPORT_OK,
-        test => [qw/throws_ok lives_ok/],
+        test => [qw/throws_ok lives_ok dies_ok/],
     );
 
-    for my $module_name (keys %dependencies) {
+    for my $module (keys %dependencies) {
+        my ($module_name, $version) = split ' ', $module;
+
         my $loaded = do {
             local $SIG{__DIE__} = 'DEFAULT';
-            eval "require $module_name; 1";
+            eval "use $module (); 1";
         };
 
         $loaded{$module_name} = $loaded;
 
-        for my $method_name (keys %{ $dependencies{ $module_name } }) {
-            my $producer = $dependencies{$module_name}{$method_name};
+        for my $method_name (keys %{ $dependencies{ $module } }) {
+            my $producer = $dependencies{$module}{$method_name};
             my $implementation;
 
             if (ref($producer) eq 'HASH') {
@@ -255,6 +267,8 @@ without L<Scalar::Util>, an error is thrown.
 =head2 Test::Exception
 
 =head3 throws_ok
+
+=head3 dies_ok
 
 =head3 lives_ok
 
