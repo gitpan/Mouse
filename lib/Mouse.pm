@@ -1,14 +1,23 @@
-#!/usr/bin/env perl
 package Mouse;
 use strict;
 use warnings;
+use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 use 5.006;
 
+BEGIN {
+    if ($ENV{MOUSE_DEBUG}) {
+        *DEBUG = sub (){ 1 };
+    } else {
+        *DEBUG = sub (){ 0 };
+    }
+}
+
 use Carp 'confess';
-use Mouse::Util 'blessed';
+use Scalar::Util 'blessed';
+use Mouse::Util;
 
 use Mouse::Meta::Attribute;
 use Mouse::Meta::Class;
@@ -66,17 +75,12 @@ sub around {
 }
 
 sub with {
-    my $meta = Mouse::Meta::Class->initialize(caller);
-
-    my $role  = shift;
-
-    confess "Mouse::Role only supports 'with' on individual roles at a time" if @_;
-
-    Mouse::load_class($role);
-    $role->meta->apply($meta);
+    Mouse::Util::apply_all_roles((caller)[0], @_);
 }
 
 sub import {
+    my $class = shift;
+
     strict->import;
     warnings->import;
 
@@ -90,7 +94,15 @@ sub import {
     no warnings 'redefine';
     *{$caller.'::meta'} = sub { $meta };
 
-    Mouse->export_to_level(1, @_);
+    if (@_) {
+        __PACKAGE__->export_to_level( 1, $class, @_);
+    } else {
+        # shortcut for the common case of no type character
+        no strict 'refs';
+        for my $keyword (@EXPORT) {
+            *{ $caller . '::' . $keyword } = *{__PACKAGE__ . '::' . $keyword};
+        }
+    }
 }
 
 sub unimport {
@@ -110,6 +122,7 @@ sub load_class {
         confess "Invalid class name ($display)";
     }
 
+    return 1 if $class eq 'Mouse::Object';
     return 1 if is_class_loaded($class);
 
     (my $file = "$class.pm") =~ s{::}{/}g;
@@ -401,11 +414,15 @@ Returns whether this class is actually loaded or not. It uses a heuristic which
 involves checking for the existence of C<$VERSION>, C<@ISA>, and any
 locally-defined method.
 
-=head1 AUTHOR
+=head1 AUTHORS
 
 Shawn M Moore, C<< <sartak at gmail.com> >>
 
 Yuval Kogman, C<< <nothingmuch at woobling.org> >>
+
+tokuhirom
+
+Yappo
 
 with plenty of code borrowed from L<Class::MOP> and L<Moose>
 
