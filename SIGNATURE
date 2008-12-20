@@ -14,7 +14,7 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 95bda5781f83a3b29adeeda8d7a31e12a7146055 Changes
+SHA1 15f809e60d0e0bc61838e1ca93f11927cff6cce7 Changes
 SHA1 631696386a824a06a84e3ed2a72b36c800050def MANIFEST
 SHA1 335359d8f94217d2bb2bb920142e2bb69f405cb4 META.yml
 SHA1 739ec327f9abe6e0fc5f9dc7bc62607c562d4081 Makefile.PL
@@ -31,7 +31,7 @@ SHA1 85e6b1cf5b7ca81bfb469a99389fa947d4b8a08e inc/Module/Install/Win32.pm
 SHA1 d32dff9f0d2f02023ca6d79a48d62fd855916351 inc/Module/Install/WriteAll.pm
 SHA1 29ccdbe057fec4775456b275262881a6f79531d6 inc/Test/Exception.pm
 SHA1 ab0c02dbe66a1a82be1cc3909a06b41d3e5894c2 inc/Test/More.pm
-SHA1 61cf2ab9499d44ef59ac5525b42d8989c25d5512 lib/Mouse.pm
+SHA1 79a226e0440c54d459e880b794f08dadb4e7b6a1 lib/Mouse.pm
 SHA1 a88a685b45ddaafcd9e2bd078d93e45d85a59ee3 lib/Mouse/Meta/Attribute.pm
 SHA1 1d5674da4b97d90c4ee803a85c60f5e25070d767 lib/Mouse/Meta/Class.pm
 SHA1 99df4c557495a541056807bae2aa1c454884831a lib/Mouse/Meta/Method/Constructor.pm
@@ -39,10 +39,10 @@ SHA1 8feddf4deaee14d9c1f69eff8d0c986222e90dde lib/Mouse/Meta/Method/Destructor.p
 SHA1 d7d068b3351d7c599ea0caf7f08e3d1a6903e123 lib/Mouse/Meta/Role.pm
 SHA1 054e2da6e4b6cbf59f8bd80e4441c4865e66c8fd lib/Mouse/Object.pm
 SHA1 27b592ee86d85d3473525718c22aa2eca177115b lib/Mouse/Role.pm
-SHA1 20f48611c7d24124f21f085ebe1f15ddc45858f2 lib/Mouse/Tiny.pm
+SHA1 d8e0247160f02d5e3bcd7a3e9fd59444d0a84383 lib/Mouse/Tiny.pm
 SHA1 c7886594030734dfaec2e008863ca17458168c7d lib/Mouse/TypeRegistry.pm
 SHA1 f1861be095458741b1a176f70ba2cc83ea13965e lib/Mouse/Util.pm
-SHA1 293b8fe6537b33d54bead307fe4d8917c3893da7 lib/MouseX/Types.pm
+SHA1 e112259dbb69d0351974528db8b4f49d331b89a2 lib/MouseX/Types.pm
 SHA1 71b80631f57738b3205bf90bbdbd8cb2f4593c71 lib/MouseX/Types/Mouse.pm
 SHA1 00024430875004de978330dc783cd7533c648c8a lib/MouseX/Types/TypeDecorator.pm
 SHA1 a71529ed650b37c094787f62e859726a9624d0e8 lib/Squirrel.pm
@@ -130,7 +130,7 @@ SHA1 e4f152b946efb3a39d27f3e708d0f5a49fba42b4 t/lib/ClassType_Foo.pm
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (Darwin)
 
-iD8DBQFJR1QRsxfQtHhyRPoRApbuAKCYoQ/zJKZvQr9X5w2mX37tENqG0gCfZAsS
-b5RiBoZASMsH4mPVOeJIEXM=
-=gEP/
+iD8DBQFJTWnHsxfQtHhyRPoRAkHSAJ0aqBCUeWYfmLXAp2EOwt4k9b0fxQCgi1g7
+wQ2rslgwTAIPSKvRFeOiuK4=
+=PnYQ
 -----END PGP SIGNATURE-----
