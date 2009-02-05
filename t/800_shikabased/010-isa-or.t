@@ -5,8 +5,8 @@ use Test::More tests => 18;
 {   
     package Foo;
     use Mouse;
-    use Mouse::TypeRegistry;
-    subtype Baz => where { defined($_) && $_ eq 'Baz' };
+    use Mouse::Util::TypeConstraints;
+    type Baz => where { defined($_) && $_ eq 'Baz' };
     coerce Baz => from 'ArrayRef', via { 'Baz' };
     has 'bar' => ( is => 'rw', isa => 'Str | Baz | Undef', coerce => 1 );
 }
@@ -14,7 +14,7 @@ use Test::More tests => 18;
 eval {
     Foo->new( bar => +{} );
 };
-ok $@, 'not got an object';
+like($@, qr/^Attribute \(bar\) does not pass the type constraint because: Validation failed for 'Str\|Baz\|Undef' failed with value HASH\(\w+\)/, 'type constraint and coercion failed');
 
 eval {
     isa_ok(Foo->new( bar => undef ), 'Foo');
@@ -51,12 +51,12 @@ is $f->bar, undef, 'bar is undef';
 {   
     package Bar;
     use Mouse;
-    use Mouse::TypeRegistry;
+    use Mouse::Util::TypeConstraints;
 
-    subtype 'Type1' => where { defined($_) && $_ eq 'Name' };
+    type 'Type1' => where { defined($_) && $_ eq 'Name' };
     coerce 'Type1', from 'Str', via { 'Names' };
 
-    subtype 'Type2' => where { defined($_) && $_ eq 'Group' };
+    type 'Type2' => where { defined($_) && $_ eq 'Group' };
     coerce 'Type2', from 'Str', via { 'Name' };
 
     has 'foo' => ( is => 'rw', isa => 'Type1|Type2', coerce => 1 );
@@ -72,20 +72,20 @@ is $foo->foo, 'Name', 'foo is Name';
     sub new { bless {}, shift };
 }
 {   
-    package Baz;
+    package Funk;
     use Mouse;
-    use Mouse::TypeRegistry;
+    use Mouse::Util::TypeConstraints;
 
-    subtype 'Type3' => where { defined($_) && $_ eq 'Name' };
+    type 'Type3' => where { defined($_) && $_ eq 'Name' };
     coerce 'Type3', from 'CodeRef', via { 'Name' };
 
     has 'foo' => ( is => 'rw', isa => 'Type3|KLASS|Undef', coerce => 1 );
 }
 
-eval { Baz->new( foo => 'aaa' ) };
+eval { Funk->new( foo => 'aaa' ) };
 like $@, qr/Attribute \(foo\) does not pass the type constraint because: Validation failed for 'Type3\|KLASS\|Undef' failed with value aaa/;
 
-my $k = Baz->new;
+my $k = Funk->new;
 ok $k, 'got an object 4';
 $k->foo(sub {});
 is $k->foo, 'Name', 'foo is Name';

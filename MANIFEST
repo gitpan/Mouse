@@ -1,5 +1,6 @@
 author/benchmarks/basic.pl
 author/generate-mouse-tiny.pl
+author/munge-tests-for-moose.pl
 Changes
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
@@ -23,9 +24,7 @@ lib/Mouse/Role.pm
 lib/Mouse/Tiny.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
-lib/MouseX/Types.pm
-lib/MouseX/Types/Mouse.pm
-lib/MouseX/Types/TypeDecorator.pm
+lib/Mouse/Util/TypeConstraints.pm
 lib/ouse.pm
 lib/Squirrel.pm
 lib/Squirrel/Role.pm
@@ -73,6 +72,11 @@ t/034-apply_all_roles.t
 t/035-apply-roles-to-roles.t
 t/036-with-method-alias.t
 t/037-dont-load-test-exception.t
+t/038-main.t
+t/039-subtype.t
+t/040-existing-subclass.t
+t/041-enum.t
+t/042-override.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t
@@ -95,7 +99,6 @@ t/602-mouse-tiny.t
 t/603-octal-defaults.t
 t/800_shikabased/001-coerce.t
 t/800_shikabased/002-coerce_multi_class.t
-t/800_shikabased/003-make_immutable.t
 t/800_shikabased/004-immutable-demolish.t
 t/800_shikabased/005-class_type.t
 t/800_shikabased/006-role_type.t
@@ -107,8 +110,6 @@ t/800_shikabased/011-util-linear-isa.t
 t/800_shikabased/012-role-compatibility.t
 t/800_shikabased/013-compatibility-get_method_list.t
 t/800_shikabased/014-subtype-as.t
-t/800_shikabased/801-mousex_types.t
-t/800_shikabased/802-mousex_types-isa-or.t
-t/lib/Anti/Mouse.pm
-t/lib/Anti/MouseError.pm
 t/lib/ClassType_Foo.pm
+t/lib/SyntaxError.pm
+t/lib/Unsweetened.pm

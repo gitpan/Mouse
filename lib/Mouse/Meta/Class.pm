@@ -63,6 +63,7 @@ sub add_method {
     my $pkg = $self->name;
 
     no strict 'refs';
+    no warnings 'redefine';
     $self->{'methods'}->{$name}++; # Moose stores meta object here.
     *{ $pkg . '::' . $name } = $code;
 }
@@ -75,7 +76,7 @@ sub get_method_list {
     no strict 'refs';
     # Get all the CODE symbol table entries
     my @functions =
-      grep !/^(?:has|with|around|before|after|blessed|extends|confess)$/,
+      grep !/^(?:has|with|around|before|after|blessed|extends|confess|override|super)$/,
       grep { defined &{"${name}::$_"} }
       keys %{"${name}::"};
     push @functions, keys %{$self->{'methods'}->{$name}};
@@ -144,10 +145,18 @@ sub clone_instance {
 
 sub make_immutable {
     my $self = shift;
-    my %args = @_;
+    my %args = (
+        inline_constructor => 1,
+        @_,
+    );
+
     my $name = $self->name;
     $self->{is_immutable}++;
-    $self->add_method('new' => Mouse::Meta::Method::Constructor->generate_constructor_method_inline( $self ));
+
+    if ($args{inline_constructor}) {
+        $self->add_method('new' => Mouse::Meta::Method::Constructor->generate_constructor_method_inline( $self ));
+    }
+
     if ($args{inline_destructor}) {
         $self->add_method('DESTROY' => Mouse::Meta::Method::Destructor->generate_destructor_method_inline( $self ));
     }
@@ -159,37 +168,40 @@ sub is_immutable { $_[0]->{is_immutable} }
 
 sub attribute_metaclass { "Mouse::Meta::Class" }
 
+sub _install_modifier {
+    my ( $self, $into, $type, $name, $code ) = @_;
+    if (eval "require Class::Method::Modifiers::Fast; 1") {
+        Class::Method::Modifiers::Fast::_install_modifier( 
+            $into,
+            $type,
+            $name,
+            $code
+        );
+    }
+    else {
+        require Class::Method::Modifiers;
+        Class::Method::Modifiers::_install_modifier( 
+            $into,
+            $type,
+            $name,
+            $code
+        );
+    }
+}
+
 sub add_before_method_modifier {
-    my ($self, $name, $code) = @_;
-    require Class::Method::Modifiers;
-    Class::Method::Modifiers::_install_modifier(
-        $self->name,
-        'before',
-        $name,
-        $code,
-    );
+    my ( $self, $name, $code ) = @_;
+    $self->_install_modifier( $self->name, 'before', $name, $code );
 }
 
 sub add_around_method_modifier {
-    my ($self, $name, $code) = @_;
-    require Class::Method::Modifiers;
-    Class::Method::Modifiers::_install_modifier(
-        $self->name,
-        'around',
-        $name,
-        $code,
-    );
+    my ( $self, $name, $code ) = @_;
+    $self->_install_modifier( $self->name, 'around', $name, $code );
 }
 
 sub add_after_method_modifier {
-    my ($self, $name, $code) = @_;
-    require Class::Method::Modifiers;
-    Class::Method::Modifiers::_install_modifier(
-        $self->name,
-        'after',
-        $name,
-        $code,
-    );
+    my ( $self, $name, $code ) = @_;
+    $self->_install_modifier( $self->name, 'after', $name, $code );
 }
 
 sub roles { $_[0]->{roles} }
@@ -208,12 +220,7 @@ sub does_role {
 }
 
 sub create {
-    my ( $class, @args ) = @_;
-
-    unshift @args, 'package' if @args % 2 == 1;
-
-    my (%options) = @args;
-    my $package_name = $options{package};
+    my ($self, $package_name, %options) = @_;
 
     (ref $options{superclasses} eq 'ARRAY')
         || confess "You must pass an ARRAY ref of superclasses"
@@ -228,9 +235,6 @@ sub create {
             if exists $options{methods};
 
     do {
-        # XXX should I implement Mouse::Meta::Module?
-        my $package_name = $options{package};
-
         ( defined $package_name && $package_name )
           || confess "You must pass a package name";
 
@@ -244,7 +248,7 @@ sub create {
         confess "creation of $package_name failed : $@" if $@;
     };
 
-    my (%initialize_options) = @args;
+    my %initialize_options = %options;
     delete @initialize_options{qw(
         package
         superclasses
@@ -253,11 +257,11 @@ sub create {
         version
         authority
     )};
-    my $meta = $class->initialize( $package_name => %initialize_options );
+    my $meta = $self->initialize( $package_name => %initialize_options );
 
     # FIXME totally lame
     $meta->add_method('meta' => sub {
-        $class->initialize(ref($_[0]) || $_[0]);
+        $self->initialize(ref($_[0]) || $_[0]);
     });
 
     $meta->superclasses(@{$options{superclasses}})
@@ -332,7 +336,7 @@ this class and its superclasses.
 Returns a mapping of attribute names to their corresponding
 L<Mouse::Meta::Attribute> objects.
 
-=head2 has_attribute Name -> Boool
+=head2 has_attribute Name -> Bool
 
 Returns whether we have a L<Mouse::Meta::Attribute> with the given name.
 

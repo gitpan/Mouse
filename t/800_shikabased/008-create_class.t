@@ -1,12 +1,13 @@
 use strict;
 use warnings;
-use Mouse;
+use Mouse ();
 use Test::More tests => 14;
 use Test::Exception;
 
 # error handling
 throws_ok {
     Mouse::Meta::Class->create(
+        "ClassName",
         superclasses => "foo"
     );
 } qr/You must pass an ARRAY ref of superclasses/;
@@ -14,12 +15,14 @@ throws_ok {
 
 throws_ok {
     Mouse::Meta::Class->create(
+        "ClassName",
         attributes => "foo"
     );
 } qr/You must pass an ARRAY ref of attributes/;
 
 throws_ok {
     Mouse::Meta::Class->create(
+        "ClassName",
         methods => "foo"
     );
 } qr/You must pass a HASH ref of methods/;
@@ -35,11 +38,14 @@ is FooBar->meta->name, "FooBar";
 
 isa_ok(
     Mouse::Meta::Class->create(
-        package      => "Baz",
+        "Baz",
         superclasses => [ "FooBar", "Mouse::Object" ],
         attributes   => [
             Mouse::Meta::Attribute->new(
-                name => "foo", is => "rw", default => "yay"
+                "foo" => (
+                    is => "rw",
+                    default => "yay",
+                ),
             )
         ],
         methods => {
@@ -60,9 +66,9 @@ is Baz->new()->dooo, "iiiit";
         }
     );
     isa_ok($meta, "Mouse::Meta::Class");
-    is $meta->name, "Mouse::Meta::Class::__ANON__::SERIAL::1";
+    like($meta->name, qr/Class::__ANON__::/);
     is $meta->name->new->dooo(), "iiiit";
 
     my $anon2 = Mouse::Meta::Class->create_anon_class();
-    is $anon2->name, "Mouse::Meta::Class::__ANON__::SERIAL::2";
+    like($anon2->name, qr/Class::__ANON__::/);
 }

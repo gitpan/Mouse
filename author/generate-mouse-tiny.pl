@@ -10,7 +10,13 @@ unlink 'lib/Mouse/Tiny.pm';
 my @files;
 
 find({
-    wanted => sub { push @files, $_ if -f $_ && !/Squirrel|MouseX|\.sw[po]$/ },
+    wanted => sub {
+        push @files, $_
+            if -f $_
+            && !/Squirrel/
+            && !/\bouse/
+            && !/\.sw[po]$/
+    },
     no_chdir => 1,
 }, 'lib');
 
@@ -21,7 +27,6 @@ for my $file (uniq 'lib/Mouse/Util.pm', sort @files) {
 
     $contents =~ s/__END__\b.*//s;          # remove documentation
     $contents =~ s/1;\n*$//;                # remove success indicator
-    $contents =~ s/^.*\n//;                 # remove shebang
 
     $contents =~ s/^use Mouse\S*\s*\n//mg;  # we're already loading everything
     $contents =~ s/^use (Mouse\S*)\s*(.+);/BEGIN { $1->import($2) }/mg;
