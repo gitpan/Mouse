@@ -69,9 +69,9 @@ sub add_method {
 }
 
 # copied from Class::Inspector
-sub get_method_list {
+my $get_methods_for_class = sub {
     my $self = shift;
-    my $name = $self->name;
+    my $name = shift;
 
     no strict 'refs';
     # Get all the CODE symbol table entries
@@ -79,8 +79,21 @@ sub get_method_list {
       grep !/^(?:has|with|around|before|after|blessed|extends|confess|override|super)$/,
       grep { defined &{"${name}::$_"} }
       keys %{"${name}::"};
-    push @functions, keys %{$self->{'methods'}->{$name}};
+    push @functions, keys %{$self->{'methods'}->{$name}} if $self;
     wantarray ? @functions : \@functions;
+};
+
+sub get_method_list {
+    my $self = shift;
+    $get_methods_for_class->($self, $self->name);
+}
+
+sub get_all_method_names {
+    my $self = shift;
+    my %uniq;
+    return grep { $uniq{$_}++ == 0 }
+            map { $get_methods_for_class->(undef, $_) }
+            $self->linearized_isa;
 }
 
 sub add_attribute {
@@ -160,6 +173,10 @@ sub make_immutable {
     if ($args{inline_destructor}) {
         $self->add_method('DESTROY' => Mouse::Meta::Method::Destructor->generate_destructor_method_inline( $self ));
     }
+
+    # Moose's make_immutable returns true allowing calling code to skip setting an explicit true value
+    # at the end of a source file. 
+    return 1;
 }
 
 sub make_mutable { confess "Mouse does not currently support 'make_mutable'" }
@@ -178,14 +195,16 @@ sub _install_modifier {
             $code
         );
     }
-    else {
-        require Class::Method::Modifiers;
+    elsif (eval "require Class::Method::Modifiers; 1") {
         Class::Method::Modifiers::_install_modifier( 
             $into,
             $type,
             $name,
             $code
         );
+    }
+    else {
+        Carp::croak("Method modifiers require the use of Class::Method::Modifiers. Please install it from CPAN and file a bug report with this application.");
     }
 }
 
