@@ -14,35 +14,36 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 65d9a337eb962257d71169e84461da81d7e950e0 Changes
-SHA1 cc5b8b3e9c343ee4255aac699cd2c9545d2db28e MANIFEST
+SHA1 42f8112ac442d396c2fe2fddaf52ca2ed73cfbea .gitignore
+SHA1 eef5c453564916359be23ef9eb6e36898db02d0d Changes
+SHA1 a09b608ca77135388faff53c4b3698ee511736ad MANIFEST
 SHA1 8abbaa4f6d2c3fc176c504426fc45cca6fbb0d7b META.yml
-SHA1 739ec327f9abe6e0fc5f9dc7bc62607c562d4081 Makefile.PL
+SHA1 dc1bf99d9424a6d4dbcee44306d1ec195646bea7 Makefile.PL
 SHA1 cc85b7cafbadec0483a5865da306b656682740eb author/benchmarks/basic.pl
 SHA1 a408c24efc701c368bbde43c020b29e1ebd80f64 author/generate-mouse-tiny.pl
 SHA1 ead9858dc8c0cedaa528be47343c9abb6bd4c6db author/munge-tests-for-moose.pl
-SHA1 8b836389e4bc170eb8d19b7296b2f4978ac36136 inc/Module/Install.pm
-SHA1 85b32a1d5f215d99f411c3dd6113b537fcd5c57d inc/Module/Install/Base.pm
-SHA1 fde745e180861c7c0ba3ee5a767cafdbdb1d3ebd inc/Module/Install/Can.pm
-SHA1 e259400ceb54c34def9c994f52d7091108ce7ffc inc/Module/Install/Fetch.pm
-SHA1 ecd277fcac91f6901ad652d5d58b515d0412b306 inc/Module/Install/Include.pm
-SHA1 da42b522e5a7ffbae0ceec900f3635ad9990c565 inc/Module/Install/Makefile.pm
-SHA1 ba005818ee9f97146bfa4e14e53c684e9e446902 inc/Module/Install/Metadata.pm
-SHA1 85e6b1cf5b7ca81bfb469a99389fa947d4b8a08e inc/Module/Install/Win32.pm
-SHA1 d32dff9f0d2f02023ca6d79a48d62fd855916351 inc/Module/Install/WriteAll.pm
+SHA1 ae018c4565c1277089ca8f1b28f888d95430cb7f inc/Module/Install.pm
+SHA1 4552acdfca8b78f8015d8449e1325616259095f5 inc/Module/Install/Base.pm
+SHA1 7fb663fff161fb45882b52edd62857bf15359658 inc/Module/Install/Can.pm
+SHA1 8b1d3db746faa6faf2d967a48d3812ec1f44b4c6 inc/Module/Install/Fetch.pm
+SHA1 d7ce736cdd05d5156d379ef39cca93beeeeba828 inc/Module/Install/Include.pm
+SHA1 9f6beaa2f4749ceb5dd0c9b0c647d0f3289c7b46 inc/Module/Install/Makefile.pm
+SHA1 92a3326557c4f557b12eb2c61d704bcdab2a1c70 inc/Module/Install/Metadata.pm
+SHA1 e9aa83f3e8b16ccfce544a90a57b63b70a497759 inc/Module/Install/Win32.pm
+SHA1 ade2ac0b0246d4d8e28fa46942e53f6925abda46 inc/Module/Install/WriteAll.pm
 SHA1 29ccdbe057fec4775456b275262881a6f79531d6 inc/Test/Exception.pm
 SHA1 ab0c02dbe66a1a82be1cc3909a06b41d3e5894c2 inc/Test/More.pm
-SHA1 47a5e77b06401e8f53154e6bd6e06ef9540f34f5 lib/Mouse.pm
-SHA1 5b298920615fd882a22420bff171102160b30ce5 lib/Mouse/Meta/Attribute.pm
-SHA1 452ba663e757a2b368d5f252486c4e9d3c59666b lib/Mouse/Meta/Class.pm
+SHA1 e7a2ba21c382a9b57d87f0a905ab83fcc2532f68 lib/Mouse.pm
+SHA1 3b16448d96194f2b1cc8ffcf83aa23ea89d5fd4f lib/Mouse/Meta/Attribute.pm
+SHA1 26f8ed51cdc16ec8553a0e5f23ca9d9d15191ec4 lib/Mouse/Meta/Class.pm
 SHA1 c92a58160d997408252443102f4ed3f59c81aabd lib/Mouse/Meta/Method/Constructor.pm
 SHA1 8feddf4deaee14d9c1f69eff8d0c986222e90dde lib/Mouse/Meta/Method/Destructor.pm
 SHA1 d7d068b3351d7c599ea0caf7f08e3d1a6903e123 lib/Mouse/Meta/Role.pm
 SHA1 7725bc3b01ddf9a9b5a60f20e807c0b93ce62c90 lib/Mouse/Object.pm
 SHA1 956720a381c30fdc017c589957a8069d648f4155 lib/Mouse/Role.pm
-SHA1 51a2936d0654b95b613dd82a4b8e54fdc77e4f31 lib/Mouse/Tiny.pm
+SHA1 85b01aba08b57c3c9b6e5f1098fadbc49f0e2d01 lib/Mouse/Tiny.pm
 SHA1 affa82bf47e1888f22731b76c5c0f678bc5e43c0 lib/Mouse/TypeRegistry.pm
-SHA1 409b1fd6115b8e97f07a58b52b0be26ee0f9cc58 lib/Mouse/Util.pm
+SHA1 2cca3d6d3b1da6a0a220e6eee231c01d728f5fb3 lib/Mouse/Util.pm
 SHA1 d4ba85be3d0e072c4e4b9ec24e3873c0ec85b6ba lib/Mouse/Util/TypeConstraints.pm
 SHA1 50017b83f252cac26cc828e427231ce8a9cd3c4d lib/Squirrel.pm
 SHA1 1d459388c2b9e9173b9fcb0f13413b85758a1e7a lib/Squirrel/Role.pm
@@ -92,6 +93,10 @@ SHA1 5a41d555a7dbb2319d30d9827e441d57e314fdd4 t/039-subtype.t
 SHA1 e845d0feb414ec954d04efac50dacdaa2cab30a1 t/040-existing-subclass.t
 SHA1 abcd24e01ed3653acd0cb5443df1a49aef4b5ffa t/041-enum.t
 SHA1 89bbc4b861d0366721cdb919d3950c0926f41f9f t/042-override.t
+SHA1 0da34f5af557781f39470f0cb58c00fb5e8e5de5 t/043-parameterized-type.t
+SHA1 512adbdecbc87de241abf24b0bc24bc5ae33d63b t/044-attribute-metaclass.t
+SHA1 2627487b336f8a2cc0c4e57ccb3b6dff8582ba06 t/045-import-into_level.t
+SHA1 05146766b178a3410df6d0505b00dc14c055b6bf t/046-meta-add_attribute.t
 SHA1 1593a1a3d5fbf80860458f57e6e0e4c87765aab1 t/100-meta-class.t
 SHA1 ed10e0911cfe567b1f8546c1ab9339b74a3fe575 t/101-meta-attribute.t
 SHA1 b686298591ef3d2164aace5bee1c2e0c45f54aef t/201-squirrel.t
@@ -117,7 +122,7 @@ SHA1 de5b445fd8157f0519b0de383270b8ae87a5f032 t/800_shikabased/002-coerce_multi_
 SHA1 75c37e5172edd56a2d68904826dc1c0a9eeb9659 t/800_shikabased/004-immutable-demolish.t
 SHA1 50fa519987c8ba49657ddb6d5449e7dc22503b1b t/800_shikabased/005-class_type.t
 SHA1 51016575d2f4d8e37241c5e04d87a0974900badb t/800_shikabased/006-role_type.t
-SHA1 5a64b8c9457c098e45cb6223002c217a72d42739 t/800_shikabased/007-multi-roles.t
+SHA1 f83ccb4d62e5c290b9be0b6a66f97c5e264943e4 t/800_shikabased/007-multi-roles.t
 SHA1 bbede7b652b703e873ee758fdac39ce6f702c0f1 t/800_shikabased/008-create_class.t
 SHA1 393bd37bf4af6bb7ee6b9ba6340669b3f2280dfe t/800_shikabased/009-overwrite-builtin-subtype.t
 SHA1 a4394a11c9f58183f8b135ef31db4fc290c7bd24 t/800_shikabased/010-isa-or.t
@@ -125,13 +130,14 @@ SHA1 3a4a820ae20b4e8566a01ec5322e1aef4fdcaed9 t/800_shikabased/011-util-linear-i
 SHA1 3448dc21f87574c329cfcec25271c00b64655ccb t/800_shikabased/012-role-compatibility.t
 SHA1 a3ecf70ff3efe242f5f572bd7ac79763793c14cd t/800_shikabased/013-compatibility-get_method_list.t
 SHA1 f6f2732bbf0c07db911cfafb15a762d8ea1ac7f8 t/800_shikabased/014-subtype-as.t
+SHA1 d059463111c35328dbf41710ec76daa5fb5b93dc t/lib/BaseClass.pm
 SHA1 e4f152b946efb3a39d27f3e708d0f5a49fba42b4 t/lib/ClassType_Foo.pm
 SHA1 5c30addc00eab464845e8d593ec12b44919997c3 t/lib/SyntaxError.pm
 SHA1 ad8b48c63818ff1e20c100959a687b01c737343d t/lib/Unsweetened.pm
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.7 (Darwin)
 
-iD8DBQFJm2DLsxfQtHhyRPoRAnEMAJ9wFADbbnrIuL+6JT4BXhBT0rauEwCePiCE
-Ex3gkunoDzjZXkFGsbflA7k=
-=V7Wy
+iD8DBQFJsbwasxfQtHhyRPoRAmJ7AJ0U6Tk4y4Ji7PBT74V71GOaJSjs5ACcCDsR
+zL/4uBs+3CKwN4v9SdByCN0=
+=chDL
 -----END PGP SIGNATURE-----

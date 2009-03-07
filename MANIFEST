@@ -1,3 +1,4 @@
+.gitignore
 author/benchmarks/basic.pl
 author/generate-mouse-tiny.pl
 author/munge-tests-for-moose.pl
@@ -77,6 +78,10 @@ t/039-subtype.t
 t/040-existing-subclass.t
 t/041-enum.t
 t/042-override.t
+t/043-parameterized-type.t
+t/044-attribute-metaclass.t
+t/045-import-into_level.t
+t/046-meta-add_attribute.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t
@@ -110,6 +115,7 @@ t/800_shikabased/011-util-linear-isa.t
 t/800_shikabased/012-role-compatibility.t
 t/800_shikabased/013-compatibility-get_method_list.t
 t/800_shikabased/014-subtype-as.t
+t/lib/BaseClass.pm
 t/lib/ClassType_Foo.pm
 t/lib/SyntaxError.pm
 t/lib/Unsweetened.pm

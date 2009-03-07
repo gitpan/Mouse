@@ -41,7 +41,7 @@ BEGIN {
     } else {
         my $loaded = do {
             local $SIG{__DIE__} = 'DEFAULT';
-            eval "require MRO::Compat; 1";
+            eval { require MRO::Compat; 1 };
         };
         if ($loaded) {
             $impl = \&mro::get_linear_isa;
@@ -72,6 +72,99 @@ BEGIN {
 
     no strict 'refs';
     *{ __PACKAGE__ . '::get_linear_isa'} = $impl;
+}
+
+# taken from Class/MOP.pm
+{
+    my %cache;
+
+    sub resolve_metaclass_alias {
+        my ( $type, $metaclass_name, %options ) = @_;
+
+        my $cache_key = $type;
+        return $cache{$cache_key}{$metaclass_name}
+          if $cache{$cache_key}{$metaclass_name};
+
+        my $possible_full_name =
+            'Mouse::Meta::' 
+          . $type
+          . '::Custom::'
+          . $metaclass_name;
+
+        my $loaded_class =
+          load_first_existing_class( $possible_full_name,
+            $metaclass_name );
+
+        return $cache{$cache_key}{$metaclass_name} =
+            $loaded_class->can('register_implementation')
+          ? $loaded_class->register_implementation
+          : $loaded_class;
+    }
+}
+
+# taken from Class/MOP.pm
+sub _is_valid_class_name {
+    my $class = shift;
+
+    return 0 if ref($class);
+    return 0 unless defined($class);
+    return 0 unless length($class);
+
+    return 1 if $class =~ /^\w+(?:::\w+)*$/;
+
+    return 0;
+}
+
+# taken from Class/MOP.pm
+sub load_first_existing_class {
+    my @classes = @_
+      or return;
+
+    foreach my $class (@classes) {
+        unless ( _is_valid_class_name($class) ) {
+            my $display = defined($class) ? $class : 'undef';
+            confess "Invalid class name ($display)";
+        }
+    }
+
+    my $found;
+    my %exceptions;
+    for my $class (@classes) {
+        my $e = _try_load_one_class($class);
+
+        if ($e) {
+            $exceptions{$class} = $e;
+        }
+        else {
+            $found = $class;
+            last;
+        }
+    }
+    return $found if $found;
+
+    confess join(
+        "\n",
+        map {
+            sprintf( "Could not load class (%s) because : %s",
+                $_, $exceptions{$_} )
+          } @classes
+    );
+}
+
+# taken from Class/MOP.pm
+sub _try_load_one_class {
+    my $class = shift;
+
+    return if Mouse::is_class_loaded($class);
+
+    my $file = $class . '.pm';
+    $file =~ s{::}{/}g;
+
+    return do {
+        local $@;
+        eval { require($file) };
+        $@;
+    };
 }
 
 sub apply_all_roles {
@@ -115,15 +208,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.16';
-
-BEGIN {
-    if ($ENV{MOUSE_DEBUG}) {
-        *DEBUG = sub (){ 1 };
-    } else {
-        *DEBUG = sub (){ 0 };
-    }
-}
+our $VERSION = '0.18';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -133,18 +218,7 @@ sub extends { Mouse::Meta::Class->initialize(caller)->superclasses(@_) }
 
 sub has {
     my $meta = Mouse::Meta::Class->initialize(caller);
-
-    my $names = shift;
-    $names = [$names] if !ref($names);
-
-    for my $name (@$names) {
-        if ($name =~ s/^\+//) {
-            Mouse::Meta::Attribute->clone_parent($meta, $name, @_);
-        }
-        else {
-            Mouse::Meta::Attribute->create($meta, $name, @_);
-        }
-    }
+    $meta->add_attribute(@_);
 }
 
 sub before {
@@ -217,7 +291,16 @@ sub import {
     strict->import;
     warnings->import;
 
-    my $caller = caller;
+    my $opts = do {
+        if (ref($_[0]) && ref($_[0]) eq 'HASH') {
+            shift @_;
+        } else {
+            +{ };
+        }
+    };
+    my $level = delete $opts->{into_level};
+       $level = 0 unless defined $level;
+    my $caller = caller($level);
 
     # we should never export to main
     if ($caller eq 'main') {
@@ -234,7 +317,7 @@ sub import {
     *{$caller.'::meta'} = sub { $meta };
 
     if (@_) {
-        __PACKAGE__->export_to_level( 1, $class, @_);
+        __PACKAGE__->export_to_level( $level+1, $class, @_);
     } else {
         # shortcut for the common case of no type character
         no strict 'refs';
@@ -508,6 +591,9 @@ sub create {
         if exists $args{coerce};
 
     if (exists $args{isa}) {
+        confess "Mouse does not yet support parameterized types (rt.cpan.org #39795)"
+            if $args{isa} =~ /\[.*\]/;
+
         my $type_constraint = delete $args{isa};
         $type_constraint =~ s/\s//g;
         my @type_constraints = split /\|/, $type_constraint;
@@ -785,9 +871,35 @@ sub get_all_method_names {
 
 sub add_attribute {
     my $self = shift;
-    my $attr = shift;
 
-    $self->{'attributes'}{$attr->name} = $attr;
+    if (@_ == 1 && blessed($_[0])) {
+        my $attr = shift @_;
+        $self->{'attributes'}{$attr->name} = $attr;
+    } else {
+        my $names = shift @_;
+        $names = [$names] if !ref($names);
+        my $metaclass = 'Mouse::Meta::Attribute';
+        my %options = @_;
+
+        if ( my $metaclass_name = delete $options{metaclass} ) {
+            my $new_class = Mouse::Util::resolve_metaclass_alias(
+                'Attribute',
+                $metaclass_name
+            );
+            if ( $metaclass ne $new_class ) {
+                $metaclass = $new_class;
+            }
+        }
+
+        for my $name (@$names) {
+            if ($name =~ s/^\+//) {
+                $metaclass->clone_parent($self, $name, @_);
+            }
+            else {
+                $metaclass->create($self, $name, @_);
+            }
+        }
+    }
 }
 
 sub compute_all_applicable_attributes {
@@ -874,25 +986,36 @@ sub attribute_metaclass { "Mouse::Meta::Class" }
 
 sub _install_modifier {
     my ( $self, $into, $type, $name, $code ) = @_;
-    if (eval "require Class::Method::Modifiers::Fast; 1") {
-        Class::Method::Modifiers::Fast::_install_modifier( 
-            $into,
-            $type,
-            $name,
-            $code
-        );
+
+    # which is modifer class available?
+    my $modifier_class = do {
+        if (eval "require Class::Method::Modifiers::Fast; 1") {
+            'Class::Method::Modifiers::Fast';
+        } elsif (eval "require Class::Method::Modifiers; 1") {
+            'Class::Method::Modifiers';
+        } else {
+            Carp::croak("Method modifiers require the use of Class::Method::Modifiers or Class::Method::Modifiers::Fast. Please install it from CPAN and file a bug report with this application.");
+        }
+    };
+    my $modifier = $modifier_class->can('_install_modifier');
+
+    # replace this method itself :)
+    {
+        no strict 'refs';
+        no warnings 'redefine';
+        *{__PACKAGE__ . '::_install_modifier'} = sub {
+            my ( $self, $into, $type, $name, $code ) = @_;
+            $modifier->(
+                $into,
+                $type,
+                $name,
+                $code
+            );
+        };
     }
-    elsif (eval "require Class::Method::Modifiers; 1") {
-        Class::Method::Modifiers::_install_modifier( 
-            $into,
-            $type,
-            $name,
-            $code
-        );
-    }
-    else {
-        Carp::croak("Method modifiers require the use of Class::Method::Modifiers. Please install it from CPAN and file a bug report with this application.");
-    }
+
+    # call me. for first time.
+    $self->_install_modifier( $into, $type, $name, $code );
 }
 
 sub add_before_method_modifier {

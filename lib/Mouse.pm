@@ -4,15 +4,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.17';
-
-BEGIN {
-    if ($ENV{MOUSE_DEBUG}) {
-        *DEBUG = sub (){ 1 };
-    } else {
-        *DEBUG = sub (){ 0 };
-    }
-}
+our $VERSION = '0.18';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -29,18 +21,7 @@ sub extends { Mouse::Meta::Class->initialize(caller)->superclasses(@_) }
 
 sub has {
     my $meta = Mouse::Meta::Class->initialize(caller);
-
-    my $names = shift;
-    $names = [$names] if !ref($names);
-
-    for my $name (@$names) {
-        if ($name =~ s/^\+//) {
-            Mouse::Meta::Attribute->clone_parent($meta, $name, @_);
-        }
-        else {
-            Mouse::Meta::Attribute->create($meta, $name, @_);
-        }
-    }
+    $meta->add_attribute(@_);
 }
 
 sub before {
@@ -113,7 +94,16 @@ sub import {
     strict->import;
     warnings->import;
 
-    my $caller = caller;
+    my $opts = do {
+        if (ref($_[0]) && ref($_[0]) eq 'HASH') {
+            shift @_;
+        } else {
+            +{ };
+        }
+    };
+    my $level = delete $opts->{into_level};
+       $level = 0 unless defined $level;
+    my $caller = caller($level);
 
     # we should never export to main
     if ($caller eq 'main') {
@@ -130,7 +120,7 @@ sub import {
     *{$caller.'::meta'} = sub { $meta };
 
     if (@_) {
-        __PACKAGE__->export_to_level( 1, $class, @_);
+        __PACKAGE__->export_to_level( $level+1, $class, @_);
     } else {
         # shortcut for the common case of no type character
         no strict 'refs';
