@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More tests => 2;
+use Test::More tests => 7;
 use lib 't/lib';
 
 do {
@@ -34,9 +34,9 @@ do {
     sub register_implementation { 'MouseX::AttributeHelpers::Number' }
 
     1;
-
-    package Klass;
-    use Mouse;
+    
+    package Foo;
+    use Mouse::Role;
 
     has 'i' => (
         metaclass => 'Number',
@@ -46,10 +46,47 @@ do {
             'add' => 'add_number'
         },
     );
+    sub f_m {}
+
+    package Bar;
+    use Mouse::Role;
+
+    has 'j' => (
+        metaclass => 'Number',
+        is => 'rw',
+        isa => 'Int',
+        provides => {
+            'add' => 'add_number_j'
+        },
+    );
+    sub b_m {}
+
+    package Klass1;
+    use Mouse;
+    with 'Foo';
+
+    package Klass2;
+    use Mouse;
+    with 'Foo', 'Bar';
+
 };
 
-can_ok 'Klass', 'add_number';
-my $k = Klass->new(i=>3);
-$k->add_number(4);
-is $k->i, 7;
+{
+    # normal
+    can_ok 'Klass1', 'add_number';
+    my $k = Klass1->new(i=>3);
+    $k->add_number(4);
+    is $k->i, 7;
+}
+
+{
+    # combine
+    can_ok 'Klass2', 'f_m';
+    can_ok 'Klass2', 'b_m';
+    can_ok 'Klass2', 'add_number';
+    can_ok 'Klass2', 'add_number_j';
+    my $k = Klass2->new(i=>3);
+    $k->add_number(4);
+    is $k->i, 7;
+}
 

@@ -82,6 +82,7 @@ t/043-parameterized-type.t
 t/044-attribute-metaclass.t
 t/045-import-into_level.t
 t/046-meta-add_attribute.t
+t/047-attribute-metaclass-role.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t
