@@ -27,7 +27,7 @@ sub new {
                 if ref($instance->{$key}) && $attribute->is_weak_ref;
 
             if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args->{$from}, $attribute);
+                $attribute->trigger->($instance, $args->{$from});
             }
         }
         else {
@@ -68,13 +68,9 @@ sub BUILDARGS {
     my $class = shift;
 
     if (scalar @_ == 1) {
-        if (defined $_[0]) {
-            (ref($_[0]) eq 'HASH')
-                || confess "Single parameters to new() must be a HASH ref";
-            return {%{$_[0]}};
-        } else {
-            return {};
-        }
+        (ref($_[0]) eq 'HASH')
+            || confess "Single parameters to new() must be a HASH ref";
+        return {%{$_[0]}};
     }
     else {
         return {@_};
@@ -120,6 +116,20 @@ sub dump {
     Data::Dumper::Dumper $self;
 }
 
+
+sub does {
+    my ($self, $role_name) = @_;
+    (defined $role_name)
+        || confess "You must supply a role name to does()";
+    my $meta = $self->meta;
+    foreach my $class ($meta->linearized_isa) {
+        my $m = $meta->initialize($class);
+        return 1 
+            if $m->can('does_role') && $m->does_role($role_name);            
+    }
+    return 0;   
+};
+
 1;
 
 __END__
@@ -158,6 +168,12 @@ L</DESTROY> time.
 
 You may put any business logic deinitialization in DEMOLISH methods. You don't
 need to redispatch or return any specific value.
+
+
+=head2 does $role_name
+
+This will check if the invocant's class "does" a given C<$role_name>.
+This is similar to "isa" for object, but it checks the roles instead.
 
 
 =head2 B<dump ($maxdepth)>

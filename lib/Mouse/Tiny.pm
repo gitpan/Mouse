@@ -13,6 +13,8 @@ $INC{'Mouse/Util.pm'} = __FILE__;
 $INC{'Mouse/Meta/Attribute.pm'} = __FILE__;
 $INC{'Mouse/Meta/Class.pm'} = __FILE__;
 $INC{'Mouse/Meta/Role.pm'} = __FILE__;
+$INC{'Mouse/Meta/TypeConstraint.pm'} = __FILE__;
+$INC{'Mouse/Meta/Method/Accessor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Constructor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Destructor.pm'} = __FILE__;
 $INC{'Mouse/Util/TypeConstraints.pm'} = __FILE__;
@@ -28,6 +30,9 @@ use Carp;
 our @EXPORT_OK = qw(
     get_linear_isa
     apply_all_roles
+    version 
+    authority
+    identifier
 );
 our %EXPORT_TAGS = (
     all  => \@EXPORT_OK,
@@ -72,6 +77,20 @@ BEGIN {
 
     no strict 'refs';
     *{ __PACKAGE__ . '::get_linear_isa'} = $impl;
+}
+
+{ # adapted from Class::MOP::Module
+
+    sub version { no strict 'refs'; ${shift->name.'::VERSION'} }
+    sub authority { no strict 'refs'; ${shift->name.'::AUTHORITY'} }  
+    sub identifier {
+        my $self = shift;
+        join '-' => (
+            $self->name,
+            ($self->version   || ()),
+            ($self->authority || ()),
+        );
+    }
 }
 
 # taken from Class/MOP.pm
@@ -208,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -312,6 +331,9 @@ sub import {
     $meta->superclasses('Mouse::Object')
         unless $meta->superclasses;
 
+    # make a subtype for each Mouse class
+    class_type($caller) unless find_type_constraint($caller);
+
     no strict 'refs';
     no warnings 'redefine';
     *{$caller.'::meta'} = sub { $meta };
@@ -392,7 +414,6 @@ require overload;
 
 use Carp 'confess';
 use Scalar::Util ();
-
 sub new {
     my ($class, $name, %options) = @_;
 
@@ -419,11 +440,14 @@ sub handles              { $_[0]->{handles}                }
 sub is_weak_ref          { $_[0]->{weak_ref}               }
 sub init_arg             { $_[0]->{init_arg}               }
 sub type_constraint      { $_[0]->{type_constraint}        }
+sub find_type_constraint {
+    Carp::carp("This method was deprecated");
+    $_[0]->type_constraint();
+}
 sub trigger              { $_[0]->{trigger}                }
 sub builder              { $_[0]->{builder}                }
 sub should_auto_deref    { $_[0]->{auto_deref}             }
 sub should_coerce        { $_[0]->{should_coerce}          }
-sub find_type_constraint { $_[0]->{find_type_constraint}   }
 
 sub has_default          { exists $_[0]->{default}         }
 sub has_predicate        { exists $_[0]->{predicate}       }
@@ -443,95 +467,6 @@ sub inlined_name {
     my $name = $self->name;
     my $key   = "'" . $name . "'";
     return $key;
-}
-
-sub generate_accessor {
-    my $attribute = shift;
-
-    my $name          = $attribute->name;
-    my $default       = $attribute->default;
-    my $constraint    = $attribute->find_type_constraint;
-    my $builder       = $attribute->builder;
-    my $trigger       = $attribute->trigger;
-    my $is_weak       = $attribute->is_weak_ref;
-    my $should_deref  = $attribute->should_auto_deref;
-    my $should_coerce = $attribute->should_coerce;
-
-    my $self  = '$_[0]';
-    my $key   = $attribute->inlined_name;
-
-    my $accessor = "sub {\n";
-    if ($attribute->_is_metadata eq 'rw') {
-        $accessor .= 'if (@_ >= 2) {' . "\n";
-
-        my $value = '$_[1]';
-
-        if ($constraint) {
-            $accessor .= 'my $val = ';
-            if ($should_coerce) {
-                $accessor  .= 'Mouse::Util::TypeConstraints->typecast_constraints("'.$attribute->associated_class->name.'", $attribute->{find_type_constraint}, $attribute->{type_constraint}, '.$value.');';
-            } else {
-                $accessor .= $value.';';
-            }
-            $accessor .= 'local $_ = $val;';
-            $accessor .= '
-                unless ($constraint->()) {
-                    $attribute->verify_type_constraint_error($name, $_, $attribute->type_constraint);
-                }' . "\n";
-            $value = '$val';
-        }
-
-        # if there's nothing left to do for the attribute we can return during
-        # this setter
-        $accessor .= 'return ' if !$is_weak && !$trigger && !$should_deref;
-
-        $accessor .= $self.'->{'.$key.'} = '.$value.';' . "\n";
-
-        if ($is_weak) {
-            $accessor .= 'Scalar::Util::weaken('.$self.'->{'.$key.'}) if ref('.$self.'->{'.$key.'});' . "\n";
-        }
-
-        if ($trigger) {
-            $accessor .= '$trigger->('.$self.', '.$value.', $attribute);' . "\n";
-        }
-
-        $accessor .= "}\n";
-    }
-    else {
-        $accessor .= 'confess "Cannot assign a value to a read-only accessor" if scalar(@_) >= 2;' . "\n";
-    }
-
-    if ($attribute->is_lazy) {
-        $accessor .= $self.'->{'.$key.'} = ';
-
-        $accessor .= $attribute->has_builder
-                ? $self.'->$builder'
-                    : ref($default) eq 'CODE'
-                    ? '$default->('.$self.')'
-                    : '$default';
-        $accessor .= ' if !exists '.$self.'->{'.$key.'};' . "\n";
-    }
-
-    if ($should_deref) {
-        my $type_constraint = $attribute->type_constraint;
-        if (!ref($type_constraint) && $type_constraint eq 'ArrayRef') {
-            $accessor .= 'if (wantarray) {
-                return @{ '.$self.'->{'.$key.'} || [] };
-            }';
-        }
-        else {
-            $accessor .= 'if (wantarray) {
-                return %{ '.$self.'->{'.$key.'} || {} };
-            }';
-        }
-    }
-
-    $accessor .= 'return '.$self.'->{'.$key.'};
-    }';
-
-    my $sub = eval $accessor;
-    confess $@ if $@;
-    return $sub;
 }
 
 sub generate_predicate {
@@ -578,59 +513,6 @@ sub generate_handles {
     return \%method_map;
 }
 
-my $optimized_constraints;
-sub _build_type_constraint {
-    my $spec = shift;
-    $optimized_constraints ||= Mouse::Util::TypeConstraints->optimized_constraints;
-    my $code;
-    if ($spec =~ /^([^\[]+)\[(.+)\]$/) {
-        # parameterized
-        my $constraint = $1;
-        my $param      = $2;
-        my $parent     = _build_type_constraint($constraint);
-        my $child      = _build_type_constraint($param);
-        if ($constraint eq 'ArrayRef') {
-            my $code_str = 
-                "sub {\n" .
-                "    if (\$parent->(\$_)) {\n" .
-                "        foreach my \$e (@\$_) {\n" .
-                "            local \$_ = \$e;\n" .
-                "            return () unless \$child->(\$_);\n" .
-                "        }\n" .
-                "        return 1;\n" .
-                "    }\n" .
-                "    return ();\n" .
-                "};\n"
-            ;
-            $code = eval $code_str or Carp::confess($@);
-        } elsif ($constraint eq 'HashRef') {
-            my $code_str = 
-                "sub {\n" .
-                "    if (\$parent->(\$_)) {\n" .
-                "        foreach my \$e (values %\$_) {\n" .
-                "            local \$_ = \$e;\n" .
-                "            return () unless \$child->(\$_);\n" .
-                "        }\n" .
-                "        return 1;\n" .
-                "    }\n" .
-                "    return ();\n" .
-                "};\n"
-            ;
-            $code = eval $code_str or Carp::confess($@);
-        } else {
-            Carp::confess("Support for parameterized types other than ArrayRef or HashRef is not implemented yet");
-        }
-        $optimized_constraints->{$spec} = $code;
-    } else {
-        $code = $optimized_constraints->{ $spec };
-        if (! $code) {
-            $code = sub { Scalar::Util::blessed($_) && $_->isa($spec) };
-            $optimized_constraints->{$spec} = $code;
-        }
-    }
-    return $code;
-}
-
 sub create {
     my ($self, $class, $name, %args) = @_;
 
@@ -647,29 +529,12 @@ sub create {
         confess "Got isa => $args{isa}, but Mouse does not yet support parameterized types for containers other than ArrayRef and HashRef (rt.cpan.org #39795)"
             if $args{isa} =~ /^([^\[]+)\[.+\]$/ &&
                $1 ne 'ArrayRef' &&
-               $1 ne 'HashRef';
+               $1 ne 'HashRef'  &&
+               $1 ne 'Maybe'
+        ;
 
         my $type_constraint = delete $args{isa};
-        $type_constraint =~ s/\s//g;
-        my @type_constraints = split /\|/, $type_constraint;
-
-        my $code;
-        if (@type_constraints == 1) {
-            $code = _build_type_constraint($type_constraints[0]);
-            $args{type_constraint} = $type_constraints[0];
-        } else {
-            my @code_list = map {
-                _build_type_constraint($_)
-            } @type_constraints;
-            $code = sub {
-                for my $code (@code_list) {
-                    return 1 if $code->();
-                }
-                return 0;
-            };
-            $args{type_constraint} = \@type_constraints;
-        }
-        $args{find_type_constraint} = $code;
+        $args{type_constraint}= Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($type_constraint);
     }
 
     my $attribute = $self->new($name, %args);
@@ -680,8 +545,10 @@ sub create {
 
     # install an accessor
     if ($attribute->_is_metadata eq 'rw' || $attribute->_is_metadata eq 'ro') {
-        my $accessor = $attribute->generate_accessor;
-        $class->add_method($name => $accessor);
+        my $code = Mouse::Meta::Method::Accessor->generate_accessor_method_inline(
+            $attribute,
+        );
+        $class->add_method($name => $code);
     }
 
     for my $method (qw/predicate clearer/) {
@@ -767,23 +634,23 @@ sub verify_against_type_constraint {
     return 1 unless $_[0]->{type_constraint};
 
     local $_ = $_[1];
-    return 1 if $_[0]->{find_type_constraint}->($_);
+    return 1 if $_[0]->{type_constraint}->check($_);
 
     my $self = shift;
-    $self->verify_type_constraint_error($self->name, $_, $self->type_constraint);
+    $self->verify_type_constraint_error($self->name, $_, $self->{type_constraint});
 }
 
 sub verify_type_constraint_error {
     my($self, $name, $value, $type) = @_;
-    $type = ref($type) eq 'ARRAY' ? join '|', @{ $type } : $type;
-    my $display = defined($_) ? overload::StrVal($_) : 'undef';
+    $type = ref($type) eq 'ARRAY' ? join '|', map { $_->name } @{ $type } : $type->name;
+    my $display = defined($value) ? overload::StrVal($value) : 'undef';
     Carp::confess("Attribute ($name) does not pass the type constraint because: Validation failed for \'$type\' failed with value $display");
 }
 
 sub coerce_constraint { ## my($self, $value) = @_;
     my $type = $_[0]->{type_constraint}
         or return $_[1];
-    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $_[0]->find_type_constraint, $type, $_[1]);
+    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $_[0]->type_constraint, $_[1]);
 }
 
 sub _canonicalize_handles {
@@ -828,8 +695,8 @@ package Mouse::Meta::Class;
 use strict;
 use warnings;
 
-use Scalar::Util qw/blessed/;
-BEGIN { Mouse::Util->import(qw/get_linear_isa/) }
+use Scalar::Util qw/blessed weaken/;
+BEGIN { Mouse::Util->import(qw/get_linear_isa version authority identifier/) }
 use Carp 'confess';
 
 do {
@@ -844,12 +711,24 @@ do {
     }
 
     sub initialize {
-        my $class = shift;
-        my $name  = shift;
+        my $class = blessed($_[0]) || $_[0];
+        my $name  = $_[1];
+
         $METACLASS_CACHE{$name} = $class->new(name => $name)
             if !exists($METACLASS_CACHE{$name});
         return $METACLASS_CACHE{$name};
     }
+
+    # Means of accessing all the metaclasses that have
+    # been initialized thus far
+    sub get_all_metaclasses         {        %METACLASS_CACHE         }
+    sub get_all_metaclass_instances { values %METACLASS_CACHE         }
+    sub get_all_metaclass_names     { keys   %METACLASS_CACHE         }
+    sub get_metaclass_by_name       { $METACLASS_CACHE{$_[0]}         }
+    sub store_metaclass_by_name     { $METACLASS_CACHE{$_[0]} = $_[1] }
+    sub weaken_metaclass            { weaken($METACLASS_CACHE{$_[0]}) }
+    sub does_metaclass_exist        { exists $METACLASS_CACHE{$_[0]} && defined $METACLASS_CACHE{$_[0]} }
+    sub remove_metaclass_by_name    { $METACLASS_CACHE{$_[0]} = undef }
 };
 
 sub new {
@@ -892,6 +771,12 @@ sub add_method {
     *{ $pkg . '::' . $name } = $code;
 }
 
+sub has_method {
+    my $self = shift;
+    my $name = shift;
+    $self->name->can($name);
+}
+
 # copied from Class::Inspector
 my $get_methods_for_class = sub {
     my $self = shift;
@@ -900,7 +785,7 @@ my $get_methods_for_class = sub {
     no strict 'refs';
     # Get all the CODE symbol table entries
     my @functions =
-      grep !/^(?:has|with|around|before|after|blessed|extends|confess|override|super)$/,
+      grep !/^(?:has|with|around|before|after|augment|inner|blessed|extends|confess|override|super)$/,
       grep { defined &{"${name}::$_"} }
       keys %{"${name}::"};
     push @functions, keys %{$self->{'methods'}->{$name}} if $self;
@@ -953,7 +838,8 @@ sub add_attribute {
     }
 }
 
-sub compute_all_applicable_attributes {
+sub compute_all_applicable_attributes { shift->get_all_attributes(@_) }
+sub get_all_attributes {
     my $self = shift;
     my (@attr, %seen);
 
@@ -973,6 +859,10 @@ sub compute_all_applicable_attributes {
 sub get_attribute_map { $_[0]->{attributes} }
 sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     { $_[0]->{attributes}->{$_[1]} }
+sub get_attribute_list {
+    my $self = shift;
+    keys %{$self->get_attribute_map};
+}
 
 sub linearized_isa { @{ get_linear_isa($_[0]->name) } }
 
@@ -994,7 +884,7 @@ sub clone_instance {
 
     my $clone = bless { %$instance }, ref $instance;
 
-    foreach my $attr ($class->compute_all_applicable_attributes()) {
+    foreach my $attr ($class->get_all_attributes()) {
         if ( defined( my $init_arg = $attr->init_arg ) ) {
             if (exists $params{$init_arg}) {
                 $clone->{ $attr->name } = $params{$init_arg};
@@ -1084,6 +974,22 @@ sub add_after_method_modifier {
     $self->_install_modifier( $self->name, 'after', $name, $code );
 }
 
+sub add_override_method_modifier {
+    my ($self, $name, $code) = @_;
+
+    my $pkg = $self->name;
+    my $method = "${pkg}::${name}";
+
+    # Class::Method::Modifiers won't do this for us, so do it ourselves
+
+    my $body = $pkg->can($name)
+        or confess "You cannot override '$method' because it has no super method";
+
+    no strict 'refs';
+    *$method = sub { $code->($pkg, $body, @_) };
+}
+
+
 sub roles { $_[0]->{roles} }
 
 sub does_role {
@@ -1092,8 +998,11 @@ sub does_role {
     (defined $role_name)
         || confess "You must supply a role name to look for";
 
-    for my $role (@{ $self->{roles} }) {
-        return 1 if $role->name eq $role_name;
+    for my $class ($self->linearized_isa) {
+        next unless $class->can('meta') and $class->meta->can('roles');
+        for my $role (@{ $self->roles }) {
+            return 1 if $role->name eq $role_name;
+        }
     }
 
     return 0;
@@ -1174,6 +1083,116 @@ sub create {
     }
 }
 
+package Mouse::Meta::Method::Accessor;
+use strict;
+use warnings;
+use Carp ();
+
+# internal use only. do not call directly
+sub generate_accessor_method_inline {
+    my ($class, $attribute) = @_;
+
+    my $name          = $attribute->name;
+    my $default       = $attribute->default;
+    my $constraint    = $attribute->type_constraint;
+    my $builder       = $attribute->builder;
+    my $trigger       = $attribute->trigger;
+    my $is_weak       = $attribute->is_weak_ref;
+    my $should_deref  = $attribute->should_auto_deref;
+    my $should_coerce = $attribute->should_coerce;
+
+    my $compiled_type_constraint    = $constraint ? $constraint->{_compiled_type_constraint} : undef;
+
+    my $self  = '$_[0]';
+    my $key   = $attribute->inlined_name;
+
+    my $accessor = 
+        '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+        "sub {\n";
+    if ($attribute->_is_metadata eq 'rw') {
+        $accessor .= 
+            '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+            'if (scalar(@_) >= 2) {' . "\n";
+
+        my $value = '$_[1]';
+
+        if ($constraint) {
+            if ($should_coerce) {
+                $accessor .=
+                    "\n".
+                    '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                    'my $val = Mouse::Util::TypeConstraints->typecast_constraints("'.$attribute->associated_class->name.'", $attribute->{type_constraint}, '.$value.');';
+                $value = '$val';
+            }
+            if ($compiled_type_constraint) {
+                $accessor .= 
+                    "\n".
+                    '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                    'unless ($compiled_type_constraint->('.$value.')) {
+                        $attribute->verify_type_constraint_error($name, '.$value.', $attribute->{type_constraint});
+                    }' . "\n";
+            } else {
+                $accessor .= 
+                    "\n".
+                    '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                    'unless ($constraint->check('.$value.')) {
+                        $attribute->verify_type_constraint_error($name, '.$value.', $attribute->{type_constraint});
+                    }' . "\n";
+            }
+        }
+
+        # if there's nothing left to do for the attribute we can return during
+        # this setter
+        $accessor .= 'return ' if !$is_weak && !$trigger && !$should_deref;
+
+        $accessor .= $self.'->{'.$key.'} = '.$value.';' . "\n";
+
+        if ($is_weak) {
+            $accessor .= 'Scalar::Util::weaken('.$self.'->{'.$key.'}) if ref('.$self.'->{'.$key.'});' . "\n";
+        }
+
+        if ($trigger) {
+            $accessor .= '$trigger->('.$self.', '.$value.');' . "\n";
+        }
+
+        $accessor .= "}\n";
+    }
+    else {
+        $accessor .= 'Carp::confess("Cannot assign a value to a read-only accessor") if scalar(@_) >= 2;' . "\n";
+    }
+
+    if ($attribute->is_lazy) {
+        $accessor .= $self.'->{'.$key.'} = ';
+
+        $accessor .= $attribute->has_builder
+                ? $self.'->$builder'
+                    : ref($default) eq 'CODE'
+                    ? '$default->('.$self.')'
+                    : '$default';
+        $accessor .= ' if !exists '.$self.'->{'.$key.'};' . "\n";
+    }
+
+    if ($should_deref) {
+        if (ref($constraint) && $constraint->name eq 'ArrayRef') {
+            $accessor .= 'if (wantarray) {
+                return @{ '.$self.'->{'.$key.'} || [] };
+            }';
+        }
+        else {
+            $accessor .= 'if (wantarray) {
+                return %{ '.$self.'->{'.$key.'} || {} };
+            }';
+        }
+    }
+
+    $accessor .= 'return '.$self.'->{'.$key.'};
+    }';
+
+    my $sub = eval $accessor;
+    Carp::confess($@) if $@;
+    return $sub;
+}
+
 package Mouse::Meta::Method::Constructor;
 use strict;
 use warnings;
@@ -1181,15 +1200,19 @@ use warnings;
 sub generate_constructor_method_inline {
     my ($class, $meta) = @_;
 
+    my $associated_metaclass_name = $meta->name;
     my @attrs = $meta->compute_all_applicable_attributes;
     my $buildall = $class->_generate_BUILDALL($meta);
     my $buildargs = $class->_generate_BUILDARGS($meta);
     my $processattrs = $class->_generate_processattrs($meta, \@attrs);
+    my @compiled_constraints = map { $_ ? $_->{_compiled_type_constraint} : undef } map { $_->{type_constraint} } @attrs;
 
     my $code = <<"...";
     sub {
         my \$class = shift;
-        my \$args = $buildargs;
+        return \$class->Mouse::Object::new(\@_)
+            if \$class ne '$associated_metaclass_name';
+        $buildargs;
         my \$instance = bless {}, \$class;
         $processattrs;
         $buildall;
@@ -1198,6 +1221,7 @@ sub generate_constructor_method_inline {
 ...
 
     local $@;
+    # warn $code;
     my $res = eval $code;
     die $@ if $@;
     $res;
@@ -1218,19 +1242,24 @@ sub _generate_processattrs {
             $code .= "if (exists \$args->{'$from'}) {\n";
 
             if ($attr->should_coerce && $attr->type_constraint) {
-                $code .= "my \$value = Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{find_type_constraint}, \$attrs[$index]->{type_constraint}, \$args->{'$from'});\n";
+                $code .= "my \$value = Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, \$args->{'$from'});\n";
             }
             else {
                 $code .= "my \$value = \$args->{'$from'};\n";
             }
 
             if ($attr->has_type_constraint) {
-                $code .= "{
-                    local \$_ = \$value;
-                    unless (\$attrs[$index]->{find_type_constraint}->(\$_)) {
-                        \$attrs[$index]->verify_type_constraint_error('$key', \$_, \$attrs[$index]->type_constraint)
+                if ($attr->type_constraint->{_compiled_type_constraint}) {
+                    $code .= "unless (\$compiled_constraints[$index](\$value)) {";
+                } else {
+                    $code .= "unless (\$attrs[$index]->{type_constraint}->check(\$value)) {";
+                }
+                $code .= "
+                        \$attrs[$index]->verify_type_constraint_error(
+                            '$key', \$_, \$attrs[$index]->type_constraint
+                        )
                     }
-                }";
+                ";
             }
 
             $code .= "\$instance->{'$key'} = \$value;\n";
@@ -1240,7 +1269,7 @@ sub _generate_processattrs {
             }
 
             if ($attr->has_trigger) {
-                $code .= "\$attrs[$index]->{trigger}->( \$instance, \$value, \$attrs[$index] );\n";
+                $code .= "\$attrs[$index]->{trigger}->( \$instance, \$value );\n";
             }
 
             $code .= "\n} else {\n";
@@ -1254,7 +1283,7 @@ sub _generate_processattrs {
                 $code .= "my \$value = ";
 
                 if ($attr->should_coerce && $attr->type_constraint) {
-                    $code .= "Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{find_type_constraint}, \$attrs[$index]->{type_constraint}, ";
+                    $code .= "Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, ";
                 }
 
                     if ($attr->has_builder) {
@@ -1282,8 +1311,7 @@ sub _generate_processattrs {
 
                 if ($attr->has_type_constraint) {
                     $code .= "{
-                        local \$_ = \$value;
-                        unless (\$attrs[$index]->{find_type_constraint}->(\$_)) {
+                        unless (\$attrs[$index]->{type_constraint}->check(\$value)) {
                             \$attrs[$index]->verify_type_constraint_error('$key', \$_, \$attrs[$index]->type_constraint)
                         }
                     }";
@@ -1313,25 +1341,19 @@ sub _generate_BUILDARGS {
     my $meta = shift;
 
     if ($meta->name->can('BUILDARGS') && $meta->name->can('BUILDARGS') != Mouse::Object->can('BUILDARGS')) {
-        return '$class->BUILDARGS(@_)';
+        return 'my $args = $class->BUILDARGS(@_)';
     }
 
     return <<'...';
-    do {
+        my $args;
         if ( scalar @_ == 1 ) {
-            if ( defined $_[0] ) {
-                ( ref( $_[0] ) eq 'HASH' )
+            ( ref( $_[0] ) eq 'HASH' )
                 || Carp::confess "Single parameters to new() must be a HASH ref";
-                +{ %{ $_[0] } };
-            }
-            else {
-                +{};
-            }
+            $args = +{ %{ $_[0] } };
         }
         else {
-            +{@_};
+            $args = +{@_};
         }
-    };
 ...
 }
 
@@ -1346,7 +1368,7 @@ sub _generate_BUILDALL {
     no warnings 'once';
     for my $klass ($meta->linearized_isa) {
         if (*{ $klass . '::BUILD' }{CODE}) {
-            push  @code, qq{${klass}::BUILD(\$instance, \$args);};
+            unshift  @code, qq{${klass}::BUILD(\$instance, \$args);};
         }
     }
     return join "\n", @code;
@@ -1391,6 +1413,8 @@ package Mouse::Meta::Role;
 use strict;
 use warnings;
 use Carp 'confess';
+BEGIN { Mouse::Util->import(qw(version authority identifier)) }
+
 do {
     my %METACLASS_CACHE;
 
@@ -1430,6 +1454,8 @@ sub add_required_methods {
     push @{$self->{required_methods}}, @methods;
 }
 
+
+
 sub add_attribute {
     my $self = shift;
     my $name = shift;
@@ -1449,18 +1475,23 @@ sub get_method_list {
     no strict 'refs';
     # Get all the CODE symbol table entries
     my @functions =
-      grep !/^(?:has|with|around|before|after|blessed|extends|confess|excludes|meta|requires)$/,
+      grep !/^(?:has|with|around|before|after|augment|inner|override|super|blessed|extends|confess|excludes|meta|requires)$/,
       grep { defined &{"${name}::$_"} }
       keys %{"${name}::"};
     wantarray ? @functions : \@functions;
 }
 
+# Moose uses Application::ToInstance, Application::ToClass, Application::ToRole
 sub apply {
     my $self  = shift;
     my $selfname = $self->name;
     my $class = shift;
     my $classname = $class->name;
     my %args  = @_;
+
+    if ($class->isa('Mouse::Object')) {
+        Carp::croak('Mouse does not support Application::ToInstance yet');
+    }
 
     if ($class->isa('Mouse::Meta::Class')) {
         for my $name (@{$self->{required_methods}}) {
@@ -1475,16 +1506,18 @@ sub apply {
         for my $name ($self->get_method_list) {
             next if $name eq 'meta';
 
-            if ($classname->can($name)) {
+            my $class_function = "${classname}::${name}";
+            my $role_function = "${selfname}::${name}";
+            if (defined &$class_function) {
                 # XXX what's Moose's behavior?
                 #next;
             } else {
-                *{"${classname}::${name}"} = *{"${selfname}::${name}"};
+                *$class_function = *$role_function;
             }
             if ($args{alias} && $args{alias}->{$name}) {
                 my $dstname = $args{alias}->{$name};
                 unless ($classname->can($dstname)) {
-                    *{"${classname}::${dstname}"} = *{"${selfname}::${name}"};
+                    *{"${classname}::${dstname}"} = \&$role_function;
                 }
             }
         }
@@ -1520,7 +1553,7 @@ sub apply {
     }
 
     # XXX Room for speed improvement in role to role
-    for my $modifier_type (qw/before after around/) {
+    for my $modifier_type (qw/before after around override/) {
         my $add_method = "add_${modifier_type}_method_modifier";
         my $modified = $self->{"${modifier_type}_method_modifiers"};
 
@@ -1564,16 +1597,18 @@ sub combine_apply {
             for my $name ($self->get_method_list) {
                 next if $name eq 'meta';
 
-                if ($classname->can($name)) {
+                my $class_function = "${classname}::${name}";
+                my $role_function = "${selfname}::${name}";
+                if (defined &$class_function) {
                     # XXX what's Moose's behavior?
                     #next;
                 } else {
-                    *{"${classname}::${name}"} = *{"${selfname}::${name}"};
+                    *$class_function = *$role_function;
                 }
                 if ($args{alias} && $args{alias}->{$name}) {
                     my $dstname = $args{alias}->{$name};
                     unless ($classname->can($dstname)) {
-                        *{"${classname}::${dstname}"} = *{"${selfname}::${name}"};
+                        *{"${classname}::${dstname}"} = \&$role_function;
                     }
                 }
             }
@@ -1617,7 +1652,7 @@ sub combine_apply {
     }
 
     # XXX Room for speed improvement in role to role
-    for my $modifier_type (qw/before after around/) {
+    for my $modifier_type (qw/before after around override/) {
         my $add_method = "add_${modifier_type}_method_modifier";
         for my $role_spec (@roles) {
             my $self = $role_spec->[0]->meta;
@@ -1633,17 +1668,17 @@ sub combine_apply {
 
     # append roles
     my %role_apply_cache;
-    my @apply_roles;
+    my $apply_roles = $class->roles;
     for my $role_spec (@roles) {
         my $self = $role_spec->[0]->meta;
-        push @apply_roles, $self unless $role_apply_cache{$self}++;
-        for my $role ($self->roles) {
-            push @apply_roles, $role unless $role_apply_cache{$role}++;
+        push @$apply_roles, $self unless $role_apply_cache{$self}++;
+        for my $role (@{ $self->roles }) {
+            push @$apply_roles, $role unless $role_apply_cache{$role}++;
         }
     }
 }
 
-for my $modifier_type (qw/before after around/) {
+for my $modifier_type (qw/before after around override/) {
     no strict 'refs';
     *{ __PACKAGE__ . '::' . "add_${modifier_type}_method_modifier" } = sub {
         my ($self, $method_name, $method) = @_;
@@ -1659,6 +1694,50 @@ for my $modifier_type (qw/before after around/) {
 }
 
 sub roles { $_[0]->{roles} }
+
+
+# This is currently not passing all the Moose tests.
+sub does_role {
+    my ($self, $role_name) = @_;
+
+    (defined $role_name)
+        || confess "You must supply a role name to look for";
+
+    # if we are it,.. then return true
+    return 1 if $role_name eq $self->name;
+
+    for my $role (@{ $self->{roles} }) {
+        return 1 if $role->does_role($role_name);
+    }
+    return 0;
+}
+
+
+package Mouse::Meta::TypeConstraint;
+use strict;
+use warnings;
+use overload '""'     => sub { shift->{name} },   # stringify to tc name
+             fallback => 1;
+
+sub new {
+    my $class = shift;
+    my %args = @_;
+    my $name = $args{name} || '__ANON__';
+
+    my $check = $args{_compiled_type_constraint} or Carp::croak("missing _compiled_type_constraint");
+    if (ref $check eq 'Mouse::Meta::TypeConstraint') {
+        $check = $check->{_compiled_type_constraint};
+    }
+
+    bless +{ name => $name, _compiled_type_constraint => $check }, $class;
+}
+
+sub name { shift->{name} }
+
+sub check {
+    my $self = shift;
+    $self->{_compiled_type_constraint}->(@_);
+}
 
 package Mouse::Object;
 use strict;
@@ -1689,7 +1768,7 @@ sub new {
                 if ref($instance->{$key}) && $attribute->is_weak_ref;
 
             if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args->{$from}, $attribute);
+                $attribute->trigger->($instance, $args->{$from});
             }
         }
         else {
@@ -1730,13 +1809,9 @@ sub BUILDARGS {
     my $class = shift;
 
     if (scalar @_ == 1) {
-        if (defined $_[0]) {
-            (ref($_[0]) eq 'HASH')
-                || confess "Single parameters to new() must be a HASH ref";
-            return {%{$_[0]}};
-        } else {
-            return {};
-        }
+        (ref($_[0]) eq 'HASH')
+            || confess "Single parameters to new() must be a HASH ref";
+        return {%{$_[0]}};
     }
     else {
         return {@_};
@@ -1782,15 +1857,29 @@ sub dump {
     Data::Dumper::Dumper $self;
 }
 
+
+sub does {
+    my ($self, $role_name) = @_;
+    (defined $role_name)
+        || confess "You must supply a role name to does()";
+    my $meta = $self->meta;
+    foreach my $class ($meta->linearized_isa) {
+        my $m = $meta->initialize($class);
+        return 1 
+            if $m->can('does_role') && $m->does_role($role_name);            
+    }
+    return 0;   
+};
+
 package Mouse::Role;
 use strict;
 use warnings;
 use base 'Exporter';
 
-use Carp 'confess';
+use Carp 'confess', 'croak';
 use Scalar::Util 'blessed';
 
-our @EXPORT = qw(before after around has extends with requires excludes confess blessed);
+our @EXPORT = qw(before after around super override inner augment has extends with requires excludes confess blessed);
 
 sub before {
     my $meta = Mouse::Meta::Role->initialize(caller);
@@ -1819,6 +1908,42 @@ sub around {
     }
 }
 
+
+sub super {
+    return unless $Mouse::SUPER_BODY; 
+    $Mouse::SUPER_BODY->(@Mouse::SUPER_ARGS);
+}
+
+sub override {
+    my $classname = caller;
+    my $meta = Mouse::Meta::Role->initialize($classname);
+
+    my $name = shift;
+    my $code = shift;
+    my $fullname = "${classname}::${name}";
+
+    defined &$fullname
+        && confess "Cannot add an override of method '$fullname' " .
+                   "because there is a local version of '$fullname'";
+
+    $meta->add_override_method_modifier($name => sub {
+        local $Mouse::SUPER_PACKAGE = shift;
+        local $Mouse::SUPER_BODY = shift;
+        local @Mouse::SUPER_ARGS = @_;
+
+        $code->(@_);
+    });
+}
+
+# We keep the same errors messages as Moose::Role emits, here.
+sub inner {
+    croak "Moose::Role cannot support 'inner'";
+}
+
+sub augment {
+    croak "Moose::Role cannot support 'augment'";
+}
+
 sub has {
     my $meta = Mouse::Meta::Role->initialize(caller);
 
@@ -1828,7 +1953,7 @@ sub has {
     $meta->add_attribute($name => \%opts);
 }
 
-sub extends  { confess "Roles do not support 'extends'" }
+sub extends  { confess "Roles do not currently support 'extends'" }
 
 sub with     {
     my $meta = Mouse::Meta::Role->initialize(caller);
@@ -1904,9 +2029,9 @@ use base 'Exporter';
 
 use Carp ();
 use Scalar::Util qw/blessed looks_like_number openhandle/;
-
 our @EXPORT = qw(
     as where message from via type subtype coerce class_type role_type enum
+    find_type_constraint
 );
 
 my %TYPE;
@@ -1929,40 +2054,41 @@ sub via (&) {
     $_[0]
 }
 
-my $optimized_constraints;
-my $optimized_constraints_base;
-{
+BEGIN {
     no warnings 'uninitialized';
     %TYPE = (
         Any        => sub { 1 },
         Item       => sub { 1 },
         Bool       => sub {
-            !defined($_) || $_ eq "" || "$_" eq '1' || "$_" eq '0'
+            !defined($_[0]) || $_[0] eq "" || "$_[0]" eq '1' || "$_[0]" eq '0'
         },
-        Undef      => sub { !defined($_) },
-        Defined    => sub { defined($_) },
-        Value      => sub { defined($_) && !ref($_) },
-        Num        => sub { !ref($_) && looks_like_number($_) },
-        Int        => sub { defined($_) && !ref($_) && /^-?[0-9]+$/ },
-        Str        => sub { defined($_) && !ref($_) },
-        ClassName  => sub { Mouse::is_class_loaded($_) },
-        Ref        => sub { ref($_) },
+        Undef      => sub { !defined($_[0]) },
+        Defined    => sub { defined($_[0]) },
+        Value      => sub { defined($_[0]) && !ref($_[0]) },
+        Num        => sub { !ref($_[0]) && looks_like_number($_[0]) },
+        Int        => sub { defined($_[0]) && !ref($_[0]) && $_[0] =~ /^-?[0-9]+$/ },
+        Str        => sub { defined($_[0]) && !ref($_[0]) },
+        ClassName  => sub { Mouse::is_class_loaded($_[0]) },
+        Ref        => sub { ref($_[0]) },
 
-        ScalarRef  => sub { ref($_) eq 'SCALAR' },
-        ArrayRef   => sub { ref($_) eq 'ARRAY'  },
-        HashRef    => sub { ref($_) eq 'HASH'   },
-        CodeRef    => sub { ref($_) eq 'CODE'   },
-        RegexpRef  => sub { ref($_) eq 'Regexp' },
-        GlobRef    => sub { ref($_) eq 'GLOB'   },
+        ScalarRef  => sub { ref($_[0]) eq 'SCALAR' },
+        ArrayRef   => sub { ref($_[0]) eq 'ARRAY'  },
+        HashRef    => sub { ref($_[0]) eq 'HASH'   },
+        CodeRef    => sub { ref($_[0]) eq 'CODE'   },
+        RegexpRef  => sub { ref($_[0]) eq 'Regexp' },
+        GlobRef    => sub { ref($_[0]) eq 'GLOB'   },
 
         FileHandle => sub {
-            ref($_) eq 'GLOB' && openhandle($_)
+            ref($_[0]) eq 'GLOB' && openhandle($_[0])
             or
-            blessed($_) && $_->isa("IO::Handle")
+            blessed($_[0]) && $_[0]->isa("IO::Handle")
         },
 
-        Object     => sub { blessed($_) && blessed($_) ne 'Regexp' },
+        Object     => sub { blessed($_[0]) && blessed($_[0]) ne 'Regexp' },
     );
+    while (my ($name, $code) = each %TYPE) {
+        $TYPE{$name} = Mouse::Meta::TypeConstraint->new( _compiled_type_constraint => $code, name => $name );
+    }
 
     sub optimized_constraints { \%TYPE }
     my @TYPE_KEYS = keys %TYPE;
@@ -1977,10 +2103,26 @@ sub type {
     if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
         Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
     };
-    my $constraint = $conf{where} || do { $TYPE{delete $conf{as} || 'Any' } };
+    my $constraint = $conf{where} || do {
+        my $as = delete $conf{as} || 'Any';
+        if (! exists $TYPE{$as}) {
+            $TYPE{$as} = _build_type_constraint($as);
+        }
+        $TYPE{$as};
+    };
 
     $TYPE_SOURCE{$name} = $pkg;
-    $TYPE{$name} = $constraint;
+    $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
+        name => $name,
+        _compiled_type_constraint => sub {
+            local $_ = $_[0];
+            if (ref $constraint eq 'CODE') {
+                $constraint->($_[0])
+            } else {
+                $constraint->check($_[0])
+            }
+        }
+    );
 }
 
 sub subtype {
@@ -1989,22 +2131,26 @@ sub subtype {
     if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
         Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
     };
-    my $constraint = $conf{where} || do {
-        my $as = delete $conf{as} || 'Any';
-        if (! exists $TYPE{$as}) { # Perhaps it's a parameterized source?
-            Mouse::Meta::Attribute::_build_type_constraint($as);
-        }
-        $TYPE{$as};
-    };
-    my $as         = $conf{as} || '';
+    my $constraint = $conf{where};
+    my $as_constraint = find_or_create_isa_type_constraint($conf{as} || 'Any');
 
     $TYPE_SOURCE{$name} = $pkg;
+    $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
+        name => $name,
+        _compiled_type_constraint => (
+            $constraint ? 
+            sub {
+                local $_ = $_[0];
+                $as_constraint->check($_[0]) && $constraint->($_[0])
+            } :
+            sub {
+                local $_ = $_[0];
+                $as_constraint->check($_[0]);
+            }
+        ),
+    );
 
-    if ($as = $TYPE{$as}) {
-        $TYPE{$name} = sub { $as->($_) && $constraint->($_) };
-    } else {
-        $TYPE{$name} = $constraint;
-    }
+    return $name;
 }
 
 sub coerce {
@@ -2024,24 +2170,28 @@ sub coerce {
         if (! $TYPE{$type}) {
             # looks parameterized
             if ($type =~ /^[^\[]+\[.+\]$/) {
-                Mouse::Meta::Attribute::_build_type_constraint($type);
+                $TYPE{$type} = _build_type_constraint($type);
             } else {
                 Carp::croak "Could not find the type constraint ($type) to coerce from"
             }
         }
 
-        push @{ $COERCE_KEYS{$name} }, $type;
+        unshift @{ $COERCE_KEYS{$name} }, $type;
         $COERCE{$name}->{$type} = $code;
     }
 }
 
 sub class_type {
-    my $pkg = caller(0);
     my($name, $conf) = @_;
-    my $class = $conf->{class};
-    subtype(
-        $name => where => sub { $_->isa($class) }
-    );
+    if ($conf && $conf->{class}) {
+        # No, you're using this wrong
+        warn "class_type() should be class_type(ClassName). Perhaps you're looking for subtype $name => as '$conf->{class}'?";
+        subtype($name, as => $conf->{class});
+    } else {
+        subtype(
+            $name => where => sub { $_->isa($name) }
+        );
+    }
 }
 
 sub role_type {
@@ -2055,18 +2205,20 @@ sub role_type {
     );
 }
 
+# this is an original method for Mouse
 sub typecast_constraints {
-    my($class, $pkg, $type_constraint, $types, $value) = @_;
+    my($class, $pkg, $types, $value) = @_;
+    Carp::croak("wrong arguments count") unless @_==4;
 
     local $_;
-    for my $type (ref($types) eq 'ARRAY' ? @{ $types } : ( $types )) {
+    for my $type ( split /\|/, $types ) {
         next unless $COERCE{$type};
         for my $coerce_type (@{ $COERCE_KEYS{$type}}) {
             $_ = $value;
-            next unless $TYPE{$coerce_type}->();
+            next unless $TYPE{$coerce_type}->check($value);
             $_ = $value;
-            $_ = $COERCE{$type}->{$coerce_type}->();
-            return $_ if $type_constraint->();
+            $_ = $COERCE{$type}->{$coerce_type}->($value);
+            return $_ if $types->check($_);
         }
     }
     return $value;
@@ -2093,8 +2245,122 @@ sub enum {
     );
 }
 
+sub _build_type_constraint {
+
+    my $spec = shift;
+    my $code;
+    $spec =~ s/\s+//g;
+    if ($spec =~ /^([^\[]+)\[(.+)\]$/) {
+        # parameterized
+        my $constraint = $1;
+        my $param      = $2;
+        my $parent;
+        if ($constraint eq 'Maybe') {
+            $parent = _build_type_constraint('Undef');
+        } else {
+            $parent = _build_type_constraint($constraint);
+        }
+        my $child = _build_type_constraint($param);
+        if ($constraint eq 'ArrayRef') {
+            my $code_str = 
+                "#line " . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                "sub {\n" .
+                "    if (\$parent->check(\$_[0])) {\n" .
+                "        foreach my \$e (\@{\$_[0]}) {\n" .
+                "            return () unless \$child->check(\$e);\n" .
+                "        }\n" .
+                "        return 1;\n" .
+                "    }\n" .
+                "    return ();\n" .
+                "};\n"
+            ;
+            $code = eval $code_str or Carp::confess("Failed to generate inline type constraint: $@");
+        } elsif ($constraint eq 'HashRef') {
+            my $code_str = 
+                "#line " . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                "sub {\n" .
+                "    if (\$parent->check(\$_[0])) {\n" .
+                "        foreach my \$e (values \%{\$_[0]}) {\n" .
+                "            return () unless \$child->check(\$e);\n" .
+                "        }\n" .
+                "        return 1;\n" .
+                "    }\n" .
+                "    return ();\n" .
+                "};\n"
+            ;
+            $code = eval $code_str or Carp::confess($@);
+        } elsif ($constraint eq 'Maybe') {
+            my $code_str =
+                "#line " . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                "sub {\n" .
+                "    return \$child->check(\$_[0]) || \$parent->check(\$_[0]);\n" .
+                "};\n"
+            ;
+            $code = eval $code_str or Carp::confess($@);
+        } else {
+            Carp::confess("Support for parameterized types other than Maybe, ArrayRef or HashRef is not implemented yet");
+        }
+        $TYPE{$spec} = Mouse::Meta::TypeConstraint->new( _compiled_type_constraint => $code, name => $spec );
+    } else {
+        $code = $TYPE{ $spec };
+        if (! $code) {
+            # is $spec a known role?  If so, constrain with 'does' instead of 'isa'
+            require Mouse::Meta::Role;
+            my $check = Mouse::Meta::Role->_metaclass_cache($spec)? 
+                'does' : 'isa';
+            my $code_str = 
+                "#line " . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                "sub {\n" .
+                "    Scalar::Util::blessed(\$_[0]) && \$_[0]->$check('$spec');\n" .
+                "}"
+            ;
+            $code = eval $code_str  or Carp::confess($@);
+            $TYPE{$spec} = Mouse::Meta::TypeConstraint->new( _compiled_type_constraint => $code, name => $spec );
+        }
+    }
+    return Mouse::Meta::TypeConstraint->new( _compiled_type_constraint => $code, name => $spec );
+}
+
+sub find_type_constraint {
+    my $type_constraint = shift;
+    return $TYPE{$type_constraint};
+}
+
+sub find_or_create_isa_type_constraint {
+    my $type_constraint = shift;
+
+    my $code;
+
+    $type_constraint =~ s/\s+//g;
+
+    $code = $TYPE{$type_constraint};
+    if (! $code) {
+        my @type_constraints = split /\|/, $type_constraint;
+        if (@type_constraints == 1) {
+            $code = $TYPE{$type_constraints[0]} ||
+                _build_type_constraint($type_constraints[0]);
+        } else {
+            my @code_list = map {
+                $TYPE{$_} || _build_type_constraint($_)
+            } @type_constraints;
+            $code = Mouse::Meta::TypeConstraint->new(
+                _compiled_type_constraint => sub {
+                    my $i = 0;
+                    for my $code (@code_list) {
+                        return 1 if $code->check($_[0]);
+                    }
+                    return 0;
+                },
+                name => $type_constraint,
+            );
+        }
+    }
+    return $code;
+}
+
 }; #eval
 } #unless
+} # XXX: 2009-04-09 Sartak: no idea why I had to add this brace. Compile errors without it!
 
 package Mouse::Tiny;
 use base 'Mouse';

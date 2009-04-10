@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More tests => 30;
+use Test::More tests => 34;
 use Test::Exception;
 
 do {
@@ -104,7 +104,7 @@ do {
     );
 };
 
-for ('A'..'E', 'G::H') {
+for ('B'..'E', 'G::H') {
     lives_ok {
         ClassNameTests->new(class => $_);
     };
@@ -113,6 +113,18 @@ for ('A'..'E', 'G::H') {
         my $obj = ClassNameTests->new;
         $obj->class($_);
     };
+}
+
+TODO: {
+    local $TODO = "Moose throws errors here. Mouse does not";
+    throws_ok {
+        ClassNameTests->new(class => 'A');
+    } qr/Attribute \(class\) does not pass the type constraint because: Validation failed for 'ClassName' failed with value A/;
+
+    throws_ok {
+            my $obj = ClassNameTests->new;
+            $obj->class('A');
+    } qr/Attribute \(class\) does not pass the type constraint because: Validation failed for 'ClassName' failed with value A/;
 }
 
 for ('F', 'G', 'I', 'Z') {
@@ -125,4 +137,38 @@ for ('F', 'G', 'I', 'Z') {
             $obj->class($_);
     } qr/Attribute \(class\) does not pass the type constraint because: Validation failed for 'ClassName' failed with value $_/;
 };
+
+
+# Check that Roles can be used in 'isa' and they are constrained with
+# 'does'
+do {
+    package SausageRole;
+    use Mouse::Role;
+
+    package DoesSausage;
+    use Mouse;
+    with 'SausageRole';
+
+    package HasSausage;
+    use Mouse;
+
+    has sausage =>
+        (isa => 'SausageRole',
+         is => 'rw');
+
+};
+
+my $hs;
+lives_ok {
+    $hs = HasSausage->new(sausage => DoesSausage->new);    
+};
+lives_ok {
+    $hs->sausage(DoesSausage->new);
+};
+throws_ok {
+    HasSausage->new(sausage => Class->new);   
+} qr/^Attribute \(sausage\) does not pass the type constraint because: Validation failed for 'SausageRole' failed with value Class=/;
+throws_ok {
+    $hs->sausage(Class->new);   
+} qr/^Attribute \(sausage\) does not pass the type constraint because: Validation failed for 'SausageRole' failed with value Class=/;
 

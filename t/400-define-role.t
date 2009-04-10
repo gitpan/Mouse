@@ -18,7 +18,7 @@ throws_ok {
     extends 'Role::Parent';
 
     no Mouse::Role;
-} qr/Roles do not support 'extends'/;
+} qr/Roles do not currently support 'extends'/;
 
 lives_ok {
     package Role;
@@ -64,14 +64,18 @@ lives_ok {
     no Mouse::Role;
 };
 
-throws_ok {
+TODO: {
     package Role;
     use Mouse::Role;
 
-    excludes 'excluded';
+    eval {
+        excludes 'excluded';
+    };
+    local our $TODO = "Mouse::Role does not currently support 'excludes'";
+    ::ok(!$@, "excludes");
 
     no Mouse::Role;
-} qr/Mouse::Role does not currently support 'excludes'/;
+};
 
 throws_ok {
     package Role;

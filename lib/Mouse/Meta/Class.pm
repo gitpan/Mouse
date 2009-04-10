@@ -4,8 +4,8 @@ use warnings;
 
 use Mouse::Meta::Method::Constructor;
 use Mouse::Meta::Method::Destructor;
-use Scalar::Util qw/blessed/;
-use Mouse::Util qw/get_linear_isa/;
+use Scalar::Util qw/blessed weaken/;
+use Mouse::Util qw/get_linear_isa version authority identifier/;
 use Carp 'confess';
 
 do {
@@ -20,12 +20,24 @@ do {
     }
 
     sub initialize {
-        my $class = shift;
-        my $name  = shift;
+        my $class = blessed($_[0]) || $_[0];
+        my $name  = $_[1];
+
         $METACLASS_CACHE{$name} = $class->new(name => $name)
             if !exists($METACLASS_CACHE{$name});
         return $METACLASS_CACHE{$name};
     }
+
+    # Means of accessing all the metaclasses that have
+    # been initialized thus far
+    sub get_all_metaclasses         {        %METACLASS_CACHE         }
+    sub get_all_metaclass_instances { values %METACLASS_CACHE         }
+    sub get_all_metaclass_names     { keys   %METACLASS_CACHE         }
+    sub get_metaclass_by_name       { $METACLASS_CACHE{$_[0]}         }
+    sub store_metaclass_by_name     { $METACLASS_CACHE{$_[0]} = $_[1] }
+    sub weaken_metaclass            { weaken($METACLASS_CACHE{$_[0]}) }
+    sub does_metaclass_exist        { exists $METACLASS_CACHE{$_[0]} && defined $METACLASS_CACHE{$_[0]} }
+    sub remove_metaclass_by_name    { $METACLASS_CACHE{$_[0]} = undef }
 };
 
 sub new {
@@ -68,6 +80,12 @@ sub add_method {
     *{ $pkg . '::' . $name } = $code;
 }
 
+sub has_method {
+    my $self = shift;
+    my $name = shift;
+    $self->name->can($name);
+}
+
 # copied from Class::Inspector
 my $get_methods_for_class = sub {
     my $self = shift;
@@ -76,7 +94,7 @@ my $get_methods_for_class = sub {
     no strict 'refs';
     # Get all the CODE symbol table entries
     my @functions =
-      grep !/^(?:has|with|around|before|after|blessed|extends|confess|override|super)$/,
+      grep !/^(?:has|with|around|before|after|augment|inner|blessed|extends|confess|override|super)$/,
       grep { defined &{"${name}::$_"} }
       keys %{"${name}::"};
     push @functions, keys %{$self->{'methods'}->{$name}} if $self;
@@ -129,7 +147,8 @@ sub add_attribute {
     }
 }
 
-sub compute_all_applicable_attributes {
+sub compute_all_applicable_attributes { shift->get_all_attributes(@_) }
+sub get_all_attributes {
     my $self = shift;
     my (@attr, %seen);
 
@@ -149,6 +168,10 @@ sub compute_all_applicable_attributes {
 sub get_attribute_map { $_[0]->{attributes} }
 sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     { $_[0]->{attributes}->{$_[1]} }
+sub get_attribute_list {
+    my $self = shift;
+    keys %{$self->get_attribute_map};
+}
 
 sub linearized_isa { @{ get_linear_isa($_[0]->name) } }
 
@@ -170,7 +193,7 @@ sub clone_instance {
 
     my $clone = bless { %$instance }, ref $instance;
 
-    foreach my $attr ($class->compute_all_applicable_attributes()) {
+    foreach my $attr ($class->get_all_attributes()) {
         if ( defined( my $init_arg = $attr->init_arg ) ) {
             if (exists $params{$init_arg}) {
                 $clone->{ $attr->name } = $params{$init_arg};
@@ -260,6 +283,22 @@ sub add_after_method_modifier {
     $self->_install_modifier( $self->name, 'after', $name, $code );
 }
 
+sub add_override_method_modifier {
+    my ($self, $name, $code) = @_;
+
+    my $pkg = $self->name;
+    my $method = "${pkg}::${name}";
+
+    # Class::Method::Modifiers won't do this for us, so do it ourselves
+
+    my $body = $pkg->can($name)
+        or confess "You cannot override '$method' because it has no super method";
+
+    no strict 'refs';
+    *$method = sub { $code->($pkg, $body, @_) };
+}
+
+
 sub roles { $_[0]->{roles} }
 
 sub does_role {
@@ -268,8 +307,11 @@ sub does_role {
     (defined $role_name)
         || confess "You must supply a role name to look for";
 
-    for my $role (@{ $self->{roles} }) {
-        return 1 if $role->name eq $role_name;
+    for my $class ($self->linearized_isa) {
+        next unless $class->can('meta') and $class->meta->can('roles');
+        for my $role (@{ $self->roles }) {
+            return 1 if $role->name eq $role_name;
+        }
     }
 
     return 0;
@@ -382,7 +424,7 @@ Gets (or sets) the list of superclasses of the owner class.
 Begins keeping track of the existing L<Mouse::Meta::Attribute> for the owner
 class.
 
-=head2 compute_all_applicable_attributes -> (Mouse::Meta::Attribute)
+=head2 get_all_attributes -> (Mouse::Meta::Attribute)
 
 Returns the list of all L<Mouse::Meta::Attribute> instances associated with
 this class and its superclasses.
@@ -391,6 +433,12 @@ this class and its superclasses.
 
 Returns a mapping of attribute names to their corresponding
 L<Mouse::Meta::Attribute> objects.
+
+=head2 get_attribute_list -> { name => Mouse::Meta::Attribute }
+
+This returns a list of attribute names which are defined in the local
+class. If you want a list of all applicable attributes for a class,
+use the C<get_all_attributes> method.
 
 =head2 has_attribute Name -> Bool
 

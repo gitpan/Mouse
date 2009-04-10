@@ -5,15 +5,19 @@ use warnings;
 sub generate_constructor_method_inline {
     my ($class, $meta) = @_;
 
+    my $associated_metaclass_name = $meta->name;
     my @attrs = $meta->compute_all_applicable_attributes;
     my $buildall = $class->_generate_BUILDALL($meta);
     my $buildargs = $class->_generate_BUILDARGS($meta);
     my $processattrs = $class->_generate_processattrs($meta, \@attrs);
+    my @compiled_constraints = map { $_ ? $_->{_compiled_type_constraint} : undef } map { $_->{type_constraint} } @attrs;
 
     my $code = <<"...";
     sub {
         my \$class = shift;
-        my \$args = $buildargs;
+        return \$class->Mouse::Object::new(\@_)
+            if \$class ne '$associated_metaclass_name';
+        $buildargs;
         my \$instance = bless {}, \$class;
         $processattrs;
         $buildall;
@@ -22,6 +26,7 @@ sub generate_constructor_method_inline {
 ...
 
     local $@;
+    # warn $code;
     my $res = eval $code;
     die $@ if $@;
     $res;
@@ -42,19 +47,24 @@ sub _generate_processattrs {
             $code .= "if (exists \$args->{'$from'}) {\n";
 
             if ($attr->should_coerce && $attr->type_constraint) {
-                $code .= "my \$value = Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{find_type_constraint}, \$attrs[$index]->{type_constraint}, \$args->{'$from'});\n";
+                $code .= "my \$value = Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, \$args->{'$from'});\n";
             }
             else {
                 $code .= "my \$value = \$args->{'$from'};\n";
             }
 
             if ($attr->has_type_constraint) {
-                $code .= "{
-                    local \$_ = \$value;
-                    unless (\$attrs[$index]->{find_type_constraint}->(\$_)) {
-                        \$attrs[$index]->verify_type_constraint_error('$key', \$_, \$attrs[$index]->type_constraint)
+                if ($attr->type_constraint->{_compiled_type_constraint}) {
+                    $code .= "unless (\$compiled_constraints[$index](\$value)) {";
+                } else {
+                    $code .= "unless (\$attrs[$index]->{type_constraint}->check(\$value)) {";
+                }
+                $code .= "
+                        \$attrs[$index]->verify_type_constraint_error(
+                            '$key', \$_, \$attrs[$index]->type_constraint
+                        )
                     }
-                }";
+                ";
             }
 
             $code .= "\$instance->{'$key'} = \$value;\n";
@@ -64,7 +74,7 @@ sub _generate_processattrs {
             }
 
             if ($attr->has_trigger) {
-                $code .= "\$attrs[$index]->{trigger}->( \$instance, \$value, \$attrs[$index] );\n";
+                $code .= "\$attrs[$index]->{trigger}->( \$instance, \$value );\n";
             }
 
             $code .= "\n} else {\n";
@@ -78,7 +88,7 @@ sub _generate_processattrs {
                 $code .= "my \$value = ";
 
                 if ($attr->should_coerce && $attr->type_constraint) {
-                    $code .= "Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{find_type_constraint}, \$attrs[$index]->{type_constraint}, ";
+                    $code .= "Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, ";
                 }
 
                     if ($attr->has_builder) {
@@ -106,8 +116,7 @@ sub _generate_processattrs {
 
                 if ($attr->has_type_constraint) {
                     $code .= "{
-                        local \$_ = \$value;
-                        unless (\$attrs[$index]->{find_type_constraint}->(\$_)) {
+                        unless (\$attrs[$index]->{type_constraint}->check(\$value)) {
                             \$attrs[$index]->verify_type_constraint_error('$key', \$_, \$attrs[$index]->type_constraint)
                         }
                     }";
@@ -137,25 +146,19 @@ sub _generate_BUILDARGS {
     my $meta = shift;
 
     if ($meta->name->can('BUILDARGS') && $meta->name->can('BUILDARGS') != Mouse::Object->can('BUILDARGS')) {
-        return '$class->BUILDARGS(@_)';
+        return 'my $args = $class->BUILDARGS(@_)';
     }
 
     return <<'...';
-    do {
+        my $args;
         if ( scalar @_ == 1 ) {
-            if ( defined $_[0] ) {
-                ( ref( $_[0] ) eq 'HASH' )
+            ( ref( $_[0] ) eq 'HASH' )
                 || Carp::confess "Single parameters to new() must be a HASH ref";
-                +{ %{ $_[0] } };
-            }
-            else {
-                +{};
-            }
+            $args = +{ %{ $_[0] } };
         }
         else {
-            +{@_};
+            $args = +{@_};
         }
-    };
 ...
 }
 
@@ -170,7 +173,7 @@ sub _generate_BUILDALL {
     no warnings 'once';
     for my $klass ($meta->linearized_isa) {
         if (*{ $klass . '::BUILD' }{CODE}) {
-            push  @code, qq{${klass}::BUILD(\$instance, \$args);};
+            unshift  @code, qq{${klass}::BUILD(\$instance, \$args);};
         }
     }
     return join "\n", @code;
