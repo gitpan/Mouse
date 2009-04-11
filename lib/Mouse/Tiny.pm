@@ -227,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -642,9 +642,7 @@ sub verify_against_type_constraint {
 
 sub verify_type_constraint_error {
     my($self, $name, $value, $type) = @_;
-    $type = ref($type) eq 'ARRAY' ? join '|', map { $_->name } @{ $type } : $type->name;
-    my $display = defined($value) ? overload::StrVal($value) : 'undef';
-    Carp::confess("Attribute ($name) does not pass the type constraint because: Validation failed for \'$type\' failed with value $display");
+    Carp::confess("Attribute ($name) does not pass the type constraint because: " . $type->get_message($value));
 }
 
 sub coerce_constraint { ## my($self, $value) = @_;
@@ -1201,7 +1199,7 @@ sub generate_constructor_method_inline {
     my ($class, $meta) = @_;
 
     my $associated_metaclass_name = $meta->name;
-    my @attrs = $meta->compute_all_applicable_attributes;
+    my @attrs = $meta->get_all_attributes;
     my $buildall = $class->_generate_BUILDALL($meta);
     my $buildargs = $class->_generate_BUILDARGS($meta);
     my $processattrs = $class->_generate_processattrs($meta, \@attrs);
@@ -1512,7 +1510,7 @@ sub apply {
                 # XXX what's Moose's behavior?
                 #next;
             } else {
-                *$class_function = *$role_function;
+                *{$class_function} = \&{$role_function};
             }
             if ($args{alias} && $args{alias}->{$name}) {
                 my $dstname = $args{alias}->{$name};
@@ -1729,7 +1727,11 @@ sub new {
         $check = $check->{_compiled_type_constraint};
     }
 
-    bless +{ name => $name, _compiled_type_constraint => $check }, $class;
+    bless +{
+        name                      => $name,
+        _compiled_type_constraint => $check,
+        message                   => $args{message}
+    }, $class;
 }
 
 sub name { shift->{name} }
@@ -1737,6 +1739,25 @@ sub name { shift->{name} }
 sub check {
     my $self = shift;
     $self->{_compiled_type_constraint}->(@_);
+}
+
+sub message {
+    return $_[0]->{message};
+}
+
+sub get_message {
+    my ($self, $value) = @_;
+    if ( my $msg = $self->message ) {
+        local $_ = $value;
+        return $msg->($value);
+    }
+    else {
+        $value = ( defined $value ? overload::StrVal($value) : 'undef' );
+        return
+            "Validation failed for '"
+          . $self->name
+          . "' failed with value $value";
+    }
 }
 
 package Mouse::Object;
@@ -1753,7 +1774,7 @@ sub new {
 
     my $instance = bless {}, $class;
 
-    for my $attribute ($class->meta->compute_all_applicable_attributes) {
+    for my $attribute ($class->meta->get_all_attributes) {
         my $from = $attribute->init_arg;
         my $key  = $attribute->name;
 
@@ -2131,8 +2152,8 @@ sub subtype {
     if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
         Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
     };
-    my $constraint = $conf{where};
-    my $as_constraint = find_or_create_isa_type_constraint($conf{as} || 'Any');
+    my $constraint = delete $conf{where};
+    my $as_constraint = find_or_create_isa_type_constraint(delete $conf{as} || 'Any');
 
     $TYPE_SOURCE{$name} = $pkg;
     $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
@@ -2148,6 +2169,7 @@ sub subtype {
                 $as_constraint->check($_[0]);
             }
         ),
+        %conf
     );
 
     return $name;
@@ -2360,7 +2382,7 @@ sub find_or_create_isa_type_constraint {
 
 }; #eval
 } #unless
-} # XXX: 2009-04-09 Sartak: no idea why I had to add this brace. Compile errors without it!
+} # XXX added manually
 
 package Mouse::Tiny;
 use base 'Mouse';

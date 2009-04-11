@@ -10,6 +10,17 @@
 
 use strict;
 use warnings;
+use Test::More;
+
+BEGIN {
+    plan skip_all => 
+            "This test requires Class::Method::Modifiers or Class::Method::Modifiers::Fast" 
+        unless eval { 
+            require Class::Method::Modifiers::Fast;
+        } or   eval {
+            require Class::Method::Modifiers;
+        };
+}
 
 # functions to capture the output of the tutorial
 our $DUMMY_STDOUT = "";
@@ -105,7 +116,7 @@ no Mouse;
 ######################################################################
 # Now the tests
 package main;
-use Test::More tests => 5;
+plan tests => 5;
 
 #use Horse;
 my $talking = Horse->new(name => 'Mr. Ed');
@@ -114,7 +125,6 @@ is stdout, "Mr. Ed\n";
 $talking->color("grey");        # sets the color
 $talking->speak;                # says "Mr. Ed goes neigh"
 
-TODO: { local $TODO = "this currently fails because of a bug in Class::Method::Modifiers (see RT #42992)";
 is stdout, <<EXPECTED;
 Mr. Ed goes neigh
 EXPECTED
@@ -126,7 +136,6 @@ $baab->speak;                   # prints "Baab goes baaaah"
 is stdout, <<EXPECTED;
 Baab goes baaaah
 EXPECTED
-    }
 
 #use MouseA
 my $mickey = MouseA->new(name => 'Mickey');
