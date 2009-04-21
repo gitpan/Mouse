@@ -227,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -631,13 +631,14 @@ sub validate_args {
 }
 
 sub verify_against_type_constraint {
-    return 1 unless $_[0]->{type_constraint};
+    my ($self, $value) = @_;
+    my $tc = $self->type_constraint;
+    return 1 unless $tc;
 
-    local $_ = $_[1];
-    return 1 if $_[0]->{type_constraint}->check($_);
+    local $_ = $value;
+    return 1 if $tc->check($value);
 
-    my $self = shift;
-    $self->verify_type_constraint_error($self->name, $_, $self->{type_constraint});
+    $self->verify_type_constraint_error($self->name, $value, $tc);
 }
 
 sub verify_type_constraint_error {
@@ -998,7 +999,7 @@ sub does_role {
 
     for my $class ($self->linearized_isa) {
         next unless $class->can('meta') and $class->meta->can('roles');
-        for my $role (@{ $self->roles }) {
+        for my $role (@{ $class->meta->roles }) {
             return 1 if $role->name eq $role_name;
         }
     }
@@ -1254,7 +1255,7 @@ sub _generate_processattrs {
                 }
                 $code .= "
                         \$attrs[$index]->verify_type_constraint_error(
-                            '$key', \$_, \$attrs[$index]->type_constraint
+                            '$key', \$value, \$attrs[$index]->type_constraint
                         )
                     }
                 ";
@@ -1310,7 +1311,7 @@ sub _generate_processattrs {
                 if ($attr->has_type_constraint) {
                     $code .= "{
                         unless (\$attrs[$index]->{type_constraint}->check(\$value)) {
-                            \$attrs[$index]->verify_type_constraint_error('$key', \$_, \$attrs[$index]->type_constraint)
+                            \$attrs[$index]->verify_type_constraint_error('$key', \$value, \$attrs[$index]->type_constraint)
                         }
                     }";
                 }
@@ -2382,7 +2383,7 @@ sub find_or_create_isa_type_constraint {
 
 }; #eval
 } #unless
-} # XXX added manually
+} # argh!
 
 package Mouse::Tiny;
 use base 'Mouse';

@@ -1,4 +1,3 @@
-.gitignore
 author/benchmarks/basic.pl
 author/benchmarks/caf.pl
 author/generate-mouse-tiny.pl
@@ -137,6 +136,7 @@ t/400-define-role.t
 t/401-meta-role.t
 t/402-attribute-application.t
 t/403-method-modifiers.t
+t/404-role-overrides.t
 t/500_moose_extends_mouse.t
 t/501_moose_coerce_mouse.t
 t/600-tiny-tiny.t
@@ -157,7 +157,9 @@ t/800_shikabased/012-role-compatibility.t
 t/800_shikabased/013-compatibility-get_method_list.t
 t/800_shikabased/014-subtype-as.t
 t/900_bug/001_immutable_types.t
+t/900_bug/002_does_role_should_search_parent.t
 t/lib/BaseClass.pm
 t/lib/ClassType_Foo.pm
 t/lib/SyntaxError.pm
 t/lib/Unsweetened.pm
+xt/99_pod.t
