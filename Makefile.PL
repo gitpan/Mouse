@@ -1,4 +1,5 @@
 use inc::Module::Install;
+use 5.008;
 
 name     'Mouse';
 all_from 'lib/Mouse.pm';
@@ -9,8 +10,8 @@ tests 't/*.t t/*/*.t';
 # > Fixed looks_like_number(undef) to return false for perl >= 5.009002
 requires 'Scalar::Util' => 1.14;
 
-build_requires 'Test::Exception';
-build_requires 'Test::More';
+build_requires 'Test::Exception' => 0.21;
+build_requires 'Test::More' => 0.80;
 
 if ($Module::Install::AUTHOR) {
     if (eval "package foo; use Moose; 1;") {

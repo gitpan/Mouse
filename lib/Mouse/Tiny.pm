@@ -227,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -405,6 +405,12 @@ sub is_class_loaded {
 
     # fail
     return 0;
+}
+
+sub class_of {
+    return unless defined $_[0];
+    my $class = blessed($_[0]) || $_[0];
+    return Mouse::Meta::Class::get_metaclass_by_name($class);
 }
 
 package Mouse::Meta::Attribute;
@@ -1865,10 +1871,23 @@ sub DEMOLISHALL {
 
     no strict 'refs';
 
-    for my $class ($self->meta->linearized_isa) {
-        my $code = *{ $class . '::DEMOLISH' }{CODE}
-            or next;
-        $code->($self, @_);
+    my @isa;
+    if ( my $meta = Mouse::class_of($self) ) {
+        @isa = $meta->linearized_isa;
+    } else {
+        # We cannot count on being able to retrieve a previously made
+        # metaclass, _or_ being able to make a new one during global
+        # destruction. However, we should still be able to use mro at
+        # that time (at least tests suggest so ;)
+        my $class_name = ref $self;
+        @isa = @{ Mouse::Util::get_linear_isa($class_name) }
+    }
+
+    foreach my $class (@isa) {
+        no strict 'refs';
+        my $demolish = *{"${class}::DEMOLISH"}{CODE};
+        $self->$demolish
+            if defined $demolish;
     }
 }
 
@@ -2383,7 +2402,7 @@ sub find_or_create_isa_type_constraint {
 
 }; #eval
 } #unless
-} # argh!
+}
 
 package Mouse::Tiny;
 use base 'Mouse';

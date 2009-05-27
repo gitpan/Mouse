@@ -4,7 +4,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -189,6 +189,12 @@ sub is_class_loaded {
 
     # fail
     return 0;
+}
+
+sub class_of {
+    return unless defined $_[0];
+    my $class = blessed($_[0]) || $_[0];
+    return Mouse::Meta::Class::get_metaclass_by_name($class);
 }
 
 1;
@@ -446,7 +452,9 @@ with plenty of code borrowed from L<Class::MOP> and L<Moose>
 
 =head1 BUGS
 
-No known bugs.
+There is a known issue with Mouse on 5.6.2 regarding the @ISA tests. Until
+this is resolve the minimum version of Perl for Mouse is set to 5.8.0. Patches
+to resolve these tests are more than welcome.
 
 Please report any bugs through RT: email
 C<bug-mouse at rt.cpan.org>, or browse
