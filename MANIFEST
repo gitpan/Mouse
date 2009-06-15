@@ -122,6 +122,7 @@ t/046-meta-add_attribute.t
 t/047-attribute-metaclass-role.t
 t/049-coercion-application-order.t
 t/050-inherited-immutable-constructor-bug.t
+t/050_metaclasses/011_init_meta.t
 t/100-meta-class.t
 t/101-meta-attribute.t
 t/201-squirrel.t

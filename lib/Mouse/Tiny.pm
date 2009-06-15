@@ -2,7 +2,7 @@
 
 # if regular Mouse is loaded, bail out
 unless ($INC{'Mouse.pm'}) {
-eval q{
+eval <<'END_OF_TINY';
 
 # tell Perl we already have all of the Mouse files loaded:
 $INC{'Mouse.pm'} = __FILE__;
@@ -227,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -304,6 +304,46 @@ sub override {
     });
 }
 
+sub init_meta {
+    # This used to be called as a function. This hack preserves
+    # backwards compatibility.
+    if ( $_[0] ne __PACKAGE__ ) {
+        return __PACKAGE__->init_meta(
+            for_class  => $_[0],
+            base_class => $_[1],
+            metaclass  => $_[2],
+        );
+    }
+
+    shift;
+    my %args = @_;
+
+    my $class = $args{for_class}
+      or Carp::croak(
+        "Cannot call init_meta without specifying a for_class");
+    my $base_class = $args{base_class} || 'Mouse::Object';
+    my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
+
+    Carp::croak("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
+            unless $metaclass->isa('Mouse::Meta::Class');
+    
+    # make a subtype for each Mouse class
+    class_type($class)
+        unless find_type_constraint($class);
+
+    my $meta = $metaclass->initialize($class);
+    $meta->superclasses($base_class)
+        unless $meta->superclasses;
+
+    {
+        no strict 'refs';
+        no warnings 'redefine';
+        *{$class.'::meta'} = sub { $meta };
+    }
+
+    return $meta;
+}
+
 sub import {
     my $class = shift;
 
@@ -327,16 +367,9 @@ sub import {
         return;
     }
 
-    my $meta = Mouse::Meta::Class->initialize($caller);
-    $meta->superclasses('Mouse::Object')
-        unless $meta->superclasses;
-
-    # make a subtype for each Mouse class
-    class_type($caller) unless find_type_constraint($caller);
-
-    no strict 'refs';
-    no warnings 'redefine';
-    *{$caller.'::meta'} = sub { $meta };
+    Mouse->init_meta(
+        for_class  => $caller,
+    );
 
     if (@_) {
         __PACKAGE__->export_to_level( $level+1, $class, @_);
@@ -905,6 +938,7 @@ sub make_immutable {
     my $self = shift;
     my %args = (
         inline_constructor => 1,
+        inline_destructor  => 1,
         @_,
     );
 
@@ -2400,9 +2434,8 @@ sub find_or_create_isa_type_constraint {
     return $code;
 }
 
-}; #eval
+END_OF_TINY
 } #unless
-}
 
 package Mouse::Tiny;
 use base 'Mouse';
