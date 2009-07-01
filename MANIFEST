@@ -24,7 +24,6 @@ lib/Mouse/Meta/Role.pm
 lib/Mouse/Meta/TypeConstraint.pm
 lib/Mouse/Object.pm
 lib/Mouse/Role.pm
-lib/Mouse/Tiny.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
 lib/Mouse/Util/TypeConstraints.pm
