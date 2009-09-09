@@ -227,7 +227,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -654,8 +654,7 @@ sub validate_args {
 
     confess "You cannot auto-dereference anything other than a ArrayRef or HashRef on attribute ($name)"
         if $args->{auto_deref}
-        && $args->{isa} ne 'ArrayRef'
-        && $args->{isa} ne 'HashRef';
+        && $args->{isa} !~ /^(?:ArrayRef|HashRef)(?:\[.*\])?$/;
 
     if ($args->{trigger}) {
         if (ref($args->{trigger}) eq 'HASH') {
@@ -1212,7 +1211,7 @@ sub generate_accessor_method_inline {
     }
 
     if ($should_deref) {
-        if (ref($constraint) && $constraint->name eq 'ArrayRef') {
+        if (ref($constraint) && $constraint->name =~ '^ArrayRef\b') {
             $accessor .= 'if (wantarray) {
                 return @{ '.$self.'->{'.$key.'} || [] };
             }';

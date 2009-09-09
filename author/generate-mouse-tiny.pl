@@ -4,8 +4,10 @@ use warnings;
 use File::Find;
 use File::Slurp 'slurp';
 use List::MoreUtils 'uniq';
+use autodie;
 
-unlink 'lib/Mouse/Tiny.pm';
+unlink 'lib/Mouse/Tiny.pm'
+    if -e 'lib/Mouse/Tiny.pm';
 
 my @files;
 

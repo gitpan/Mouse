@@ -24,6 +24,7 @@ if ($Module::Install::AUTHOR) {
     } else {
         print "you don't have a moose. skipping moose compatibility test\n";
     }
+    system("author/generate-mouse-tiny.pl");
 }
 
 auto_include;
