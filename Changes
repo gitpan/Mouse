@@ -1,9 +1,24 @@
 Revision history for Mouse
 
+0.30 Mon Sep 21 16:43:05 2009
+
+    * Work around anonymous classes as mortal classes (gfx)
+
+    * Implement with $role => -exlucdes => [...] (gfx)
+
+    * Implement get_method() in M::Meta::Class and M::Meta::Role (gfx)
+
+    * Make get_method_list() compatible with Moose's (gfx)
+
+    * Make unimport() not to remove non-Mouse functions (blessed and confess) (gfx)
+
+    * Remove a lot of duplication code (gfx)
+
+    * Support is => 'bare', and you must pass and 'is' option to has() (gfx)
+
 0.29 Thu Sep 17 11:49:49 2009
 
-    * role class has ->meta in method_list, because it does in Moose since 0.90
-
+    * role class has ->meta in method_list, because it does in Moose since 0.9
 0.28 Wed Sep  8 20:00:06 2009
     * Alter Makefile.PL so in author mode we generate lib/Mouse/Tiny.pm on
       every run so that 'make dist' actually does what it's meant to (mst)

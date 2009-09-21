@@ -2,18 +2,16 @@
 
 use strict;
 use warnings;
-use Test::More;
-BEGIN {
-    plan skip_all => 
-            "This test requires Class::Method::Modifiers or Class::Method::Modifiers::Fast" 
-        unless eval { 
-            require Class::Method::Modifiers::Fast;
-        } or   eval {
-            require Class::Method::Modifiers;
-        };
-}
 
-plan tests => 86;
+use Test::More;
+BEGIN{
+    if(eval{ require Class::Method::Modifiers::Fast } || eval{ require Class::Method::Modifiers }){
+        plan tests => 86;
+    }
+    else{
+        plan skip_all => 'This test requires Class::Method::Modifiers(::Fast)?';
+    }
+}
 use Test::Exception;
 
 {
@@ -27,7 +25,6 @@ use Test::Exception;
     sub foo {'FooRole::foo'}
 
     override 'boo' => sub { 'FooRole::boo -> ' . super() };
-#    sub boo { 'FooRole::boo -> ' . shift->SUPER::boo() }
 
     around 'blau' => sub {
         my $c = shift;
@@ -103,19 +100,16 @@ ok( !$foobar_class_meta->does_role('OtherRole'),
     '... the FooBarClass->meta !does_role OtherRole' );
 
 foreach my $method_name (qw(bar baz foo boo blau goo)) {
-#    ok( $foo_class_meta->has_method($method_name), ## Mouse: no ->has_method
-    ok( FooClass->can($method_name),
+    #use Data::Dumper; $Data::Dumper::Maxdepth=1; diag(Dumper $foo_class_meta->{methods});
+    ok( $foo_class_meta->has_method($method_name),
         '... FooClass has the method ' . $method_name );
-#    ok( $foobar_class_meta->has_method($method_name), ## Mouse: no ->has_method
-    ok( FooClass->can($method_name),
+    ok( $foobar_class_meta->has_method($method_name),
         '... FooBarClass has the method ' . $method_name );
 }
 
-#ok( !$foo_class_meta->has_method('woot'), ## Mouse: no ->has_method
-ok( !FooClass->can('woot'),
+ok( !$foo_class_meta->has_method('woot'),
     '... FooClass lacks the method woot' );
-#ok( $foobar_class_meta->has_method('woot'), ## Mouse: no ->has_method
-ok( FooBarClass->can('woot'),
+ok( $foobar_class_meta->has_method('woot'),
     '... FooBarClass has the method woot' );
 
 foreach my $attr_name (qw(bar baz)) {

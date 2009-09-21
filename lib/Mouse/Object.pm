@@ -2,65 +2,15 @@ package Mouse::Object;
 use strict;
 use warnings;
 
-use Scalar::Util 'weaken';
-use Carp 'confess';
-
 sub new {
     my $class = shift;
 
+    $class->throw_error('Cannot call new() on an instance') if ref $class;
+
     my $args = $class->BUILDARGS(@_);
 
-    my $instance = bless {}, $class;
-
-    for my $attribute ($class->meta->get_all_attributes) {
-        my $from = $attribute->init_arg;
-        my $key  = $attribute->name;
-
-        if (defined($from) && exists($args->{$from})) {
-            $args->{$from} = $attribute->coerce_constraint($args->{$from})
-                if $attribute->should_coerce;
-            $attribute->verify_against_type_constraint($args->{$from});
-
-            $instance->{$key} = $args->{$from};
-
-            weaken($instance->{$key})
-                if ref($instance->{$key}) && $attribute->is_weak_ref;
-
-            if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args->{$from});
-            }
-        }
-        else {
-            if ($attribute->has_default || $attribute->has_builder) {
-                unless ($attribute->is_lazy) {
-                    my $default = $attribute->default;
-                    my $builder = $attribute->builder;
-                    my $value = $attribute->has_builder
-                              ? $instance->$builder
-                              : ref($default) eq 'CODE'
-                                  ? $default->($instance)
-                                  : $default;
-
-                    $value = $attribute->coerce_constraint($value)
-                        if $attribute->should_coerce;
-                    $attribute->verify_against_type_constraint($value);
-
-                    $instance->{$key} = $value;
-
-                    weaken($instance->{$key})
-                        if ref($instance->{$key}) && $attribute->is_weak_ref;
-                }
-            }
-            else {
-                if ($attribute->is_required) {
-                    confess "Attribute (".$attribute->name.") is required";
-                }
-            }
-        }
-    }
-
+    my $instance = Mouse::Meta::Class->initialize($class)->new_object($args);
     $instance->BUILDALL($args);
-
     return $instance;
 }
 
@@ -69,7 +19,7 @@ sub BUILDARGS {
 
     if (scalar @_ == 1) {
         (ref($_[0]) eq 'HASH')
-            || confess "Single parameters to new() must be a HASH ref";
+            || $class->meta->throw_error("Single parameters to new() must be a HASH ref");
         return {%{$_[0]}};
     }
     else {
@@ -92,6 +42,7 @@ sub BUILDALL {
             or next;
         $code->($self, @_);
     }
+    return;
 }
 
 sub DEMOLISHALL {
@@ -100,47 +51,35 @@ sub DEMOLISHALL {
     # short circuit
     return unless $self->can('DEMOLISH');
 
-    no strict 'refs';
+    # We cannot count on being able to retrieve a previously made
+    # metaclass, _or_ being able to make a new one during global
+    # destruction. However, we should still be able to use mro at
+    # that time (at least tests suggest so ;)
 
-    my @isa;
-    if ( my $meta = Mouse::class_of($self) ) {
-        @isa = $meta->linearized_isa;
-    } else {
-        # We cannot count on being able to retrieve a previously made
-        # metaclass, _or_ being able to make a new one during global
-        # destruction. However, we should still be able to use mro at
-        # that time (at least tests suggest so ;)
-        my $class_name = ref $self;
-        @isa = @{ Mouse::Util::get_linear_isa($class_name) }
-    }
-
-    foreach my $class (@isa) {
-        no strict 'refs';
-        my $demolish = *{"${class}::DEMOLISH"}{CODE};
-        $self->$demolish
+    foreach my $class (@{ Mouse::Util::get_linear_isa(ref $self) }) {
+        my $demolish = do{ no strict 'refs'; *{"${class}::DEMOLISH"}{CODE} };
+        $self->$demolish()
             if defined $demolish;
     }
+    return;
 }
 
 sub dump { 
-    my $self = shift;
-    require Data::Dumper;
-    local $Data::Dumper::Maxdepth = shift if @_;
-    Data::Dumper::Dumper $self;
+    my($self, $maxdepth) = @_;
+
+    require 'Data/Dumper.pm'; # we don't want to create its namespace
+    my $dd = Data::Dumper->new([$self]);
+    $dd->Maxdepth($maxdepth || 1);
+    return $dd->Dump();
 }
 
 
 sub does {
     my ($self, $role_name) = @_;
     (defined $role_name)
-        || confess "You must supply a role name to does()";
-    my $meta = $self->meta;
-    foreach my $class ($meta->linearized_isa) {
-        my $m = $meta->initialize($class);
-        return 1 
-            if $m->can('does_role') && $m->does_role($role_name);            
-    }
-    return 0;   
+        || $self->meta->throw_error("You must supply a role name to does()");
+
+    return $self->meta->does_role($role_name);
 };
 
 1;

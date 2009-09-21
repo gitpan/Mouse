@@ -1,11 +1,9 @@
 package Mouse::Meta::Method::Accessor;
 use strict;
 use warnings;
-use Carp ();
 
-# internal use only. do not call directly
-sub generate_accessor_method_inline {
-    my ($class, $attribute) = @_;
+sub _install_accessor{
+    my (undef, $attribute, $method_name, $class, $type) = @_;
 
     my $name          = $attribute->name;
     my $default       = $attribute->default;
@@ -19,16 +17,26 @@ sub generate_accessor_method_inline {
     my $compiled_type_constraint    = $constraint ? $constraint->{_compiled_type_constraint} : undef;
 
     my $self  = '$_[0]';
-    my $key   = $attribute->inlined_name;
+    my $key   = $attribute->_inlined_name;
+
+    $type ||= 'accessor';
 
     my $accessor = 
         '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
         "sub {\n";
-    if ($attribute->_is_metadata eq 'rw') {
-        $accessor .= 
-            '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
-            'if (scalar(@_) >= 2) {' . "\n";
-
+    if ($type eq 'accessor' || $type eq 'writer') {
+        if($type eq 'accessor'){
+            $accessor .= 
+                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                'if (scalar(@_) >= 2) {' . "\n";
+        }
+        else{ # writer
+            $accessor .= 
+                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
+                'if(@_ < 2){ Carp::confess("Not enough arguments for writer '.$method_name.'") }'.
+                '{' . "\n";
+        }
+                
         my $value = '$_[1]';
 
         if ($constraint) {
@@ -72,8 +80,11 @@ sub generate_accessor_method_inline {
 
         $accessor .= "}\n";
     }
-    else {
+    elsif($type eq 'reader') {
         $accessor .= 'Carp::confess("Cannot assign a value to a read-only accessor") if scalar(@_) >= 2;' . "\n";
+    }
+    else{
+        $class->throw_error("Unknown accessor type '$type'");
     }
 
     if ($attribute->is_lazy) {
@@ -88,24 +99,98 @@ sub generate_accessor_method_inline {
     }
 
     if ($should_deref) {
-        if (ref($constraint) && $constraint->name =~ '^ArrayRef\b') {
+        if ($constraint->is_a_type_of('ArrayRef')) {
             $accessor .= 'if (wantarray) {
                 return @{ '.$self.'->{'.$key.'} || [] };
             }';
         }
-        else {
+        elsif($constraint->is_a_type_of('HashRef')){
             $accessor .= 'if (wantarray) {
                 return %{ '.$self.'->{'.$key.'} || {} };
             }';
         }
+        else{
+            $class->throw_error("Can not auto de-reference the type constraint " . $constraint->name);
+        }
     }
 
-    $accessor .= 'return '.$self.'->{'.$key.'};
-    }';
+    $accessor .= 'return '.$self.'->{'.$key."};\n}";
 
-    my $sub = eval $accessor;
-    Carp::confess($@) if $@;
-    return $sub;
+    #print $accessor, "\n";
+    my $code = eval $accessor;
+    $attribute->throw_error($@) if $@;
+
+    $class->add_method($method_name => $code);
+    return;
 }
+
+sub _install_reader{
+    my $class = shift;
+    $class->_install_accessor(@_, 'reader');
+    return;
+}
+
+sub _install_writer{
+    my $class = shift;
+    $class->_install_accessor(@_, 'writer');
+    return;
+}
+
+
+sub _install_predicate {
+    my (undef, $attribute, $method_name, $class) = @_;
+
+    my $key = $attribute->_inlined_name;
+
+    my $predicate = 'sub { exists($_[0]->{'.$key.'}) }';
+
+    my $code = eval $predicate;
+    $attribute->throw_error($@) if $@;
+    $class->add_method($method_name => $code);
+    return;
+}
+
+sub _install_clearer {
+    my (undef, $attribute, $method_name, $class) = @_;
+
+    my $key = $attribute->_inlined_name;
+
+    my $clearer = 'sub { delete($_[0]->{'.$key.'}) }';
+
+    my $code = eval $clearer;
+    $attribute->throw_error($@) if $@;
+    $class->add_method($method_name => $code);
+    return;
+}
+
+sub _install_handles {
+    my (undef, $attribute, $handles, $class) = @_;
+
+    my $reader  = $attribute->name;
+    my %handles = $attribute->_canonicalize_handles($handles);
+
+    my @methods;
+
+    foreach my $local_method (keys %handles) {
+        my $remote_method = $handles{$local_method};
+
+        my $method = 'sub {
+            my $self = shift;
+            $self->'.$reader.'->'.$remote_method.'(@_)
+        }';
+
+        my $code = eval $method;
+        $attribute->throw_error($@) if $@;
+
+        push @methods, ($local_method => $code);
+    }
+
+    # install after all the method compiled successfully
+    while(my($name, $code) = splice @methods, 0, 2){
+        $class->add_method($name, $code);
+    }
+    return;
+}
+
 
 1;

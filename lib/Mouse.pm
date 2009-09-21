@@ -4,28 +4,33 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
-use Mouse::Util;
+use Mouse::Util qw(load_class is_class_loaded);
 
 use Mouse::Meta::Attribute;
+use Mouse::Meta::Module; # class_of()
 use Mouse::Meta::Class;
 use Mouse::Object;
 use Mouse::Util::TypeConstraints;
 
 our @EXPORT = qw(extends has before after around override super blessed confess with);
 
-sub extends { Mouse::Meta::Class->initialize(caller)->superclasses(@_) }
+our %is_removable = map{ $_ => undef } @EXPORT;
+delete $is_removable{blessed};
+delete $is_removable{confess};
+
+sub extends { Mouse::Meta::Class->initialize(scalar caller)->superclasses(@_) }
 
 sub has {
-    my $meta = Mouse::Meta::Class->initialize(caller);
+    my $meta = Mouse::Meta::Class->initialize(scalar caller);
     $meta->add_attribute(@_);
 }
 
 sub before {
-    my $meta = Mouse::Meta::Class->initialize(caller);
+    my $meta = Mouse::Meta::Class->initialize(scalar caller);
 
     my $code = pop;
 
@@ -35,7 +40,7 @@ sub before {
 }
 
 sub after {
-    my $meta = Mouse::Meta::Class->initialize(caller);
+    my $meta = Mouse::Meta::Class->initialize(scalar caller);
 
     my $code = pop;
 
@@ -45,7 +50,7 @@ sub after {
 }
 
 sub around {
-    my $meta = Mouse::Meta::Class->initialize(caller);
+    my $meta = Mouse::Meta::Class->initialize(scalar caller);
 
     my $code = pop;
 
@@ -55,7 +60,7 @@ sub around {
 }
 
 sub with {
-    Mouse::Util::apply_all_roles((caller)[0], @_);
+    Mouse::Util::apply_all_roles(scalar(caller), @_);
 }
 
 our $SUPER_PACKAGE;
@@ -119,11 +124,10 @@ sub init_meta {
     $meta->superclasses($base_class)
         unless $meta->superclasses;
 
-    {
-        no strict 'refs';
-        no warnings 'redefine';
-        *{$class.'::meta'} = sub { $meta };
-    }
+    $meta->add_method(meta => sub{
+        return Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
+    });
+
 
     return $meta;
 }
@@ -169,65 +173,20 @@ sub import {
 sub unimport {
     my $caller = caller;
 
-    no strict 'refs';
+    my $stash = do{
+        no strict 'refs';
+        \%{$caller . '::'}
+    };
+
     for my $keyword (@EXPORT) {
-        delete ${ $caller . '::' }{$keyword};
+        my $code;
+        if(exists $is_removable{$keyword}
+            && ($code = $caller->can($keyword))
+            && (Mouse::Util::get_code_info($code))[0] eq __PACKAGE__){
+
+            delete $stash->{$keyword};
+        }
     }
-}
-
-sub load_class {
-    my $class = shift;
-
-    if (ref($class) || !defined($class) || !length($class)) {
-        my $display = defined($class) ? $class : 'undef';
-        confess "Invalid class name ($display)";
-    }
-
-    return 1 if $class eq 'Mouse::Object';
-    return 1 if is_class_loaded($class);
-
-    (my $file = "$class.pm") =~ s{::}{/}g;
-
-    eval { CORE::require($file) };
-    confess "Could not load class ($class) because : $@" if $@;
-
-    return 1;
-}
-
-sub is_class_loaded {
-    my $class = shift;
-
-    return 0 if ref($class) || !defined($class) || !length($class);
-
-    # walk the symbol table tree to avoid autovififying
-    # \*{${main::}{"Foo::"}} == \*main::Foo::
-
-    my $pack = \*::;
-    foreach my $part (split('::', $class)) {
-        return 0 unless exists ${$$pack}{"${part}::"};
-        $pack = \*{${$$pack}{"${part}::"}};
-    }
-
-    # check for $VERSION or @ISA
-    return 1 if exists ${$$pack}{VERSION}
-             && defined *{${$$pack}{VERSION}}{SCALAR};
-    return 1 if exists ${$$pack}{ISA}
-             && defined *{${$$pack}{ISA}}{ARRAY};
-
-    # check for any method
-    foreach ( keys %{$$pack} ) {
-        next if substr($_, -2, 2) eq '::';
-        return 1 if defined *{${$$pack}{$_}}{CODE};
-    }
-
-    # fail
-    return 0;
-}
-
-sub class_of {
-    return unless defined $_[0];
-    my $class = blessed($_[0]) || $_[0];
-    return Mouse::Meta::Class::get_metaclass_by_name($class);
 }
 
 1;
@@ -495,6 +454,8 @@ tokuhirom
 Yappo
 
 wu-lee
+
+Goro Fuji (gfx) C<< <gfuji at cpan.org> >>
 
 with plenty of code borrowed from L<Class::MOP> and L<Moose>
 

@@ -1,6 +1,8 @@
 package Mouse::Meta::TypeConstraint;
 use strict;
 use warnings;
+use Carp ();
+
 use overload '""'     => sub { shift->{name} },   # stringify to tc name
              fallback => 1;
 
@@ -28,6 +30,26 @@ sub check {
     $self->{_compiled_type_constraint}->(@_);
 }
 
+sub validate {
+    my ($self, $value) = @_;
+    if ($self->{_compiled_type_constraint}->($value)) {
+        return undef;
+    }
+    else {
+        $self->get_message($value);
+    }
+}
+
+sub assert_valid {
+    my ($self, $value) = @_;
+
+    my $error = $self->validate($value);
+    return 1 if ! defined $error;
+
+    Carp::confess($error);
+}
+
+
 sub message {
     return $_[0]->{message};
 }
@@ -45,6 +67,13 @@ sub get_message {
           . $self->name
           . "' failed with value $value";
     }
+}
+
+sub is_a_type_of{
+    my($self, $tc_name) = @_;
+
+    return $self->name eq $tc_name
+        || $self->name =~ /\A $tc_name \[/xms; # "ArrayRef" =~ "ArrayRef[Foo]"
 }
 
 1;

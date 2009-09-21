@@ -3,25 +3,25 @@
 use strict;
 use warnings;
 
-use Test::More tests => 25;
+use Test::More tests => 26;
 use Test::Exception;
 
 use Mouse::Meta::Role;
 
 {
     package FooRole;
-    
+
     our $VERSION = '0.01';
-    
+
     sub foo { 'FooRole::foo' }
 }
 
 my $foo_role = Mouse::Meta::Role->initialize('FooRole');
 isa_ok($foo_role, 'Mouse::Meta::Role');
-#isa_ok($foo_role, 'Class::MOP::Module'); ## Mouse: doesn't use Class::MOP
+#isa_ok($foo_role, 'Class::MOP::Module');
 
 is($foo_role->name, 'FooRole', '... got the right name of FooRole');
-#is($foo_role->version, '0.01', '... got the right version of FooRole'); ## Mouse: ->version is cfrom Class::MOP
+is($foo_role->version, '0.01', '... got the right version of FooRole');
 
 # methods ...
 
@@ -34,7 +34,7 @@ is_deeply(
     [ $foo_role->get_method_list() ],
     [ 'foo' ],
     '... got the right method list');
-    
+
 # attributes ...
 
 is_deeply(
@@ -56,8 +56,8 @@ is_deeply(
 ok($foo_role->has_attribute('bar'), '... FooRole does have the bar attribute');
 
 is_deeply(
-    $foo_role->get_attribute('bar'),
-    { is => 'rw', isa => 'Foo' },
+    join('|', %{$foo_role->get_attribute('bar')}),
+    join('|', %{+{ is => 'rw', isa => 'Foo' }}),
     '... got the correct description of the bar attribute');
 
 lives_ok {

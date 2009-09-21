@@ -7,11 +7,15 @@ use Carp 'confess', 'croak';
 use Scalar::Util 'blessed';
 
 use Mouse::Meta::Role;
+use Mouse::Util;
 
 our @EXPORT = qw(before after around super override inner augment has extends with requires excludes confess blessed);
+our %is_removable = map{ $_ => undef } @EXPORT;
+delete $is_removable{confess};
+delete $is_removable{blessed};
 
 sub before {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
 
     my $code = pop;
     for (@_) {
@@ -20,7 +24,7 @@ sub before {
 }
 
 sub after {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
 
     my $code = pop;
     for (@_) {
@@ -29,7 +33,7 @@ sub after {
 }
 
 sub around {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
 
     my $code = pop;
     for (@_) {
@@ -74,7 +78,7 @@ sub augment {
 }
 
 sub has {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
 
     my $name = shift;
     my %opts = @_;
@@ -85,7 +89,7 @@ sub has {
 sub extends  { confess "Roles do not currently support 'extends'" }
 
 sub with     {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
     my $role  = shift;
     my $args  = shift || {};
     confess "Mouse::Role only supports 'with' on individual roles at a time" if @_ || !ref $args;
@@ -95,7 +99,7 @@ sub with     {
 }
 
 sub requires {
-    my $meta = Mouse::Meta::Role->initialize(caller);
+    my $meta = Mouse::Meta::Role->initialize(scalar caller);
     Carp::croak "Must specify at least one method" unless @_;
     $meta->add_required_methods(@_);
 }
@@ -116,11 +120,9 @@ sub import {
         return;
     }
 
-    my $meta = Mouse::Meta::Role->initialize(caller);
-
-    no strict 'refs';
-    no warnings 'redefine';
-    *{$caller.'::meta'} = sub { $meta };
+    Mouse::Meta::Role->initialize($caller)->add_method(meta => sub {
+        return Mouse::Meta::Role->initialize(ref($_[0]) || $_[0]);
+    });
 
     Mouse::Role->export_to_level(1, @_);
 }
@@ -128,10 +130,21 @@ sub import {
 sub unimport {
     my $caller = caller;
 
-    no strict 'refs';
+    my $stash = do{
+        no strict 'refs';
+        \%{$caller . '::'}
+    };
+
     for my $keyword (@EXPORT) {
-        delete ${ $caller . '::' }{$keyword};
+        my $code;
+        if(exists $is_removable{$keyword}
+            && ($code = $caller->can($keyword))
+            && (Mouse::Util::get_code_info($code))[0] eq __PACKAGE__){
+
+            delete $stash->{$keyword};
+        }
     }
+    return;
 }
 
 1;
