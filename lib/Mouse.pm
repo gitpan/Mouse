@@ -4,7 +4,9 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
+
+sub moose_version(){ 0.90 } # which Mouse is a subset of
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -13,6 +15,7 @@ use Mouse::Util qw(load_class is_class_loaded);
 use Mouse::Meta::Attribute;
 use Mouse::Meta::Module;
 use Mouse::Meta::Class;
+use Mouse::Meta::Role;
 use Mouse::Object;
 use Mouse::Util::TypeConstraints;
 

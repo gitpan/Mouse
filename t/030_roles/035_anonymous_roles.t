@@ -27,9 +27,9 @@ ok($visored->is_worn, "accessor was consumed");
 $visored->remove;
 ok(!$visored->is_worn, "method was consumed");
 
-like($role->name, qr/^Mouse::Meta::Role::__ANON__::SERIAL::\d+$/, "");
+like($role->name, qr/::__ANON__::/, "the role name (is " . $role->name . ")");
 ok($role->is_anon_role, "the role knows it's anonymous");
 
-ok(Class::MOP::is_class_loaded(Mouse::Meta::Role->create_anon_role->name), "creating an anonymous role satisifes is_class_loaded");
-ok(Class::MOP::class_of(Mouse::Meta::Role->create_anon_role->name), "creating an anonymous role satisifes class_of");
+ok(Mouse::Util::is_class_loaded(Mouse::Meta::Role->create_anon_role->name), "creating an anonymous role satisifes is_class_loaded");
+ok(Mouse::Util::find_meta(Mouse::Meta::Role->create_anon_role->name), "creating an anonymous role satisifes class_of");
 

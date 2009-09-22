@@ -1,3 +1,4 @@
+.shipit
 author/benchmarks/basic.pl
 author/benchmarks/caf.pl
 author/generate-mouse-tiny.pl
@@ -76,13 +77,16 @@ t/030-has-plus.t
 t/030_roles/001_meta_role.t
 t/030_roles/002_role.t
 t/030_roles/003_apply_role.t
+t/030_roles/004_role_composition_errors.t
+t/030_roles/005_role_conflict_detection.t
 t/030_roles/009_more_role_edge_cases.t
 t/030_roles/019_build.t
 t/030_roles/031_roles_applied_in_create.t
+t/030_roles/034_create_role.t
+t/030_roles/035_anonymous_roles.t
+t/030_roles/036_free_anonymous_roles.t
 t/030_roles/041_empty_method_modifiers_meta_bug.t
 t/030_roles/042_compose_overloading.t
-t/030_roles/failing/004_role_composition_errors.t
-t/030_roles/failing/005_role_conflict_detection.t
 t/030_roles/failing/006_role_exclusion.t
 t/030_roles/failing/007_roles_and_req_method_edge_cases.t
 t/030_roles/failing/008_role_conflict_edge_cases.t
@@ -104,9 +108,6 @@ t/030_roles/failing/025_role_composition_override.t
 t/030_roles/failing/026_role_composition_method_mods.t
 t/030_roles/failing/032_roles_and_method_cloning.t
 t/030_roles/failing/033_role_exclusion_and_alias_bug.t
-t/030_roles/failing/034_create_role.t
-t/030_roles/failing/035_anonymous_roles.t
-t/030_roles/failing/036_free_anonymous_roles.t
 t/030_roles/failing/037_create_role_subclass.t
 t/030_roles/failing/038_new_meta_role.t
 t/030_roles/failing/039_application_toclass.t
@@ -135,6 +136,13 @@ t/050_metaclasses/011_init_meta.t
 t/051_throw_error.t
 t/100-meta-class.t
 t/101-meta-attribute.t
+t/200_examples/001_example.t
+t/200_examples/003_example.t
+t/200_examples/004_example_w_DCS.t
+t/200_examples/005_example_w_TestDeep.t
+t/200_examples/0071_Child_Parent_attr_inherit_imm.t
+t/200_examples/007_Child_Parent_attr_inherit.t
+t/200_examples/008_record_set_iterator.t
 t/201-squirrel.t
 t/202-squirrel-role.t
 t/300_immutable/001_immutable_moose.t
@@ -144,6 +152,7 @@ t/300_immutable/009_buildargs.t
 t/300_immutable/101-immutable-default.t
 t/301-bugs-non-mouse.t
 t/400-define-role.t
+t/400_mouse_util/002_mouse_util_does_role.t
 t/401-meta-role.t
 t/402-attribute-application.t
 t/403-method-modifiers.t

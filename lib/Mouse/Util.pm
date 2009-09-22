@@ -9,6 +9,7 @@ our @EXPORT_OK = qw(
     find_meta
     does_role
     resolve_metaclass_alias
+    english_list
 
     load_class
     is_class_loaded
@@ -26,13 +27,13 @@ our %EXPORT_TAGS = (
 # Moose::Util compatible utilities
 
 sub find_meta{
-    return Mouse::Module::class_of( $_[0] );
+    return Mouse::Meta::Module::class_of( $_[0] );
 }
 
 sub does_role{
     my ($class_or_obj, $role) = @_;
 
-    my $meta = Mouse::Module::class_of($class_or_obj);
+    my $meta = Mouse::Meta::Module::class_of($class_or_obj);
 
     return 0 unless defined $meta;
     return 1 if $meta->does_role($role);
@@ -259,6 +260,19 @@ sub apply_all_roles {
         Mouse::Meta::Role->combine_apply($meta, @roles);
     }
     return;
+}
+
+# taken from Moose::Util 0.90
+sub english_list {
+    return $_[0] if @_ == 1;
+
+    my @items = sort @_;
+
+    return "$items[0] and $items[1]" if @items == 2;
+
+    my $tail = pop @items;
+
+    return join q{, }, @items, "and $tail";
 }
 
 sub not_supported{

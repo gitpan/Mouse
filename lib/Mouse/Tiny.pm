@@ -35,6 +35,7 @@ our @EXPORT_OK = qw(
     find_meta
     does_role
     resolve_metaclass_alias
+    english_list
 
     load_class
     is_class_loaded
@@ -52,13 +53,13 @@ our %EXPORT_TAGS = (
 # Moose::Util compatible utilities
 
 sub find_meta{
-    return Mouse::Module::class_of( $_[0] );
+    return Mouse::Meta::Module::class_of( $_[0] );
 }
 
 sub does_role{
     my ($class_or_obj, $role) = @_;
 
-    my $meta = Mouse::Module::class_of($class_or_obj);
+    my $meta = Mouse::Meta::Module::class_of($class_or_obj);
 
     return 0 unless defined $meta;
     return 1 if $meta->does_role($role);
@@ -287,6 +288,19 @@ sub apply_all_roles {
     return;
 }
 
+# taken from Moose::Util 0.90
+sub english_list {
+    return $_[0] if @_ == 1;
+
+    my @items = sort @_;
+
+    return "$items[0] and $items[1]" if @items == 2;
+
+    my $tail = pop @items;
+
+    return join q{, }, @items, "and $tail";
+}
+
 sub not_supported{
     my($feature) = @_;
 
@@ -302,7 +316,9 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.31';
+our $VERSION = '0.32';
+
+sub moose_version(){ 0.90 } # which Mouse is a subset of
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -746,7 +762,19 @@ sub _new {
         \@{ $args{package} . '::ISA' };
     };
 
-    bless \%args, $class;
+    #return Mouse::Meta::Class->initialize($class)->new_object(%args)
+    #    if $class ne __PACKAGE__;
+
+    return bless \%args, $class;
+}
+
+sub create_anon_class{
+    my $self = shift;
+    return $self->create(undef, @_);
+}
+
+sub is_anon_class{
+    return exists $_[0]->{anon_serial_id};
 }
 
 sub roles { $_[0]->{roles} }
@@ -776,11 +804,12 @@ sub add_attribute {
     if (@_ == 1 && blessed($_[0])) {
         my $attr = shift @_;
         $self->{'attributes'}{$attr->name} = $attr;
-    } else {
+    }
+    else {
         my $names = shift @_;
         $names = [$names] if !ref($names);
         my $metaclass = 'Mouse::Meta::Attribute';
-        my %options = @_;
+        my %options   = (@_ == 1 ? %{$_[0]} : @_);
 
         if ( my $metaclass_name = delete $options{metaclass} ) {
             my $new_class = Mouse::Util::resolve_metaclass_alias(
@@ -794,10 +823,10 @@ sub add_attribute {
 
         for my $name (@$names) {
             if ($name =~ s/^\+//) {
-                $metaclass->clone_parent($self, $name, @_);
+                $metaclass->clone_parent($self, $name, %options);
             }
             else {
-                $metaclass->create($self, $name, @_);
+                $metaclass->create($self, $name, %options);
             }
         }
     }
@@ -825,26 +854,28 @@ sub linearized_isa { @{ get_linear_isa($_[0]->name) } }
 
 sub new_object {
     my $self = shift;
-    my $args = (@_ == 1) ? $_[0] : { @_ };
+    my %args = (@_ == 1 ? %{$_[0]} : @_);
 
     my $instance = bless {}, $self->name;
+
+    my @triggers_queue;
 
     foreach my $attribute ($self->get_all_attributes) {
         my $from = $attribute->init_arg;
         my $key  = $attribute->name;
 
-        if (defined($from) && exists($args->{$from})) {
-            $args->{$from} = $attribute->coerce_constraint($args->{$from})
+        if (defined($from) && exists($args{$from})) {
+            $args{$from} = $attribute->coerce_constraint($args{$from})
                 if $attribute->should_coerce;
-            $attribute->verify_against_type_constraint($args->{$from});
+            $attribute->verify_against_type_constraint($args{$from});
 
-            $instance->{$key} = $args->{$from};
+            $instance->{$key} = $args{$from};
 
             weaken($instance->{$key})
                 if ref($instance->{$key}) && $attribute->is_weak_ref;
 
             if ($attribute->has_trigger) {
-                $attribute->trigger->($instance, $args->{$from});
+                push @triggers_queue, [ $attribute->trigger, $args{$from} ];
             }
         }
         else {
@@ -875,6 +906,12 @@ sub new_object {
             }
         }
     }
+
+    foreach my $trigger_and_value(@triggers_queue){
+        my($trigger, $value) = @{$trigger_and_value};
+        $trigger->($instance, $value);
+    }
+
     return $instance;
 }
 
@@ -1014,131 +1051,6 @@ sub does_role {
     }
 
     return 0;
-}
-
-sub create {
-    my ($class, $package_name, %options) = @_;
-
-    (ref $options{superclasses} eq 'ARRAY')
-        || $class->throw_error("You must pass an ARRAY ref of superclasses")
-            if exists $options{superclasses};
-
-    (ref $options{attributes} eq 'ARRAY')
-        || $class->throw_error("You must pass an ARRAY ref of attributes")
-            if exists $options{attributes};
-
-    (ref $options{methods} eq 'HASH')
-        || $class->throw_error("You must pass a HASH ref of methods")
-            if exists $options{methods};
-
-    (ref $options{roles} eq 'ARRAY')
-        || $class->throw_error("You must pass an ARRAY ref of roles")
-            if exists $options{roles};
-
-    {
-        ( defined $package_name && $package_name )
-          || $class->throw_error("You must pass a package name");
-
-        no strict 'refs';
-        ${ $package_name . '::VERSION'   } = $options{version}   if exists $options{version};
-        ${ $package_name . '::AUTHORITY' } = $options{authority} if exists $options{authority};
-    }
-
-    my %initialize_options = %options;
-    delete @initialize_options{qw(
-        package
-        superclasses
-        attributes
-        methods
-        roles
-        version
-        authority
-    )};
-    my $meta = $class->initialize( $package_name => %initialize_options );
-
-    # FIXME totally lame
-    $meta->add_method('meta' => sub {
-        Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
-    });
-
-    $meta->superclasses(@{$options{superclasses}})
-        if exists $options{superclasses};
-    # NOTE:
-    # process attributes first, so that they can
-    # install accessors, but locally defined methods
-    # can then overwrite them. It is maybe a little odd, but
-    # I think this should be the order of things.
-    if (exists $options{attributes}) {
-        foreach my $attr (@{$options{attributes}}) {
-            Mouse::Meta::Attribute->create($meta, $attr->{name}, %$attr);
-        }
-    }
-    if (exists $options{methods}) {
-        foreach my $method_name (keys %{$options{methods}}) {
-            $meta->add_method($method_name, $options{methods}->{$method_name});
-        }
-    }
-    if (exists $options{roles}){
-        Mouse::Util::apply_all_roles($package_name, @{$options{roles}});
-    }
-    return $meta;
-}
-
-{
-    my $ANON_CLASS_SERIAL = 0;
-    my $ANON_CLASS_PREFIX = 'Mouse::Meta::Class::__ANON__::SERIAL::';
-
-    my %IMMORTAL_ANON_CLASSES;
-    sub create_anon_class {
-        my ( $class, %options ) = @_;
-
-        my $cache = $options{cache};
-        my $cache_key;
-
-        if($cache){ # anonymous but not mortal
-                # something like Super::Class|Super::Class::2=Role|Role::1
-                $cache_key = join '=' => (
-                    join('|', @{$options{superclasses} || []}),
-                    join('|', sort @{$options{roles}   || []}),
-                );
-                return $IMMORTAL_ANON_CLASSES{$cache_key} if exists $IMMORTAL_ANON_CLASSES{$cache_key};
-        }
-        my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
-        my $meta = $class->create( $package_name, anon_class_id => $ANON_CLASS_SERIAL, %options );
-
-        if($cache){
-            $IMMORTAL_ANON_CLASSES{$cache_key} = $meta;
-        }
-        else{
-            Mouse::Meta::Module::weaken_metaclass($package_name);
-        }
-        return $meta;
-    }
-
-    sub is_anon_class{
-        return exists $_[0]->{anon_class_id};
-    }
-
-
-    sub DESTROY{
-        my($self) = @_;
-
-        my $serial_id = $self->{anon_class_id};
-
-        return if !$serial_id;
-
-        my $stash = $self->namespace;
-
-        @{$self->{sperclasses}} = ();
-        %{$stash} = ();
-        Mouse::Meta::Module::remove_metaclass_by_name($self->name);
-
-        no strict 'refs';
-        delete ${$ANON_CLASS_PREFIX}{ $serial_id . '::' };
-
-        return;
-    }
-
 }
 
 package Mouse::Meta::Method;
@@ -1387,7 +1299,7 @@ sub generate_constructor_method_inline {
 ...
 
     local $@;
-    # warn $code;
+    #warn $code;
     my $res = eval $code;
     die $@ if $@;
     $res;
@@ -1422,20 +1334,20 @@ sub _generate_processattrs {
                 }
                 $code .= "
                         \$attrs[$index]->verify_type_constraint_error(
-                            '$key', \$value, \$attrs[$index]->type_constraint
+                            q{$key}, \$value, \$attrs[$index]->type_constraint
                         )
                     }
                 ";
             }
 
-            $code .= "\$instance->{'$key'} = \$value;\n";
+            $code .= "\$instance->{q{$key}} = \$value;\n";
 
             if ($attr->is_weak_ref) {
-                $code .= "Scalar::Util::weaken( \$instance->{'$key'} ) if ref( \$value );\n";
+                $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref( \$value );\n";
             }
 
             if ($attr->has_trigger) {
-                $code .= "\$attrs[$index]->{trigger}->( \$instance, \$value );\n";
+                $code .= "push \@triggers, [\$attrs[$index]->{trigger}, \$value];\n";
             }
 
             $code .= "\n} else {\n";
@@ -1478,15 +1390,15 @@ sub _generate_processattrs {
                 if ($attr->has_type_constraint) {
                     $code .= "{
                         unless (\$attrs[$index]->{type_constraint}->check(\$value)) {
-                            \$attrs[$index]->verify_type_constraint_error('$key', \$value, \$attrs[$index]->type_constraint)
+                            \$attrs[$index]->verify_type_constraint_error(q{$key}, \$value, \$attrs[$index]->type_constraint)
                         }
                     }";
                 }
 
-                $code .= "\$instance->{'$key'} = \$value;\n";
+                $code .= "\$instance->{q{$key}} = \$value;\n";
 
                 if ($attr->is_weak_ref) {
-                    $code .= "Scalar::Util::weaken( \$instance->{'$key'} ) if ref( \$value );\n";
+                    $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref( \$value );\n";
                 }
             }
         }
@@ -1499,7 +1411,7 @@ sub _generate_processattrs {
         push @res, $code;
     }
 
-    return join "\n", @res;
+    return join "\n", q{my @triggers;}, @res, q{$_->[0]->($instance, $_->[1]) for @triggers;};
 }
 
 sub _generate_BUILDARGS {
@@ -1581,7 +1493,6 @@ use warnings;
 
 BEGIN { Mouse::Util->import(qw/get_code_info not_supported load_class/) }
 use Scalar::Util qw/blessed weaken/;
-
 
 {
     my %METACLASS_CACHE;
@@ -1714,6 +1625,146 @@ sub get_method_list {
     return grep { $self->has_method($_) } keys %{ $self->namespace };
 }
 
+{
+    my $ANON_SERIAL = 0;
+    my $ANON_PREFIX = 'Mouse::Meta::Module::__ANON__::';
+
+    my %IMMORTALS;
+
+    sub create {
+        my ($class, $package_name, %options) = @_;
+
+        $class->throw_error('You must pass a package name') if @_ == 1;
+
+
+        if(exists $options{superclasses}){
+            if($class->isa('Mouse::Meta::Class')){
+                (ref $options{superclasses} eq 'ARRAY')
+                    || $class->throw_error("You must pass an ARRAY ref of superclasses");
+            }
+            else{ # role
+                delete $options{superclasses};
+            }
+        }
+
+        my $attributes;
+        if(exists $options{attributes}){
+            $attributes = delete $options{attributes};
+           (ref $attributes eq 'ARRAY' || ref $attributes eq 'HASH')
+               || $class->throw_error("You must pass an ARRAY ref of attributes")
+           }
+
+        (ref $options{methods} eq 'HASH')
+            || $class->throw_error("You must pass a HASH ref of methods")
+                if exists $options{methods};
+
+        (ref $options{roles} eq 'ARRAY')
+            || $class->throw_error("You must pass an ARRAY ref of roles")
+                if exists $options{roles};
+
+
+        my @extra_options;
+        my $mortal;
+        my $cache_key;
+
+        if(!defined $package_name){ # anonymous
+            $mortal = !$options{cache};
+
+            # anonymous but immortal
+            if(!$mortal){
+                    # something like Super::Class|Super::Class::2=Role|Role::1
+                    $cache_key = join '=' => (
+                        join('|',      @{$options{superclasses} || []}),
+                        join('|', sort @{$options{roles}        || []}),
+                    );
+                    return $IMMORTALS{$cache_key} if exists $IMMORTALS{$cache_key};
+            }
+            $package_name = $ANON_PREFIX . ++$ANON_SERIAL;
+
+            push @extra_options, (anon_serial_id => $ANON_SERIAL);
+        }
+
+        # instantiate a module
+        {
+            no strict 'refs';
+            ${ $package_name . '::VERSION'   } = delete $options{version}   if exists $options{version};
+            ${ $package_name . '::AUTHORITY' } = delete $options{authority} if exists $options{authority};
+        }
+
+        my %initialize_options = %options;
+        delete @initialize_options{qw(
+            package
+            superclasses
+            attributes
+            methods
+            roles
+        )};
+        my $meta = $class->initialize( $package_name, %initialize_options, @extra_options);
+
+        Mouse::Meta::Module::weaken_metaclass($package_name)
+            if $mortal;
+
+        # FIXME totally lame
+        $meta->add_method('meta' => sub {
+            $class->initialize(ref($_[0]) || $_[0]);
+        });
+
+        $meta->superclasses(@{$options{superclasses}})
+            if exists $options{superclasses};
+
+        # NOTE:
+        # process attributes first, so that they can
+        # install accessors, but locally defined methods
+        # can then overwrite them. It is maybe a little odd, but
+        # I think this should be the order of things.
+        if (defined $attributes) {
+            if(ref($attributes) eq 'ARRAY'){
+                foreach my $attr (@{$attributes}) {
+                    $meta->add_attribute($attr->{name} => $attr);
+                }
+            }
+            else{
+                while(my($name, $attr) = each %{$attributes}){
+                    $meta->add_attribute($name => $attr);
+                }
+            }
+        }
+        if (exists $options{methods}) {
+            foreach my $method_name (keys %{$options{methods}}) {
+                $meta->add_method($method_name, $options{methods}->{$method_name});
+            }
+        }
+        if (exists $options{roles}){
+            Mouse::Util::apply_all_roles($package_name, @{$options{roles}});
+        }
+
+        if(!$mortal && exists $meta->{anon_serial_id}){
+            $IMMORTALS{$cache_key} = $meta;
+        }
+
+        return $meta;
+    }
+
+    sub DESTROY{
+        my($self) = @_;
+
+        my $serial_id = $self->{anon_serial_id};
+
+        return if !$serial_id;
+
+        my $stash = $self->namespace;
+
+        @{$self->{superclasses}} = () if exists $self->{superclasses};
+        %{$stash} = ();
+        Mouse::Meta::Module::remove_metaclass_by_name($self->name);
+
+        no strict 'refs';
+        delete ${$ANON_PREFIX}{ $serial_id . '::' };
+
+        return;
+    }
+}
+
 sub throw_error{
     my($class, $message, %args) = @_;
 
@@ -1732,13 +1783,14 @@ package Mouse::Meta::Role;
 use strict;
 use warnings;
 
-BEGIN { Mouse::Util->import(qw(not_supported)) }
+BEGIN { Mouse::Util->import(qw(not_supported english_list)) }
 use base qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
 
 sub _new {
     my $class = shift;
+
     my %args  = @_;
 
     $args{methods}          ||= {};
@@ -1746,7 +1798,19 @@ sub _new {
     $args{required_methods} ||= [];
     $args{roles}            ||= [];
 
-    bless \%args, $class;
+#    return Mouse::Meta::Class->initialize($class)->new_object(%args)
+#        if $class ne __PACKAGE__;
+
+    return bless \%args, $class;
+}
+
+sub create_anon_role{
+    my $self = shift;
+    return $self->create(undef, @_);
+}
+
+sub is_anon_role{
+    return exists $_[0]->{anon_serial_id};
 }
 
 sub get_roles { $_[0]->{roles} }
@@ -1773,14 +1837,50 @@ sub add_attribute {
     $self->{attributes}->{$name} = (@_ == 1) ? $_[0] : { @_ };
 }
 
+sub _canonicalize_apply_args{
+    my($self, $applicant, %args) = @_;
+
+    if($applicant->isa('Mouse::Meta::Class')){
+        $args{_to} = 'class';
+    }
+    elsif($applicant->isa('Mouse::Meta::Role')){
+        $args{_to} = 'role';
+    }
+    else{
+        $args{_to} = 'instance';
+
+        not_supported 'Application::ToInstance';
+    }
+
+    if($args{alias} && !exists $args{-alias}){
+        $args{-alias} = $args{alias};
+    }
+    if($args{excludes} && !exists $args{-excludes}){
+        $args{-excludes} = $args{excludes};
+    }
+
+    if(my $excludes = $args{-excludes}){
+        $args{-excludes} = {}; # replace with a hash ref
+        if(ref $excludes){
+            %{$args{-excludes}} = (map{ $_ => undef } @{$excludes});
+        }
+        else{
+            $args{-excludes}{$excludes} = undef;
+        }
+    }
+
+    return \%args;
+}
+
 sub _check_required_methods{
     my($role, $class, $args, @other_roles) = @_;
 
-    if($class->isa('Mouse::Meta::Class')){
+    if($args->{_to} eq 'class'){
         my $class_name = $class->name;
+        my $role_name  = $role->name;
+        my @missing;
         foreach my $method_name(@{$role->{required_methods}}){
-            unless($class_name->can($method_name)){
-                my $role_name       = $role->name;
+            if(!$class_name->can($method_name)){
                 my $has_method      = 0;
 
                 foreach my $another_role_spec(@other_roles){
@@ -1790,10 +1890,23 @@ sub _check_required_methods{
                         last;
                     }
                 }
-                
-                $role->throw_error("'$role_name' requires the method '$method_name' to be implemented by '$class_name'")
-                    unless $has_method;
+
+                push @missing, $method_name if !$has_method;
             }
+        }
+        if(@missing){
+            $class->throw_error("'$role_name' requires the "
+                . (@missing == 1 ? 'method' : 'methods')
+                . " "
+                . english_list(map{ sprintf q{'%s'}, $_ } @missing)
+                . " to be implemented by '$class_name'");
+        }
+    }
+    elsif($args->{_to} eq 'role'){
+        # apply role($role) to role($class)
+        foreach my $method_name($role->get_required_method_list){
+            next if $class->has_method($method_name); # already has it
+            $class->add_required_methods($method_name);
         }
     }
 
@@ -1806,26 +1919,15 @@ sub _apply_methods{
     my $role_name  = $role->name;
     my $class_name = $class->name;
 
-    my $alias    = (exists $args->{alias}    && !exists $args->{-alias})    ? $args->{alias}    : $args->{-alias};
-    my $excludes = (exists $args->{excludes} && !exists $args->{-excludes}) ? $args->{excludes} : $args->{-excludes};
-
-    my %exclude_map;
-
-    if(defined $excludes){
-        if(ref $excludes){
-            %exclude_map = map{ $_ => undef } @{$excludes};
-        }
-        else{
-            $exclude_map{$excludes} = undef;
-        }
-    }
+    my $alias    = $args->{-alias};
+    my $excludes = $args->{-excludes};
 
     foreach my $method_name($role->get_method_list){
         next if $method_name eq 'meta';
 
         my $code = $role_name->can($method_name);
 
-        if(!exists $exclude_map{$method_name}){
+        if(!exists $excludes->{$method_name}){
             if(!$class->has_method($method_name)){
                 $class->add_method($method_name => $code);
             }
@@ -1834,8 +1936,9 @@ sub _apply_methods{
         if($alias && $alias->{$method_name}){
             my $dstname = $alias->{$method_name};
 
-            my $slot = do{ no strict 'refs'; \*{$class_name . '::' . $dstname} };
-            if(defined(*{$slot}{CODE}) && *{$slot}{CODE} != $code){
+            my $dstcode = do{ no strict 'refs'; *{$class_name . '::' . $dstname}{CODE} };
+
+            if(defined($dstcode) && $dstcode != $code){
                 $class->throw_error("Cannot create a method alias if a local method of the same name exists");
             }
             else{
@@ -1850,7 +1953,7 @@ sub _apply_methods{
 sub _apply_attributes{
     my($role, $class, $args) = @_;
 
-    if ($class->isa('Mouse::Meta::Class')) {
+    if ($args->{_to} eq 'class') {
         # apply role to class
         for my $attr_name ($role->get_attribute_list) {
             next if $class->has_attribute($attr_name);
@@ -1867,7 +1970,8 @@ sub _apply_attributes{
 
             $attr_metaclass->create($class, $attr_name => %$spec);
         }
-    } else {
+    }
+    elsif($args->{_to} eq 'role'){
         # apply role to role
         for my $attr_name ($role->get_attribute_list) {
             next if $class->has_attribute($attr_name);
@@ -1883,7 +1987,7 @@ sub _apply_attributes{
 sub _apply_modifiers{
     my($role, $class, $args) = @_;
 
-    for my $modifier_type (qw/before after around override/) {
+    for my $modifier_type (qw/override before around after/) {
         my $add_modifier = "add_${modifier_type}_method_modifier";
         my $modifiers    = $role->{"${modifier_type}_method_modifiers"};
 
@@ -1899,7 +2003,7 @@ sub _apply_modifiers{
 sub _append_roles{
     my($role, $class, $args) = @_;
 
-    my $roles = $class->isa('Mouse::Meta::Class') ? $class->roles : $class->get_roles;
+    my $roles = ($args->{_to} eq 'class') ? $class->roles : $class->get_roles;
 
     foreach my $r($role, @{$role->get_roles}){
         if(!$class->does_role($r->name)){
@@ -1911,27 +2015,111 @@ sub _append_roles{
 
 # Moose uses Application::ToInstance, Application::ToClass, Application::ToRole
 sub apply {
-    my($self, $class, %args) = @_;
+    my $self      = shift;
+    my $applicant = shift;
 
-    if ($class->isa('Mouse::Object')) {
-        not_supported 'Application::ToInstance';
-    }
+    my $args = $self->_canonicalize_apply_args($applicant, @_);
 
-    $self->_check_required_methods($class, \%args);
-    $self->_apply_methods($class, \%args);
-    $self->_apply_attributes($class, \%args);
-    $self->_apply_modifiers($class, \%args);
-    $self->_append_roles($class, \%args);
+    $self->_check_required_methods($applicant, $args);
+    $self->_apply_methods($applicant, $args);
+    $self->_apply_attributes($applicant, $args);
+    $self->_apply_modifiers($applicant, $args);
+    $self->_append_roles($applicant, $args);
     return;
 }
 
 sub combine_apply {
     my(undef, $class, @roles) = @_;
 
+    if($class->isa('Mouse::Object')){
+        not_supported 'Application::ToInstance';
+    }
+
+    # check conflicting
+    my %method_provided;
+    my @method_conflicts;
+    my %attr_provided;
+    my %override_provided;
+
+    foreach my $role_spec (@roles) {
+        my $role      = $role_spec->[0]->meta;
+        my $role_name = $role->name;
+
+        # methods
+        foreach my $method_name($role->get_method_list){
+            next if $class->has_method($method_name); # manually resolved
+
+            my $code = do{ no strict 'refs'; \&{ $role_name . '::' . $method_name } };
+
+            my $c = $method_provided{$method_name};
+
+            if($c && $c->[0] != $code){
+                push @{$c}, $role;
+                push @method_conflicts, $c;
+            }
+            else{
+                $method_provided{$method_name} = [$code, $method_name, $role];
+            }
+        }
+
+        # attributes
+        foreach my $attr_name($role->get_attribute_list){
+            my $attr = $role->get_attribute($attr_name);
+            my $c    = $attr_provided{$attr_name};
+            if($c && $c != $attr){
+                $class->throw_error("We have encountered an attribute conflict with '$attr_name' "
+                                   . "during composition. This is fatal error and cannot be disambiguated.")
+            }
+            else{
+                $attr_provided{$attr_name} = $attr;
+            }
+        }
+
+        # override modifiers
+        foreach my $method_name($role->get_method_modifier_list('override')){
+            my $override = $role->get_override_method_modifier($method_name);
+            my $c        = $override_provided{$method_name};
+            if($c && $c != $override){
+                $class->throw_error( "We have encountered an 'override' method conflict with '$method_name' during "
+                                   . "composition (Two 'override' methods of the same name encountered). "
+                                   . "This is fatal error.")
+            }
+            else{
+                $override_provided{$method_name} = $override;
+            }
+        }
+    }
+    if(@method_conflicts){
+        my $error;
+
+        if(@method_conflicts == 1){
+            my($code, $method_name, @roles) = @{$method_conflicts[0]};
+            $class->throw_error(
+                sprintf q{Due to a method name conflict in roles %s, the method '%s' must be implemented or excluded by '%s'},
+                    english_list(map{ sprintf q{'%s'}, $_->name } @roles), $method_name, $class->name
+            );
+        }
+        else{
+            @method_conflicts = sort { $a->[0] cmp $b->[0] } @method_conflicts; # to avoid hash-ordering bugs
+            my $methods = english_list(map{ sprintf q{'%s'}, $_->[1] } @method_conflicts);
+            my $roles   = english_list(
+                map{ sprintf q{'%s'}, $_->name }
+                map{ my($code, $method_name, @roles) = @{$_}; @roles } @method_conflicts
+            );
+
+            $class->throw_error(
+                sprintf q{Due to method name conflicts in roles %s, the methods %s must be implemented or excluded by '%s'},
+                    $roles, $methods, $class->name
+            );
+        }
+    }
+
     foreach my $role_spec (@roles) {
         my($role_name, $args) = @{$role_spec};
 
         my $role = $role_name->meta;
+
+        $args = $role->_canonicalize_apply_args($class, %{$args});
 
         $role->_check_required_methods($class, $args, @roles);
         $role->_apply_methods($class, $args);
@@ -1970,9 +2158,13 @@ for my $modifier_type (qw/before after around/) {
 sub add_override_method_modifier{
     my($self, $method_name, $method) = @_;
 
-    (!$self->has_method($method_name))
-        || $self->throw_error("Cannot add an override of method '$method_name' " .
-                   "because there is a local version of '$method_name'");
+    if($self->has_method($method_name)){
+        # This error happens in the override keyword or during role composition,
+        # so I added a message, "A local method of ...", only for compatibility (gfx)
+        $self->throw_error("Cannot add an override of method '$method_name' "
+                   . "because there is a local version of '$method_name'"
+                   . "(A local method of the same name as been found)");
+    }
 
     $self->{override_method_modifiers}->{$method_name} = $method;
 }
@@ -2443,8 +2635,20 @@ sub type {
 }
 
 sub subtype {
-    my $pkg = caller(0);
-    my($name, %conf) = @_;
+    my $pkg = caller;
+
+    my $name;
+    my %conf;
+
+    if(@_ % 2){ # odd number of arguments
+        $name = shift;
+        %conf = @_;
+    }
+    else{
+        %conf = @_;
+        $name = $conf{name} || '__ANON__';
+    }
+
     if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
         Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
     };
