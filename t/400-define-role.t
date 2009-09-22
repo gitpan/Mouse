@@ -1,7 +1,15 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More tests => 11;
+use Test::More;
+BEGIN{
+    if(eval{ require Class::Method::Modifiers::Fast } || eval{ require Class::Method::Modifiers }){
+        plan tests => 11;
+    }
+    else{
+        plan skip_all => 'This test requires Class::Method::Modifiers(::Fast)?';
+    }
+}
 use Test::Exception;
 
 lives_ok {
@@ -18,7 +26,7 @@ throws_ok {
     extends 'Role::Parent';
 
     no Mouse::Role;
-} qr/Roles do not currently support 'extends'/;
+} qr/Roles do not support 'extends'/;
 
 lives_ok {
     package Role;
@@ -93,11 +101,10 @@ lives_ok {
     ::is(blessed($obj), "Impromptu::Class");
 };
 
-our $TODO = 'skip';
-throws_ok {
+lives_ok{
     package Class;
     use Mouse;
 
     with 'Role', 'Other::Role';
-} qr/Mouse::Role only supports 'with' on individual roles at a time/;
+};
 

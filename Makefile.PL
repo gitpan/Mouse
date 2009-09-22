@@ -1,3 +1,5 @@
+use strict;
+use warnings;
 use inc::Module::Install;
 use 5.008;
 
@@ -35,33 +37,42 @@ sub create_moose_compatibility_test {
     require File::Spec;
     require File::Basename;
 
+    print "Creating compatibility tests in xt/compatibility/* ...\n";
+
+    File::Path::rmtree(File::Spec->catfile('xt', 'compatibility'));
+
     # some test does not pass... currently skip it.
     my %SKIP_TEST = (
         '016-trigger.t'    => "trigger's argument is incompatble :(",
-        '020-load-class.t' => "&Moose::is_class_loaded doesn't exists",
-        '019-handles.t'    => 'incompatible',
-        '025-more-isa.t'   => 'Class::MOP::is_class_loaded is not compatible with Mouse::is_class_loaded',
         '029-new.t'        => 'Class->new(undef) incompatible',
         '010-isa-or.t'     => 'Mouse has a [BUG]',
         '044-attribute-metaclass.t' => 'Moose::Meta::Attribute does not have a "create"',
         '047-attribute-metaclass-role.t' => 'Moose::Meta::Attribute does not have a "create"',
         '201-squirrel.t'      => 'skip Squirrel',
         '202-squirrel-role.t' => 'Squirrel is ...',
-        '400-define-role.t'   => 'incompatibility',
         '600-tiny-tiny.t'     => "Moose doesn't support ::Tiny",
         '601-tiny-mouse.t'    => "Moose doesn't support ::Tiny",
         '602-mouse-tiny.t'    => "Moose doesn't support ::Tiny",
-        '031_roles_applied_in_create.t' => 'wtf?',
+        '031_roles_applied_in_create.t' => 't/lib/* classes are not Moose classes/roles',
     );
+
+    my @compat_tests;
 
     File::Find::find(
         {
             wanted => sub {
                 return unless -f $_;
+
+                return if /failing/; # skip tests in failing/ directories
+
                 my $basename = File::Basename::basename($_);
                 return if $basename =~ /^\./;
-                return if $SKIP_TEST{$basename};
-                
+
+                if(exists $SKIP_TEST{$basename}){
+                    print "# skip $basename because: $SKIP_TEST{$basename}\n";
+                    return;
+                }
+
                 my $dirname = File::Basename::dirname($_);
 
                 my $tmpdir = File::Spec->catfile('xt', 'compatibility', $dirname);
@@ -77,14 +88,19 @@ sub create_moose_compatibility_test {
                         $s;
                     };
                     $src =~ s/Mouse::is_class_loaded/Class::MOP::is_class_loaded/g;
+                    $src =~ s/Mouse::load_class/Class::MOP::load_class/g;
                     $src =~ s/Mouse/Moose/g;
                     $src;
                 };
                 close $wfh;
+                push @compat_tests, $tmpfile;
             },
             no_chdir => 1
         },
         't',
     );
+    print "Compatibility tests created.\n";
+
+    clean_files "@compat_tests";
 }
 

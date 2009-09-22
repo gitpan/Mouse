@@ -6,16 +6,40 @@ use Carp qw(confess);
 use B ();
 
 our @EXPORT_OK = qw(
+    find_meta
+    does_role
+    resolve_metaclass_alias
+
     load_class
     is_class_loaded
-    get_linear_isa
+
     apply_all_roles
-    get_code_info
     not_supported
+
+    get_linear_isa
+    get_code_info
 );
 our %EXPORT_TAGS = (
     all  => \@EXPORT_OK,
 );
+
+# Moose::Util compatible utilities
+
+sub find_meta{
+    return Mouse::Module::class_of( $_[0] );
+}
+
+sub does_role{
+    my ($class_or_obj, $role) = @_;
+
+    my $meta = Mouse::Module::class_of($class_or_obj);
+
+    return 0 unless defined $meta;
+    return 1 if $meta->does_role($role);
+    return 0;
+}
+
+
 
 BEGIN {
     my $impl;
@@ -75,31 +99,30 @@ BEGIN {
     }
 }
 
-# taken from Class/MOP.pm
+# taken from Mouse::Util (0.90)
 {
     my %cache;
 
     sub resolve_metaclass_alias {
         my ( $type, $metaclass_name, %options ) = @_;
 
-        my $cache_key = $type;
-        return $cache{$cache_key}{$metaclass_name}
-          if $cache{$cache_key}{$metaclass_name};
+        my $cache_key = $type . q{ } . ( $options{trait} ? '-Trait' : '' );
 
-        my $possible_full_name =
-            'Mouse::Meta::' 
-          . $type
-          . '::Custom::'
-          . $metaclass_name;
+        return $cache{$cache_key}{$metaclass_name} ||= do{
 
-        my $loaded_class =
-          load_first_existing_class( $possible_full_name,
-            $metaclass_name );
+            my $possible_full_name = join '::',
+                'Mouse::Meta', $type, 'Custom', ($options{trait} ? 'Trait' : ()), $metaclass_name
+            ;
 
-        return $cache{$cache_key}{$metaclass_name} =
+            my $loaded_class = load_first_existing_class(
+                $possible_full_name,
+                $metaclass_name
+            );
+
             $loaded_class->can('register_implementation')
-          ? $loaded_class->register_implementation
-          : $loaded_class;
+                ? $loaded_class->register_implementation
+                : $loaded_class;
+        };
     }
 }
 
@@ -180,27 +203,28 @@ sub is_class_loaded {
 
     return 0 if ref($class) || !defined($class) || !length($class);
 
-    return 1 if exists $is_class_loaded_cache{$class};
+    return 1 if $is_class_loaded_cache{$class};
 
     # walk the symbol table tree to avoid autovififying
     # \*{${main::}{"Foo::"}} == \*main::Foo::
 
-    my $pack = \*::;
+    my $pack = \%::;
     foreach my $part (split('::', $class)) {
-        return 0 unless exists ${$$pack}{"${part}::"};
-        $pack = \*{${$$pack}{"${part}::"}};
+        my $entry = \$pack->{$part . '::'};
+        return 0 if ref($entry) ne 'GLOB';
+        $pack = *{$entry}{HASH} or return 0;
     }
 
     # check for $VERSION or @ISA
-    return ++$is_class_loaded_cache{$class} if exists ${$$pack}{VERSION}
-             && defined *{${$$pack}{VERSION}}{SCALAR};
-    return ++$is_class_loaded_cache{$class} if exists ${$$pack}{ISA}
-             && defined *{${$$pack}{ISA}}{ARRAY};
+    return ++$is_class_loaded_cache{$class} if exists $pack->{VERSION}
+             && defined *{$pack->{VERSION}}{SCALAR} && defined ${ $pack->{VERSION} };
+    return ++$is_class_loaded_cache{$class} if exists $pack->{ISA}
+             && defined *{$pack->{ISA}}{ARRAY} && @{ $pack->{ISA} } != 0;
 
     # check for any method
-    foreach ( keys %{$$pack} ) {
-        next if substr($_, -2, 2) eq '::';
-        return ++$is_class_loaded_cache{$class} if defined *{${$$pack}{$_}}{CODE};
+    foreach my $name( keys %{$pack} ) {
+        my $entry = \$pack->{$name};
+        return ++$is_class_loaded_cache{$class} if ref($entry) ne 'GLOB' || defined *{$entry}{CODE};
     }
 
     # fail
@@ -221,17 +245,11 @@ sub apply_all_roles {
         } else {
             push @roles, [ $_[$i] => {} ];
         }
+        my $role_name = $roles[-1][0];
+        load_class($role_name);
+        ( $role_name->can('meta') && $role_name->meta->isa('Mouse::Meta::Role') )
+            || $meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
     }
-
-    foreach my $role_spec (@roles) {
-        Mouse::load_class( $role_spec->[0] );
-    }
-
-    ( $_->[0]->can('meta') && $_->[0]->meta->isa('Mouse::Meta::Role') )
-        || confess("You can only consume roles, "
-        . $_->[0]
-        . " is not a Moose role")
-        foreach @roles;
 
     if ( scalar @roles == 1 ) {
         my ( $role, $params ) = @{ $roles[0] };

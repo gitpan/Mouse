@@ -21,7 +21,6 @@ $INC{'Mouse/Meta/Method/Destructor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Accessor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Role/Method.pm'} = __FILE__;
 $INC{'Mouse/Util/TypeConstraints.pm'} = __FILE__;
-$INC{'Test/Mouse.pm'} = __FILE__;
 
 # and now their contents
 
@@ -33,16 +32,40 @@ use Carp qw(confess);
 use B ();
 
 our @EXPORT_OK = qw(
+    find_meta
+    does_role
+    resolve_metaclass_alias
+
     load_class
     is_class_loaded
-    get_linear_isa
+
     apply_all_roles
-    get_code_info
     not_supported
+
+    get_linear_isa
+    get_code_info
 );
 our %EXPORT_TAGS = (
     all  => \@EXPORT_OK,
 );
+
+# Moose::Util compatible utilities
+
+sub find_meta{
+    return Mouse::Module::class_of( $_[0] );
+}
+
+sub does_role{
+    my ($class_or_obj, $role) = @_;
+
+    my $meta = Mouse::Module::class_of($class_or_obj);
+
+    return 0 unless defined $meta;
+    return 1 if $meta->does_role($role);
+    return 0;
+}
+
+
 
 BEGIN {
     my $impl;
@@ -102,31 +125,30 @@ BEGIN {
     }
 }
 
-# taken from Class/MOP.pm
+# taken from Mouse::Util (0.90)
 {
     my %cache;
 
     sub resolve_metaclass_alias {
         my ( $type, $metaclass_name, %options ) = @_;
 
-        my $cache_key = $type;
-        return $cache{$cache_key}{$metaclass_name}
-          if $cache{$cache_key}{$metaclass_name};
+        my $cache_key = $type . q{ } . ( $options{trait} ? '-Trait' : '' );
 
-        my $possible_full_name =
-            'Mouse::Meta::' 
-          . $type
-          . '::Custom::'
-          . $metaclass_name;
+        return $cache{$cache_key}{$metaclass_name} ||= do{
 
-        my $loaded_class =
-          load_first_existing_class( $possible_full_name,
-            $metaclass_name );
+            my $possible_full_name = join '::',
+                'Mouse::Meta', $type, 'Custom', ($options{trait} ? 'Trait' : ()), $metaclass_name
+            ;
 
-        return $cache{$cache_key}{$metaclass_name} =
+            my $loaded_class = load_first_existing_class(
+                $possible_full_name,
+                $metaclass_name
+            );
+
             $loaded_class->can('register_implementation')
-          ? $loaded_class->register_implementation
-          : $loaded_class;
+                ? $loaded_class->register_implementation
+                : $loaded_class;
+        };
     }
 }
 
@@ -207,27 +229,28 @@ sub is_class_loaded {
 
     return 0 if ref($class) || !defined($class) || !length($class);
 
-    return 1 if exists $is_class_loaded_cache{$class};
+    return 1 if $is_class_loaded_cache{$class};
 
     # walk the symbol table tree to avoid autovififying
     # \*{${main::}{"Foo::"}} == \*main::Foo::
 
-    my $pack = \*::;
+    my $pack = \%::;
     foreach my $part (split('::', $class)) {
-        return 0 unless exists ${$$pack}{"${part}::"};
-        $pack = \*{${$$pack}{"${part}::"}};
+        my $entry = \$pack->{$part . '::'};
+        return 0 if ref($entry) ne 'GLOB';
+        $pack = *{$entry}{HASH} or return 0;
     }
 
     # check for $VERSION or @ISA
-    return ++$is_class_loaded_cache{$class} if exists ${$$pack}{VERSION}
-             && defined *{${$$pack}{VERSION}}{SCALAR};
-    return ++$is_class_loaded_cache{$class} if exists ${$$pack}{ISA}
-             && defined *{${$$pack}{ISA}}{ARRAY};
+    return ++$is_class_loaded_cache{$class} if exists $pack->{VERSION}
+             && defined *{$pack->{VERSION}}{SCALAR} && defined ${ $pack->{VERSION} };
+    return ++$is_class_loaded_cache{$class} if exists $pack->{ISA}
+             && defined *{$pack->{ISA}}{ARRAY} && @{ $pack->{ISA} } != 0;
 
     # check for any method
-    foreach ( keys %{$$pack} ) {
-        next if substr($_, -2, 2) eq '::';
-        return ++$is_class_loaded_cache{$class} if defined *{${$$pack}{$_}}{CODE};
+    foreach my $name( keys %{$pack} ) {
+        my $entry = \$pack->{$name};
+        return ++$is_class_loaded_cache{$class} if ref($entry) ne 'GLOB' || defined *{$entry}{CODE};
     }
 
     # fail
@@ -248,17 +271,11 @@ sub apply_all_roles {
         } else {
             push @roles, [ $_[$i] => {} ];
         }
+        my $role_name = $roles[-1][0];
+        load_class($role_name);
+        ( $role_name->can('meta') && $role_name->meta->isa('Mouse::Meta::Role') )
+            || $meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
     }
-
-    foreach my $role_spec (@roles) {
-        Mouse::load_class( $role_spec->[0] );
-    }
-
-    ( $_->[0]->can('meta') && $_->[0]->meta->isa('Mouse::Meta::Role') )
-        || confess("You can only consume roles, "
-        . $_->[0]
-        . " is not a Moose role")
-        foreach @roles;
 
     if ( scalar @roles == 1 ) {
         my ( $role, $params ) = @{ $roles[0] };
@@ -285,13 +302,12 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.30';
+our $VERSION = '0.31';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
 BEGIN { Mouse::Util->import(qw(load_class is_class_loaded)) }
 
-BEGIN { Mouse::Meta::Modul->import(e) } # class_of()
 our @EXPORT = qw(extends has before after around override super blessed confess with);
 
 our %is_removable = map{ $_ => undef } @EXPORT;
@@ -469,7 +485,6 @@ package Mouse::Meta::Attribute;
 use strict;
 use warnings;
 
-use Scalar::Util ();
 sub new {
     my ($class, $name, %options) = @_;
 
@@ -539,12 +554,6 @@ sub _create_args {
 }
 
 sub accessor_metaclass { 'Mouse::Meta::Method::Accessor' }
-
-sub _inlined_name {
-    my $self = shift;
-    return sprintf '"%s"', quotemeta $self->name;
-}
-
 
 sub create {
     my ($self, $class, $name, %args) = @_;
@@ -995,10 +1004,11 @@ sub does_role {
         || $self->throw_error("You must supply a role name to look for");
 
     for my $class ($self->linearized_isa) {
-        my $meta = Mouse::class_of($class);
+        my $meta = Mouse::Meta::Module::class_of($class);
         next unless $meta && $meta->can('roles');
 
         for my $role (@{ $meta->roles }) {
+
             return 1 if $role->does_role($role_name);
         }
     }
@@ -1021,6 +1031,10 @@ sub create {
         || $class->throw_error("You must pass a HASH ref of methods")
             if exists $options{methods};
 
+    (ref $options{roles} eq 'ARRAY')
+        || $class->throw_error("You must pass an ARRAY ref of roles")
+            if exists $options{roles};
+
     {
         ( defined $package_name && $package_name )
           || $class->throw_error("You must pass a package name");
@@ -1036,6 +1050,7 @@ sub create {
         superclasses
         attributes
         methods
+        roles
         version
         authority
     )};
@@ -1062,6 +1077,9 @@ sub create {
         foreach my $method_name (keys %{$options{methods}}) {
             $meta->add_method($method_name, $options{methods}->{$method_name});
         }
+    }
+    if (exists $options{roles}){
+        Mouse::Util::apply_all_roles($package_name, @{$options{roles}});
     }
     return $meta;
 }
@@ -1148,6 +1166,7 @@ sub package{ $_[0]->{name} }
 package Mouse::Meta::Method::Accessor;
 use strict;
 use warnings;
+use Scalar::Util qw(blessed);
 
 sub _install_accessor{
     my (undef, $attribute, $method_name, $class, $type) = @_;
@@ -1164,7 +1183,7 @@ sub _install_accessor{
     my $compiled_type_constraint    = $constraint ? $constraint->{_compiled_type_constraint} : undef;
 
     my $self  = '$_[0]';
-    my $key   = $attribute->_inlined_name;
+    my $key   = sprintf q{"%s"}, quotemeta $name;
 
     $type ||= 'accessor';
 
@@ -1287,54 +1306,54 @@ sub _install_writer{
 sub _install_predicate {
     my (undef, $attribute, $method_name, $class) = @_;
 
-    my $key = $attribute->_inlined_name;
+    my $slot = $attribute->name;
 
-    my $predicate = 'sub { exists($_[0]->{'.$key.'}) }';
-
-    my $code = eval $predicate;
-    $attribute->throw_error($@) if $@;
-    $class->add_method($method_name => $code);
+    $class->add_method($method_name => sub{
+        return exists $_[0]->{$slot};
+    });
     return;
 }
 
 sub _install_clearer {
     my (undef, $attribute, $method_name, $class) = @_;
 
-    my $key = $attribute->_inlined_name;
+    my $slot = $attribute->name;
 
-    my $clearer = 'sub { delete($_[0]->{'.$key.'}) }';
-
-    my $code = eval $clearer;
-    $attribute->throw_error($@) if $@;
-    $class->add_method($method_name => $code);
+    $class->add_method($method_name => sub{
+        delete $_[0]->{$slot};
+    });
     return;
 }
 
 sub _install_handles {
     my (undef, $attribute, $handles, $class) = @_;
 
-    my $reader  = $attribute->name;
+    my $reader  = $attribute->reader || $attribute->accessor
+        or $class->throw_error("You must pass a reader method for '".$attribute->name."'");
+
     my %handles = $attribute->_canonicalize_handles($handles);
 
-    my @methods;
+    foreach my $handle_name (keys %handles) {
+        my $method_to_call = $handles{$handle_name};
 
-    foreach my $local_method (keys %handles) {
-        my $remote_method = $handles{$local_method};
+        my $code = sub {
+            my $instance = shift;
+            my $proxy    = $instance->$reader();
 
-        my $method = 'sub {
-            my $self = shift;
-            $self->'.$reader.'->'.$remote_method.'(@_)
-        }';
-
-        my $code = eval $method;
-        $attribute->throw_error($@) if $@;
-
-        push @methods, ($local_method => $code);
-    }
-
-    # install after all the method compiled successfully
-    while(my($name, $code) = splice @methods, 0, 2){
-        $class->add_method($name, $code);
+            my $error = !defined($proxy)                ? ' is not defined'
+                      : ref($proxy) && !blessed($proxy) ? qq{ is not an object (got '$proxy')}
+                                                        : undef;
+            if ($error) {
+                $instance->meta->throw_error(
+                    "Cannot delegate $handle_name to $method_to_call because "
+                        . "the value of "
+                        . $attribute->name
+                        . $error
+                 );
+            }
+            $proxy->$method_to_call(@_);
+        };
+        $class->add_method($handle_name => $code);
     }
     return;
 }
@@ -1584,7 +1603,7 @@ use Scalar::Util qw/blessed weaken/;
             ||= $class->_new(package => $package_name, @args);
     }
 
-    sub Mouse::class_of{
+    sub class_of{
         my($class_or_instance) = @_;
         return undef unless defined $class_or_instance;
         return $METACLASS_CACHE{ blessed($class_or_instance) || $class_or_instance };
@@ -2169,6 +2188,8 @@ use base 'Exporter';
 use Carp 'confess', 'croak';
 use Scalar::Util 'blessed';
 
+BEGIN { Mouse::Util->import(qw(load_class)) }
+
 our @EXPORT = qw(before after around super override inner augment has extends with requires excludes confess blessed);
 our %is_removable = map{ $_ => undef } @EXPORT;
 delete $is_removable{confess};
@@ -2246,16 +2267,11 @@ sub has {
     $meta->add_attribute($name => \%opts);
 }
 
-sub extends  { confess "Roles do not currently support 'extends'" }
+sub extends  { confess "Roles do not support 'extends'" }
 
 sub with     {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-    my $role  = shift;
-    my $args  = shift || {};
-    confess "Mouse::Role only supports 'with' on individual roles at a time" if @_ || !ref $args;
-
-    Mouse::load_class($role);
-    $role->meta->apply($meta, %$args);
+    Mouse::Util::apply_all_roles($meta->name, @_);
 }
 
 sub requires {
@@ -2668,62 +2684,6 @@ sub find_or_create_isa_type_constraint {
     }
     return $code;
 }
-
-package Test::Mouse;
-
-use strict;
-use warnings;
-BEGIN { Mouse->import(()) }
-
-use base qw(Test::Builder::Module);
-
-our @EXPORT = qw(meta_ok does_ok has_attribute_ok);
-
-sub find_meta{ Mouse::class_of($class_or_obj) }
-
-sub meta_ok ($;$) {
-    my ($class_or_obj, $message) = @_;
-
-    $message ||= "The object has a meta";
-
-    if (find_meta($class_or_obj)) {
-        return __PACKAGE__->builder->ok(1, $message)
-    }
-    else {
-        return __PACKAGE__->builder->ok(0, $message);
-    }
-}
-
-sub does_ok ($$;$) {
-    my ($class_or_obj, $does, $message) = @_;
-
-    $message ||= "The object does $does";
-
-    my $meta = find_meta($class_or_obj);
-    if ($meta && $meta->does_role($does)) {
-        return __PACKAGE__->builder->ok(1, $message)
-    }
-    else {
-        return __PACKAGE__->builder->ok(0, $message);
-    }
-}
-
-sub has_attribute_ok ($$;$) {
-    my ($class_or_obj, $attr_name, $message) = @_;
-
-    $message ||= "The object does has an attribute named $attr_name";
-
-    my $meta = find_meta($class_or_obj);
-
-    if ($meta->find_attribute_by_name($attr_name)) {
-        return __PACKAGE__->builder->ok(1, $message)
-    }
-    else {
-        return __PACKAGE__->builder->ok(0, $message);
-    }
-}
-
-1;
 
 END_OF_TINY
 } #unless

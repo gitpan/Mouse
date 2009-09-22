@@ -2,13 +2,11 @@ package Test::Mouse;
 
 use strict;
 use warnings;
-use Mouse ();
+use Mouse::Util qw(find_meta does_role);
 
 use base qw(Test::Builder::Module);
 
 our @EXPORT = qw(meta_ok does_ok has_attribute_ok);
-
-sub find_meta{ Mouse::class_of($class_or_obj) }
 
 sub meta_ok ($;$) {
     my ($class_or_obj, $message) = @_;
@@ -28,8 +26,7 @@ sub does_ok ($$;$) {
 
     $message ||= "The object does $does";
 
-    my $meta = find_meta($class_or_obj);
-    if ($meta && $meta->does_role($does)) {
+    if (does_ok($class_or_obj)) {
         return __PACKAGE__->builder->ok(1, $message)
     }
     else {
