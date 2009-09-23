@@ -4,22 +4,31 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub moose_version(){ 0.90 } # which Mouse is a subset of
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
-use Mouse::Util qw(load_class is_class_loaded);
 
-use Mouse::Meta::Attribute;
+use Mouse::Util qw(load_class is_class_loaded not_supported);
+
 use Mouse::Meta::Module;
 use Mouse::Meta::Class;
 use Mouse::Meta::Role;
+use Mouse::Meta::Attribute;
 use Mouse::Object;
-use Mouse::Util::TypeConstraints;
+use Mouse::Util::TypeConstraints ();
 
-our @EXPORT = qw(extends has before after around override super blessed confess with);
+our @EXPORT = qw(
+    extends with
+    has
+    before after around
+    override super
+    augment  inner
+
+    blessed confess
+);
 
 our %is_removable = map{ $_ => undef } @EXPORT;
 delete $is_removable{blessed};
@@ -96,41 +105,33 @@ sub override {
     });
 }
 
-sub init_meta {
-    # This used to be called as a function. This hack preserves
-    # backwards compatibility.
-    if ( $_[0] ne __PACKAGE__ ) {
-        return __PACKAGE__->init_meta(
-            for_class  => $_[0],
-            base_class => $_[1],
-            metaclass  => $_[2],
-        );
-    }
+sub inner  { not_supported }
+sub augment{ not_supported }
 
+sub init_meta {
     shift;
     my %args = @_;
 
     my $class = $args{for_class}
-      or Carp::croak(
-        "Cannot call init_meta without specifying a for_class");
+                    or confess("Cannot call init_meta without specifying a for_class");
     my $base_class = $args{base_class} || 'Mouse::Object';
     my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
 
-    Carp::croak("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
+    confess("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
             unless $metaclass->isa('Mouse::Meta::Class');
-    
+
     # make a subtype for each Mouse class
-    class_type($class)
-        unless find_type_constraint($class);
+    Mouse::Util::TypeConstraints::class_type($class)
+        unless Mouse::Util::TypeConstraints::find_type_constraint($class);
 
     my $meta = $metaclass->initialize($class);
-    $meta->superclasses($base_class)
-        unless $meta->superclasses;
 
     $meta->add_method(meta => sub{
-        return Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
+        return $metaclass->initialize(ref($_[0]) || $_[0]);
     });
 
+    $meta->superclasses($base_class)
+        unless $meta->superclasses;
 
     return $meta;
 }
@@ -158,7 +159,7 @@ sub import {
         return;
     }
 
-    Mouse->init_meta(
+    $class->init_meta(
         for_class  => $caller,
     );
 

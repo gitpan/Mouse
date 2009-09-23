@@ -1,7 +1,7 @@
 ---
-abstract: 'Moose minus the antlers'
+abstract: "Moose minus the antlers\r"
 author:
-  - 'Shawn M Moore, C<< <sartak at gmail.com> >>'
+  - "Shawn M Moore, C<< <sartak at gmail.com> >>\r"
 build_requires:
   ExtUtils::MakeMaker: 6.42
   Test::Exception: 0.21
@@ -25,4 +25,4 @@ requires:
   perl: 5.6.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.32
+version: 0.33

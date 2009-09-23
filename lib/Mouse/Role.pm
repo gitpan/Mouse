@@ -3,13 +3,24 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-use Carp 'confess', 'croak';
+use Carp 'confess';
 use Scalar::Util 'blessed';
 
-use Mouse::Meta::Role;
-use Mouse::Util qw(load_class);
+use Mouse::Util qw(load_class not_supported);
+use Mouse ();
 
-our @EXPORT = qw(before after around super override inner augment has extends with requires excludes confess blessed);
+our @EXPORT = qw(
+    extends with
+    has
+    before after around
+    override super
+    augment  inner
+
+    requires excludes
+
+    blessed confess
+);
+
 our %is_removable = map{ $_ => undef } @EXPORT;
 delete $is_removable{confess};
 delete $is_removable{blessed};
@@ -56,8 +67,8 @@ sub override {
     my $fullname = "${classname}::${name}";
 
     defined &$fullname
-        && confess "Cannot add an override of method '$fullname' " .
-                   "because there is a local version of '$fullname'";
+        && $meta->throw_error("Cannot add an override of method '$fullname' "
+                            . "because there is a local version of '$fullname'");
 
     $meta->add_override_method_modifier($name => sub {
         local $Mouse::SUPER_PACKAGE = shift;
@@ -70,11 +81,11 @@ sub override {
 
 # We keep the same errors messages as Moose::Role emits, here.
 sub inner {
-    croak "Moose::Role cannot support 'inner'";
+    Carp::croak "Roles cannot support 'inner'";
 }
 
 sub augment {
-    croak "Moose::Role cannot support 'augment'";
+    Carp::croak "Roles cannot support 'augment'";
 }
 
 sub has {
@@ -86,7 +97,9 @@ sub has {
     $meta->add_attribute($name => \%opts);
 }
 
-sub extends  { confess "Roles do not support 'extends'" }
+sub extends  {
+    Carp::croak "Roles do not support 'extends'"
+}
 
 sub with     {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
@@ -95,11 +108,13 @@ sub with     {
 
 sub requires {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-    Carp::croak "Must specify at least one method" unless @_;
+    $meta->throw_error("Must specify at least one method") unless @_;
     $meta->add_required_methods(@_);
 }
 
-sub excludes { confess "Mouse::Role does not currently support 'excludes'" }
+sub excludes {
+    not_supported;
+}
 
 sub import {
     my $class = shift;

@@ -28,6 +28,7 @@ package Mouse::Util;
 use strict;
 use warnings;
 use base qw/Exporter/;
+
 use Carp qw(confess);
 use B ();
 
@@ -316,15 +317,26 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub moose_version(){ 0.90 } # which Mouse is a subset of
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
-BEGIN { Mouse::Util->import(qw(load_class is_class_loaded)) }
 
-our @EXPORT = qw(extends has before after around override super blessed confess with);
+BEGIN { Mouse::Util->import(qw(load_class is_class_loaded not_supported)) }
+
+BEGIN { Mouse::Util::TypeConstraints->import(()) }
+
+our @EXPORT = qw(
+    extends with
+    has
+    before after around
+    override super
+    augment  inner
+
+    blessed confess
+);
 
 our %is_removable = map{ $_ => undef } @EXPORT;
 delete $is_removable{blessed};
@@ -401,41 +413,33 @@ sub override {
     });
 }
 
-sub init_meta {
-    # This used to be called as a function. This hack preserves
-    # backwards compatibility.
-    if ( $_[0] ne __PACKAGE__ ) {
-        return __PACKAGE__->init_meta(
-            for_class  => $_[0],
-            base_class => $_[1],
-            metaclass  => $_[2],
-        );
-    }
+sub inner  { not_supported }
+sub augment{ not_supported }
 
+sub init_meta {
     shift;
     my %args = @_;
 
     my $class = $args{for_class}
-      or Carp::croak(
-        "Cannot call init_meta without specifying a for_class");
+                    or confess("Cannot call init_meta without specifying a for_class");
     my $base_class = $args{base_class} || 'Mouse::Object';
     my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
 
-    Carp::croak("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
+    confess("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
             unless $metaclass->isa('Mouse::Meta::Class');
-    
+
     # make a subtype for each Mouse class
-    class_type($class)
-        unless find_type_constraint($class);
+    Mouse::Util::TypeConstraints::class_type($class)
+        unless Mouse::Util::TypeConstraints::find_type_constraint($class);
 
     my $meta = $metaclass->initialize($class);
-    $meta->superclasses($base_class)
-        unless $meta->superclasses;
 
     $meta->add_method(meta => sub{
-        return Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
+        return $metaclass->initialize(ref($_[0]) || $_[0]);
     });
 
+    $meta->superclasses($base_class)
+        unless $meta->superclasses;
 
     return $meta;
 }
@@ -463,7 +467,7 @@ sub import {
         return;
     }
 
-    Mouse->init_meta(
+    $class->init_meta(
         for_class  => $caller,
     );
 
@@ -496,6 +500,8 @@ sub unimport {
         }
     }
 }
+
+1;
 
 package Mouse::Meta::Attribute;
 use strict;
@@ -744,6 +750,7 @@ use strict;
 use warnings;
 
 use Scalar::Util qw/blessed weaken/;
+
 BEGIN { Mouse::Util->import(qw/get_linear_isa not_supported/) }
 
 use base qw(Mouse::Meta::Module);
@@ -1491,8 +1498,10 @@ package Mouse::Meta::Module;
 use strict;
 use warnings;
 
-BEGIN { Mouse::Util->import(qw/get_code_info not_supported load_class/) }
+use Carp ();
 use Scalar::Util qw/blessed weaken/;
+
+BEGIN { Mouse::Util->import(qw/get_code_info not_supported load_class/) }
 
 {
     my %METACLASS_CACHE;
@@ -2213,10 +2222,13 @@ use base qw(Mouse::Meta::Method);
 package Mouse::Meta::TypeConstraint;
 use strict;
 use warnings;
-use Carp ();
 
 use overload '""'     => sub { shift->{name} },   # stringify to tc name
              fallback => 1;
+
+use Carp ();
+
+BEGIN { Mouse::Util->import(()) }
 
 sub new {
     my $class = shift;
@@ -2377,12 +2389,24 @@ use strict;
 use warnings;
 use base 'Exporter';
 
-use Carp 'confess', 'croak';
+use Carp 'confess';
 use Scalar::Util 'blessed';
 
-BEGIN { Mouse::Util->import(qw(load_class)) }
+BEGIN { Mouse::Util->import(qw(load_class not_supported)) }
+BEGIN { Mouse->import(()) }
 
-our @EXPORT = qw(before after around super override inner augment has extends with requires excludes confess blessed);
+our @EXPORT = qw(
+    extends with
+    has
+    before after around
+    override super
+    augment  inner
+
+    requires excludes
+
+    blessed confess
+);
+
 our %is_removable = map{ $_ => undef } @EXPORT;
 delete $is_removable{confess};
 delete $is_removable{blessed};
@@ -2429,8 +2453,8 @@ sub override {
     my $fullname = "${classname}::${name}";
 
     defined &$fullname
-        && confess "Cannot add an override of method '$fullname' " .
-                   "because there is a local version of '$fullname'";
+        && $meta->throw_error("Cannot add an override of method '$fullname' "
+                            . "because there is a local version of '$fullname'");
 
     $meta->add_override_method_modifier($name => sub {
         local $Mouse::SUPER_PACKAGE = shift;
@@ -2443,11 +2467,11 @@ sub override {
 
 # We keep the same errors messages as Moose::Role emits, here.
 sub inner {
-    croak "Moose::Role cannot support 'inner'";
+    Carp::croak "Roles cannot support 'inner'";
 }
 
 sub augment {
-    croak "Moose::Role cannot support 'augment'";
+    Carp::croak "Roles cannot support 'augment'";
 }
 
 sub has {
@@ -2459,7 +2483,9 @@ sub has {
     $meta->add_attribute($name => \%opts);
 }
 
-sub extends  { confess "Roles do not support 'extends'" }
+sub extends  {
+    Carp::croak "Roles do not support 'extends'"
+}
 
 sub with     {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
@@ -2468,11 +2494,13 @@ sub with     {
 
 sub requires {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-    Carp::croak "Must specify at least one method" unless @_;
+    $meta->throw_error("Must specify at least one method") unless @_;
     $meta->add_required_methods(@_);
 }
 
-sub excludes { confess "Mouse::Role does not currently support 'excludes'" }
+sub excludes {
+    not_supported;
+}
 
 sub import {
     my $class = shift;
@@ -2515,6 +2543,8 @@ sub unimport {
     return;
 }
 
+1;
+
 package Mouse::TypeRegistry;
 sub import {
     warn "Mouse::TypeRegistry is deprecated, please use Mouse::Util::TypeConstraints instead.";
@@ -2539,6 +2569,7 @@ use base 'Exporter';
 
 use Carp ();
 use Scalar::Util qw/blessed looks_like_number openhandle/;
+
 our @EXPORT = qw(
     as where message from via type subtype coerce class_type role_type enum
     find_type_constraint
@@ -2559,24 +2590,34 @@ sub message (&) {
     return(message => $_[0])
 }
 
-sub from { @_ }
+sub from    { @_ }
 sub via (&) { $_[0] }
 
+sub export_type_constraints_as_functions {
+    my $into = caller;
+
+    foreach my $constraint ( values %TYPE ) {
+        my $tc = $constraint->{_compiled_type_constraint};
+        my $as = $into . '::' . $constraint->{name};
+
+        no strict 'refs';
+        *{$as} = sub{ &{$tc} || undef };
+    }
+    return;
+}
+
 BEGIN {
-    no warnings 'uninitialized';
     %TYPE = (
         Any        => sub { 1 },
         Item       => sub { 1 },
-        Bool       => sub {
-            !defined($_[0]) || $_[0] eq "" || "$_[0]" eq '1' || "$_[0]" eq '0'
-        },
+
+        Bool       => sub { $_[0] ? $_[0] eq '1' : 1 },
         Undef      => sub { !defined($_[0]) },
         Defined    => sub { defined($_[0]) },
         Value      => sub { defined($_[0]) && !ref($_[0]) },
         Num        => sub { !ref($_[0]) && looks_like_number($_[0]) },
         Int        => sub { defined($_[0]) && !ref($_[0]) && $_[0] =~ /^-?[0-9]+$/ },
         Str        => sub { defined($_[0]) && !ref($_[0]) },
-        ClassName  => sub { Mouse::is_class_loaded($_[0]) },
         Ref        => sub { ref($_[0]) },
 
         ScalarRef  => sub { ref($_[0]) eq 'SCALAR' },
@@ -2593,86 +2634,121 @@ BEGIN {
         },
 
         Object     => sub { blessed($_[0]) && blessed($_[0]) ne 'Regexp' },
+
+        ClassName  => sub { Mouse::Util::is_class_loaded($_[0]) },
+        RoleName   => sub { (Mouse::Util::find_meta($_[0]) || return 0)->isa('Mouse::Meta::Role') },
     );
     while (my ($name, $code) = each %TYPE) {
-        $TYPE{$name} = Mouse::Meta::TypeConstraint->new( _compiled_type_constraint => $code, name => $name );
+        $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
+            name                      => $name,
+            _compiled_type_constraint => $code,
+        );
+        $TYPE_SOURCE{$name} = __PACKAGE__;
     }
 
     sub optimized_constraints { \%TYPE }
+
     my @TYPE_KEYS = keys %TYPE;
     sub list_all_builtin_type_constraints { @TYPE_KEYS }
-
-    @TYPE_SOURCE{@TYPE_KEYS} = (__PACKAGE__) x @TYPE_KEYS;
 }
 
 sub type {
-    my $pkg = caller(0);
-    my($name, %conf) = @_;
-
-    if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
-        Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
-    }
-    my $constraint = $conf{where} || do {
-        my $as = delete $conf{as} || 'Any';
-        if (! exists $TYPE{$as}) {
-            $TYPE{$as} = _build_type_constraint($as);
-        }
-        $TYPE{$as};
-    };
-
-    $TYPE_SOURCE{$name} = $pkg;
-    $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
-        name => $name,
-        _compiled_type_constraint => sub {
-            local $_ = $_[0];
-            if (ref $constraint eq 'CODE') {
-                $constraint->($_[0])
-            } else {
-                $constraint->check($_[0])
-            }
-        }
-    );
-}
-
-sub subtype {
-    my $pkg = caller;
-
     my $name;
     my %conf;
 
-    if(@_ % 2){ # odd number of arguments
+    if(@_ == 1 && ref $_[0]){ # type { where => ... }
+        %conf = %{$_[0]};
+    }
+    elsif(@_ == 2 && ref $_[1]){ # type $name => { where => ... }*
+        $name = $_[0];
+        %conf = %{$_[1]};
+    }
+    elsif(@_ % 2){ # odd number of arguments
         $name = shift;
         %conf = @_;
     }
     else{
         %conf = @_;
-        $name = $conf{name} || '__ANON__';
     }
+
+    $name = '__ANON__' if !defined $name;
+
+    my $pkg = caller;
 
     if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
         Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
+    }
+
+    my $constraint = $conf{where} || do {
+        my $as = delete $conf{as} || 'Any';
+        ($TYPE{$as} ||= _build_type_constraint($as))->{_compiled_type_constraint};
     };
-    my $constraint = delete $conf{where};
-    my $as_constraint = find_or_create_isa_type_constraint(delete $conf{as} || 'Any');
+
+    my $tc = Mouse::Meta::TypeConstraint->new(
+        name                      => $name,
+        _compiled_type_constraint => sub {
+            local $_ = $_[0];
+            return &{$constraint};
+        },
+    );
 
     $TYPE_SOURCE{$name} = $pkg;
-    $TYPE{$name} = Mouse::Meta::TypeConstraint->new(
+    $TYPE{$name}        = $tc;
+
+    return $tc;
+}
+
+sub subtype {
+    my $name;
+    my %conf;
+
+    if(@_ == 1 && ref $_[0]){ # type { where => ... }
+        %conf = %{$_[0]};
+    }
+    elsif(@_ == 2 && ref $_[1]){ # type $name => { where => ... }*
+        $name = $_[0];
+        %conf = %{$_[1]};
+    }
+    elsif(@_ % 2){ # odd number of arguments
+        $name = shift;
+        %conf = @_;
+    }
+    else{
+        %conf = @_;
+    }
+
+    $name = '__ANON__' if !defined $name;
+
+    my $pkg = caller;
+
+    if ($TYPE{$name} && $TYPE_SOURCE{$name} ne $pkg) {
+        Carp::croak "The type constraint '$name' has already been created in $TYPE_SOURCE{$name} and cannot be created again in $pkg";
+    }
+
+    my $constraint    = delete $conf{where};
+    my $as_constraint = find_or_create_isa_type_constraint(delete $conf{as} || 'Any')
+        ->{_compiled_type_constraint};
+
+    my $tc = Mouse::Meta::TypeConstraint->new(
         name => $name,
         _compiled_type_constraint => (
             $constraint ? 
             sub {
                 local $_ = $_[0];
-                $as_constraint->check($_[0]) && $constraint->($_[0])
+                $as_constraint->($_[0]) && $constraint->($_[0])
             } :
             sub {
                 local $_ = $_[0];
-                $as_constraint->check($_[0]);
+                $as_constraint->($_[0]);
             }
         ),
-        %conf
+        %conf,
     );
 
-    return $name;
+    $TYPE_SOURCE{$name} = $pkg;
+    $TYPE{$name}        = $tc;
+
+    return $tc;
 }
 
 sub coerce {
@@ -2888,6 +2964,8 @@ sub find_or_create_isa_type_constraint {
     }
     return $code;
 }
+
+1;
 
 END_OF_TINY
 } #unless

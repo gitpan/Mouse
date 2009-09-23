@@ -44,6 +44,11 @@ t/000-load.t
 t/000-recipes/001_point.t
 t/000-recipes/002_schwartz_tutorial.t
 t/000-recipes/basics-recipe10.t
+t/000-recipes/moose_cookbook_basics_recipe2.t
+t/000-recipes/moose_cookbook_basics_recipe3.t
+t/000-recipes/moose_cookbook_basics_recipe4.t
+t/000-recipes/moose_cookbook_basics_recipe5.t
+t/000-recipes/moose_cookbook_roles_recipe2.t
 t/001-strict.t
 t/002-warnings.t
 t/003-mouse-object.t
@@ -123,6 +128,7 @@ t/037-dont-load-test-exception.t
 t/038-main.t
 t/039-subtype.t
 t/040-existing-subclass.t
+t/040_type_constraints/003_util_std_type_constraints.t
 t/041-enum.t
 t/042-override.t
 t/043-parameterized-type.t
