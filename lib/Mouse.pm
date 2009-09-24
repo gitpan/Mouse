@@ -4,9 +4,7 @@ use warnings;
 use 5.006;
 use base 'Exporter';
 
-our $VERSION = '0.33';
-
-sub moose_version(){ 0.90 } # which Mouse is a subset of
+our $VERSION = '0.33_01';
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -38,7 +36,9 @@ sub extends { Mouse::Meta::Class->initialize(scalar caller)->superclasses(@_) }
 
 sub has {
     my $meta = Mouse::Meta::Class->initialize(scalar caller);
-    $meta->add_attribute(@_);
+    my $name = shift;
+
+    $meta->add_attribute($_ => @_) for ref($name) ? @{$name} : $name;
 }
 
 sub before {
