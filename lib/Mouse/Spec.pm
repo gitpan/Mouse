@@ -1,16 +1,14 @@
 package Mouse::Spec;
-
 use strict;
-use version;
+use warnings;
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
 
 sub MouseVersion{ $MouseVersion }
 sub MooseVersion{ $MooseVersion }
-
 
 1;
 __END__

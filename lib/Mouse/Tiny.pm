@@ -28,28 +28,32 @@ $INC{'Mouse/Util/TypeConstraints.pm'} = __FILE__;
 package Mouse::Util;
 use strict;
 use warnings;
-use base qw/Exporter/;
+
+use Exporter;
 
 use Carp qw(confess);
-use B ();
 
+our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(
     find_meta
     does_role
     resolve_metaclass_alias
+    apply_all_roles
     english_list
 
     load_class
     is_class_loaded
 
-    apply_all_roles
-    not_supported
-
     get_linear_isa
     get_code_info
+
+    not_supported
+
+    does meta dump
 );
 our %EXPORT_TAGS = (
     all  => \@EXPORT_OK,
+    meta => [qw(does meta dump)],
 );
 
 # Moose::Util compatible utilities
@@ -59,13 +63,14 @@ sub find_meta{
 }
 
 sub does_role{
-    my ($class_or_obj, $role) = @_;
+    my ($class_or_obj, $role_name) = @_;
 
     my $meta = Mouse::Meta::Module::class_of($class_or_obj);
 
-    return 0 unless defined $meta;
-    return 1 if $meta->does_role($role);
-    return 0;
+    (defined $role_name)
+        || ($meta || 'Mouse::Meta::Class')->throw_error("You must supply a role name to does()");
+
+    return defined($meta) && $meta->does_role($role_name);
 }
 
 
@@ -117,6 +122,8 @@ BEGIN {
     sub get_code_info($) {
         my ($coderef) = @_;
         ref($coderef) or return;
+
+        require B;
 
         my $cv = B::svref_2object($coderef);
         $cv->isa('B::CV') or return;
@@ -172,7 +179,6 @@ sub load_first_existing_class {
     my @classes = @_
       or return;
 
-    my $found;
     my %exceptions;
     for my $class (@classes) {
         my $e = _try_load_one_class($class);
@@ -181,12 +187,11 @@ sub load_first_existing_class {
             $exceptions{$class} = $e;
         }
         else {
-            $found = $class;
-            last;
+            return $class;
         }
     }
-    return $found if $found;
 
+    # not found
     confess join(
         "\n",
         map {
@@ -272,7 +277,7 @@ sub apply_all_roles {
         if ($i + 1 < $max && ref($_[$i + 1])) {
             push @roles, [ $_[$i++] => $_[$i] ];
         } else {
-            push @roles, [ $_[$i] => {} ];
+            push @roles, [ $_[$i]   => undef ];
         }
         my $role_name = $roles[-1][0];
         load_class($role_name);
@@ -303,6 +308,9 @@ sub english_list {
     return join q{, }, @items, "and $tail";
 }
 
+
+# common utilities
+
 sub not_supported{
     my($feature) = @_;
 
@@ -312,15 +320,34 @@ sub not_supported{
     Carp::confess("Mouse does not currently support $feature");
 }
 
+sub meta{
+    return Mouse::Meta::Class->initialize($_[0]);
+}
+
+sub dump { 
+    my($self, $maxdepth) = @_;
+
+    require 'Data/Dumper.pm'; # we don't want to create its namespace
+    my $dd = Data::Dumper->new([$self]);
+    $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 2);
+    $dd->Indent(1);
+    return $dd->Dump();
+}
+
+sub does :method;
+*does = \&does_role; # alias
+
 1;
 
 package Mouse;
+use 5.006_002;
+
 use strict;
 use warnings;
-use 5.006;
-use base 'Exporter';
 
-our $VERSION = '0.33_01';
+our $VERSION = '0.34';
+
+use Exporter;
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
@@ -328,6 +355,8 @@ use Scalar::Util 'blessed';
 BEGIN { Mouse::Util->import(qw(load_class is_class_loaded not_supported)) }
 
 BEGIN { Mouse::Util::TypeConstraints->import(()) }
+
+our @ISA = qw(Exporter);
 
 our @EXPORT = qw(
     extends with
@@ -511,28 +540,11 @@ use strict;
 use warnings;
 
 use Carp ();
-use Scalar::Util qw(weaken);
 
-sub BUILDARGS{
-    my $class = shift;
-    my $name  = shift;
-    my %args  = (@_ == 1) ? %{$_[0]} : @_;
+BEGIN { Mouse::Util->import(qw(:meta)) }
 
-    $args{name} = $name;
-
-    # XXX: for backward compatibility (with method modifiers)
-    if($class->can('canonicalize_args') != \&canonicalize_args){
-        %args = $class->canonicalize_args($name, %args);
-    }
-
-    return \%args;
-}
-
-sub new {
-    my $class = shift;
-    my $args  = $class->BUILDARGS(@_);
-
-    my $name = $args->{name};
+sub _process_options{
+    my($class, $name, $args) = @_;
 
     # taken from Class::MOP::Attribute::new
 
@@ -594,7 +606,8 @@ sub new {
         $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($args->{isa});
     }
     elsif(exists $args->{does}){
-        $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
+        # TODO
+        # $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
     }
     $tc = $args->{type_constraint};
 
@@ -640,11 +653,28 @@ sub new {
             || $class->throw_error("You cannot have lazy attribute ($name) without specifying a default value for it");
     }
 
-    my $instance = bless $args, $class;
+    # XXX: for backward compatibility (with method modifiers)
+    if($class->can('canonicalize_args') != \&canonicalize_args){
+        %{$args} = $class->canonicalize_args($name, %{$args});
+    }
+    return;
+}
+
+sub new {
+    my $class = shift;
+    my $name  = shift;
+
+    my %args  = (@_ == 1) ? %{ $_[0] } : @_;
+
+    $class->_process_options($name, \%args);
+
+    $args{name} = $name;
+
+    my $instance = bless \%args, $class;
 
     # extra attributes
     if($class ne __PACKAGE__){
-        $class->meta->_initialize_instance($instance, $args);
+        $class->meta->_initialize_instance($instance,\%args);
     }
 
 # XXX: there is no fast way to check attribute validity
@@ -656,16 +686,6 @@ sub new {
 
     return $instance
 }
-
-sub does {
-    my ($self, $role_name) = @_;
-    my $meta = Mouse::Meta::Class->initialize(ref($self) || $self);
-
-    (defined $role_name)
-        || $meta->throw_error("You must supply a role name to does()");
-
-    return $meta->does_role($role_name);
-};
 
 # readers
 
@@ -718,18 +738,16 @@ sub _create_args {
     $_[0]->{_create_args}
 }
 
-sub accessor_metaclass { 'Mouse::Meta::Method::Accessor' }
-
-sub interpolate_class_and_new{
+sub interpolate_class{
     my($class, $name, $args) = @_;
 
     if(my $metaclass = delete $args->{metaclass}){
         $class = Mouse::Util::resolve_metaclass_alias( Attribute => $metaclass );
     }
 
-
+    my @traits;
     if(my $traits_ref = delete $args->{traits}){
-        my @traits;
+
         for (my $i = 0; $i < @{$traits_ref}; $i++) {
             my $trait = Mouse::Util::resolve_metaclass_alias(Attribute => $traits_ref->[$i], trait => 1);
 
@@ -748,19 +766,17 @@ sub interpolate_class_and_new{
                 roles        => \@traits,
                 cache        => 1,
             )->name;
-
-            $args->{traits} = \@traits;
         }
     }
 
-    return $class->new($name, $args);
+    return( $class, @traits );
 }
 
 sub canonicalize_args{
     my ($self, $name, %args) = @_;
 
     Carp::cluck("$self->canonicalize_args has been deprecated."
-        . "Use \$self->BUILDARGS instead.");
+        . "Use \$self->_process_options instead.");
 
     return %args;
 }
@@ -794,7 +810,7 @@ sub verify_type_constraint_error {
 sub coerce_constraint { ## my($self, $value) = @_;
     my $type = $_[0]->{type_constraint}
         or return $_[1];
-    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $_[0]->type_constraint, $_[1]);
+    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $type, $_[1]);
 }
 
 sub _canonicalize_handles {
@@ -816,7 +832,7 @@ sub clone_and_inherit_options{
     my $self = shift;
     my $name = shift;
 
-    return ref($self)->new($name, %{$self}, @_ == 1 ? %{$_[0]} : @_);
+    return ref($self)->new($name, %{$self}, (@_ == 1) ? %{$_[0]} : @_);
 }
 
 sub clone_parent {
@@ -829,7 +845,7 @@ sub clone_parent {
         . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
 
 
-    $self->create($class, $name, %args);
+    $self->clone_and_inherited_args($class, $name, %args);
 }
 
 sub get_parent_args {
@@ -850,17 +866,19 @@ sub install_accessors{
     my($attribute) = @_;
 
     my $metaclass       = $attribute->{associated_class};
-    my $generator_class = $attribute->accessor_metaclass;
 
     foreach my $type(qw(accessor reader writer predicate clearer handles)){
         if(exists $attribute->{$type}){
             my $installer    = '_install_' . $type;
-            $generator_class->$installer($attribute, $attribute->{$type}, $metaclass);
+
+            Mouse::Meta::Method::Accessor->$installer($attribute, $attribute->{$type}, $metaclass);
+
             $attribute->{associated_methods}++;
         }
     }
 
     if($attribute->can('create') != \&create){
+        # backword compatibility
         $attribute->create($metaclass, $attribute->name, %{$attribute});
     }
 
@@ -884,7 +902,7 @@ use Scalar::Util qw/blessed weaken/;
 
 BEGIN { Mouse::Util->import(qw/get_linear_isa not_supported/) }
 
-use base qw(Mouse::Meta::Module);
+our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Method' } # required for get_method()
 
@@ -941,7 +959,7 @@ sub find_method_by_name{
 
 sub get_all_methods {
     my($self) = @_;
-    return map{ $self->find_method_by_name($self) } $self->get_all_method_names;
+    return map{ $self->find_method_by_name($_) } $self->get_all_method_names;
 }
 
 sub get_all_method_names {
@@ -952,40 +970,48 @@ sub get_all_method_names {
             $self->linearized_isa;
 }
 
-sub _process_attribute{
-    my $self = shift;
-    my $name = shift;
-
-    my $args = (@_ == 1) ? $_[0] : { @_ };
-
-    defined($name)
-        or $self->throw_error('You must provide a name for the attribute');
-
-    if ($name =~ s/^\+//) {
-        my $inherited_attr;
-
-        foreach my $class($self->linearized_isa){
-            my $meta = Mouse::Meta::Module::get_metaclass_by_name($class) or next;
-            $inherited_attr = $meta->get_attribute($name) and last;
-        }
-
-        defined($inherited_attr)
-            or $self->throw_error("Could not find an attribute by the name of '$name' to inherit from in ".$self->name);
-
-        return $inherited_attr->clone_and_inherit_options($name, $args);
-    }
-    else{
-        return Mouse::Meta::Attribute->interpolate_class_and_new($name, $args);
-    }
-}
-
 sub add_attribute {
     my $self = shift;
 
-    my $attr = blessed($_[0]) ? $_[0] : $self->_process_attribute(@_);
+    my($attr, $name);
 
-    $attr->isa('Mouse::Meta::Attribute')
-        || $self->throw_error("Your attribute must be an instance of Mouse::Meta::Attribute (or a subclass)");
+    if(blessed $_[0]){
+        $attr = $_[0];
+
+        $attr->isa('Mouse::Meta::Attribute')
+            || $self->throw_error("Your attribute must be an instance of Mouse::Meta::Attribute (or a subclass)");
+
+        $name = $attr->name;
+    }
+    else{
+        # _process_attribute
+        $name = shift;
+
+        my %args = (@_ == 1) ? %{$_[0]} : @_;
+
+        defined($name)
+            or $self->throw_error('You must provide a name for the attribute');
+
+        if ($name =~ s/^\+//) { # inherited attributes
+            my $inherited_attr;
+
+            foreach my $class($self->linearized_isa){
+                my $meta = Mouse::Meta::Module::get_metaclass_by_name($class) or next;
+                $inherited_attr = $meta->get_attribute($name) and last;
+            }
+
+            defined($inherited_attr)
+                or $self->throw_error("Could not find an attribute by the name of '$name' to inherit from in ".$self->name);
+
+            $attr = $inherited_attr->clone_and_inherit_options($name, \%args);
+        }
+        else{
+            my($attribute_class, @traits) = Mouse::Meta::Attribute->interpolate_class($name, \%args);
+            $args{traits} = \@traits if @traits;
+
+            $attr = $attribute_class->new($name, \%args);
+        }
+    }
 
     weaken( $attr->{associated_class} = $self );
 
@@ -1096,18 +1122,10 @@ sub _initialize_instance{
 sub clone_object {
     my $class    = shift;
     my $instance = shift;
+    my %params   = (@_ == 1) ? %{$_[0]} : @_;
 
     (blessed($instance) && $instance->isa($class->name))
         || $class->throw_error("You must pass an instance of the metaclass (" . $class->name . "), not ($instance)");
-
-    $class->clone_instance($instance, @_);
-}
-
-sub clone_instance {
-    my ($class, $instance, %params) = @_;
-
-    (blessed($instance))
-        || $class->throw_error("You can only clone instances, ($instance) is not a blessed instance");
 
     my $clone = bless { %$instance }, ref $instance;
 
@@ -1120,7 +1138,13 @@ sub clone_instance {
     }
 
     return $clone;
+}
 
+sub clone_instance {
+    my ($class, $instance, %params) = @_;
+
+    Carp::cluck('clone_instance has been deprecated. Use clone_object instead');
+    return $class->clone_object($instance, %params);
 }
 
 sub make_immutable {
@@ -1151,27 +1175,90 @@ sub make_mutable { not_supported }
 sub is_immutable {  $_[0]->{is_immutable} }
 sub is_mutable   { !$_[0]->{is_immutable} }
 
+sub _install_modifier_pp{
+    my( $self, $into, $type, $name, $code ) = @_;
+
+    my $original = $into->can($name)
+        or $self->throw_error("The method '$name' is not found in the inheritance hierarchy for class $into");
+
+    my $modifier_table = $self->{modifiers}{$name};
+
+    if(!$modifier_table){
+        my(@before, @after, @around, $cache, $modified);
+
+        $cache = $original;
+
+        $modified = sub {
+            for my $c (@before) { $c->(@_) }
+
+            if(wantarray){ # list context
+                my @rval = $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return @rval;
+            }
+            elsif(defined wantarray){ # scalar context
+                my $rval = $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return $rval;
+            }
+            else{ # void context
+                $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return;
+            }
+        };
+
+        $self->{modifiers}{$name} = $modifier_table = {
+            original => $original,
+
+            before   => \@before,
+            after    => \@after,
+            around   => \@around,
+
+            cache    => \$cache, # cache for around modifiers
+        };
+
+        $self->add_method($name => $modified);
+    }
+
+    if($type eq 'before'){
+        unshift @{$modifier_table->{before}}, $code;
+    }
+    elsif($type eq 'after'){
+        push @{$modifier_table->{after}}, $code;
+    }
+    else{ # around
+        push @{$modifier_table->{around}}, $code;
+
+        my $next = ${ $modifier_table->{cache} };
+        ${ $modifier_table->{cache} } = sub{ $code->($next, @_) };
+    }
+
+    return;
+}
+
 sub _install_modifier {
     my ( $self, $into, $type, $name, $code ) = @_;
 
-    # which is modifer class available?
-    my $modifier_class = do {
-        if (eval "require Class::Method::Modifiers::Fast; 1") {
-            'Class::Method::Modifiers::Fast';
-        } elsif (eval "require Class::Method::Modifiers; 1") {
-            'Class::Method::Modifiers';
-        } else {
-            Carp::croak("Method modifiers require the use of Class::Method::Modifiers or Class::Method::Modifiers::Fast. Please install it from CPAN and file a bug report with this application.");
-        }
+    # load Class::Method::Modifiers first
+    my $no_cmm_fast = do{
+        local $@;
+        eval q{ require Class::Method::Modifiers::Fast };
+        $@;
     };
-    my $modifier = $modifier_class->can('_install_modifier');
 
-    # replace this method itself :)
-    {
-        no warnings 'redefine';
-        *_install_modifier = sub {
+    my $impl;
+    if($no_cmm_fast){
+        $impl = \&_install_modifier_pp;
+    }
+    else{
+        my $install_modifier = Class::Method::Modifiers::Fast->can('_install_modifier');
+        $impl = sub {
             my ( $self, $into, $type, $name, $code ) = @_;
-            $modifier->(
+            $install_modifier->(
                 $into,
                 $type,
                 $name,
@@ -1182,8 +1269,13 @@ sub _install_modifier {
         };
     }
 
-    # call me. for first time.
-    $self->_install_modifier( $into, $type, $name, $code );
+    # replace this method itself :)
+    {
+        no warnings 'redefine';
+        *_install_modifier = $impl;
+    }
+
+    $self->$impl( $into, $type, $name, $code );
 }
 
 sub add_before_method_modifier {
@@ -1237,6 +1329,8 @@ package Mouse::Meta::Method;
 use strict;
 use warnings;
 
+BEGIN { Mouse::Util->import(qw(:meta)) }
+
 use overload
     '&{}' => 'body',
     fallback => 1,
@@ -1252,6 +1346,10 @@ sub body        { $_[0]->{body}    }
 sub name        { $_[0]->{name}    }
 sub package_name{ $_[0]->{package} }
 
+sub fully_qualified_name {
+    my $self = shift;
+    return $self->package_name . '::' . $self->name;
+}
 
 1;
 
@@ -1460,17 +1558,19 @@ sub generate_constructor_method_inline {
     my ($class, $metaclass) = @_;
 
     my $associated_metaclass_name = $metaclass->name;
-    my @attrs = $metaclass->get_all_attributes;
-    my $buildall = $class->_generate_BUILDALL($metaclass);
-    my $buildargs = $class->_generate_BUILDARGS($metaclass);
-    my $processattrs = $class->_generate_processattrs($metaclass, \@attrs);
+    my @attrs         = $metaclass->get_all_attributes;
+
+    my $buildall      = $class->_generate_BUILDALL($metaclass);
+    my $buildargs     = $class->_generate_BUILDARGS($metaclass);
+    my $processattrs  = $class->_generate_processattrs($metaclass, \@attrs);
+
     my @compiled_constraints = map { $_ ? $_->{_compiled_type_constraint} : undef } map { $_->{type_constraint} } @attrs;
 
     my $code = <<"...";
     sub {
         my \$class = shift;
         return \$class->Mouse::Object::new(\@_)
-            if \$class ne '$associated_metaclass_name';
+            if \$class ne q{$associated_metaclass_name};
         $buildargs;
         my \$instance = bless {}, \$class;
         $processattrs;
@@ -1480,7 +1580,6 @@ sub generate_constructor_method_inline {
 ...
 
     local $@;
-    #warn $code;
     my $res = eval $code;
     die $@ if $@;
     $res;
@@ -1610,7 +1709,7 @@ sub _generate_processattrs {
 sub _generate_BUILDARGS {
     my($self, $metaclass) = @_;
 
-    if ($metaclass->name->can('BUILDARGS') && $metaclass->name->can('BUILDARGS') != Mouse::Object->can('BUILDARGS')) {
+    if ($metaclass->name->can('BUILDARGS') && $metaclass->name->can('BUILDARGS') != \&Mouse::Object::BUILDARGS) {
         return 'my $args = $class->BUILDARGS(@_)';
     }
 
@@ -1629,16 +1728,15 @@ sub _generate_BUILDARGS {
 
 sub _generate_BUILDALL {
     my ($class, $metaclass) = @_;
+
     return '' unless $metaclass->name->can('BUILD');
 
-    my @code = ();
-    push @code, q{no strict 'refs';};
-    push @code, q{no warnings 'once';};
-    no strict 'refs';
-    no warnings 'once';
-    for my $klass ($metaclass->linearized_isa) {
-        if (*{ $klass . '::BUILD' }{CODE}) {
-            unshift  @code, qq{${klass}::BUILD(\$instance, \$args);};
+    my @code;
+    for my $class ($metaclass->linearized_isa) {
+        no strict 'refs';
+
+        if (*{ $class . '::BUILD' }{CODE}) {
+            unshift  @code, qq{${class}::BUILD(\$instance, \$args);};
         }
     }
     return join "\n", @code;
@@ -1655,10 +1753,10 @@ sub generate_destructor_method_inline {
     my $demolishall = do {
         if ($meta->name->can('DEMOLISH')) {
             my @code = ();
-            no strict 'refs';
-            for my $klass ($meta->linearized_isa) {
-                if (*{$klass . '::DEMOLISH'}{CODE}) {
-                    push @code, "${klass}::DEMOLISH(\$self);";
+            for my $class ($meta->linearized_isa) {
+                no strict 'refs';
+                if (*{$class . '::DEMOLISH'}{CODE}) {
+                    push @code, "${class}::DEMOLISH(\$self);";
                 }
             }
             join "\n", @code;
@@ -1687,7 +1785,7 @@ use warnings;
 use Carp ();
 use Scalar::Util qw/blessed weaken/;
 
-BEGIN { Mouse::Util->import(qw/get_code_info not_supported load_class/) }
+BEGIN { Mouse::Util->import(qw/:meta get_code_info not_supported load_class/) }
 
 {
     my %METACLASS_CACHE;
@@ -1727,8 +1825,6 @@ BEGIN { Mouse::Util->import(qw/get_code_info not_supported load_class/) }
     sub remove_metaclass_by_name    { delete $METACLASS_CACHE{$_[0]}  }
 
 }
-
-sub meta{ Mouse::Meta::Class->initialize(ref $_[0] || $_[0]) }
 
 sub _new{ Carp::croak("Mouse::Meta::Module is an abstract class") }
 
@@ -1786,7 +1882,7 @@ sub _code_is_mine { # taken from Class::MOP::Class
 
     my ( $code_package, $code_name ) = get_code_info($code);
 
-    return $code_package && $code_package eq $self->name
+    return $code_package && $code_package eq $self->{package}
         || ( $code_package eq 'constant' && $code_name eq '__ANON__' );
 }
 
@@ -1794,7 +1890,8 @@ sub has_method {
     my($self, $method_name) = @_;
 
     return 1 if $self->{methods}->{$method_name};
-    my $code = $self->name->can($method_name);
+
+    my $code = $self->{package}->can($method_name);
 
     return $code && $self->_code_is_mine($code);
 }
@@ -1984,7 +2081,7 @@ use strict;
 use warnings;
 
 BEGIN { Mouse::Util->import(qw(not_supported english_list)) }
-use base qw(Mouse::Meta::Module);
+our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
 
@@ -2020,8 +2117,7 @@ sub get_required_method_list{
 }
 
 sub add_required_methods {
-    my $self = shift;
-    my @methods = @_;
+    my($self, @methods) = @_;
     push @{$self->{required_methods}}, @methods;
 }
 
@@ -2400,7 +2496,7 @@ package Mouse::Meta::Role::Method;
 use strict;
 use warnings;
 
-use base qw(Mouse::Meta::Method);
+our @ISA = qw(Mouse::Meta::Method);
 
 1;
 
@@ -2413,7 +2509,7 @@ use overload '""'     => sub { shift->{name} },   # stringify to tc name
 
 use Carp ();
 
-BEGIN { Mouse::Util->import(()) }
+BEGIN { Mouse::Util->import(qw(:meta)) }
 
 sub new {
     my $class = shift;
@@ -2490,6 +2586,8 @@ package Mouse::Object;
 use strict;
 use warnings;
 
+BEGIN { Mouse::Util->import(qw(does dump)) }
+
 sub new {
     my $class = shift;
 
@@ -2508,6 +2606,7 @@ sub BUILDARGS {
     if (scalar @_ == 1) {
         (ref($_[0]) eq 'HASH')
             || $class->meta->throw_error("Single parameters to new() must be a HASH ref");
+
         return {%{$_[0]}};
     }
     else {
@@ -2515,7 +2614,11 @@ sub BUILDARGS {
     }
 }
 
-sub DESTROY { shift->DEMOLISHALL }
+sub DESTROY {
+    my $self = shift;
+
+    $self->DEMOLISHALL();
+}
 
 sub BUILDALL {
     my $self = shift;
@@ -2524,11 +2627,10 @@ sub BUILDALL {
     return unless $self->can('BUILD');
 
     for my $class (reverse $self->meta->linearized_isa) {
-        no strict 'refs';
-        no warnings 'once';
-        my $code = *{ $class . '::BUILD' }{CODE}
+        my $build = do{ no strict 'refs'; *{ $class . '::BUILD' }{CODE} }
             or next;
-        $code->($self, @_);
+
+        $self->$build(@_);
     }
     return;
 }
@@ -2545,44 +2647,29 @@ sub DEMOLISHALL {
     # that time (at least tests suggest so ;)
 
     foreach my $class (@{ Mouse::Util::get_linear_isa(ref $self) }) {
-        my $demolish = do{ no strict 'refs'; *{"${class}::DEMOLISH"}{CODE} };
-        $self->$demolish()
-            if defined $demolish;
+        my $demolish = do{ no strict 'refs'; *{ $class . '::DEMOLISH'}{CODE} }
+            or next;
+
+        $self->$demolish();
     }
     return;
 }
-
-sub dump { 
-    my($self, $maxdepth) = @_;
-
-    require 'Data/Dumper.pm'; # we don't want to create its namespace
-    my $dd = Data::Dumper->new([$self]);
-    $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 2);
-    $dd->Indent(1);
-    return $dd->Dump();
-}
-
-
-sub does {
-    my ($self, $role_name) = @_;
-    (defined $role_name)
-        || $self->meta->throw_error("You must supply a role name to does()");
-
-    return $self->meta->does_role($role_name);
-};
 
 1;
 
 package Mouse::Role;
 use strict;
 use warnings;
-use base 'Exporter';
+
+use Exporter;
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
 
 BEGIN { Mouse::Util->import(qw(load_class not_supported)) }
 BEGIN { Mouse->import(()) }
+
+our @ISA = qw(Exporter);
 
 our @EXPORT = qw(
     extends with
@@ -2733,18 +2820,16 @@ sub unimport {
 1;
 
 package Mouse::Spec;
-
 use strict;
-use version;
+use warnings;
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
 
 sub MouseVersion{ $MouseVersion }
 sub MooseVersion{ $MooseVersion }
-
 
 1;
 package Mouse::TypeRegistry;
@@ -2767,13 +2852,15 @@ sub unimport {
 package Mouse::Util::TypeConstraints;
 use strict;
 use warnings;
-use base 'Exporter';
+
+use Exporter;
 
 use Carp ();
 use Scalar::Util qw/blessed looks_like_number openhandle/;
 
 BEGIN { Mouse::Util->import(qw(does_role not_supported)) }
 BEGIN { Mouse::Meta::Modul->import(e) } # class_of
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
     as where message from via type subtype coerce class_type role_type enum
     find_type_constraint

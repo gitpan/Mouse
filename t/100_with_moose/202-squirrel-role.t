@@ -4,6 +4,9 @@ use strict;
 use warnings;
 
 use Test::More;
+
+use Mouse::Spec;
+
 use Scalar::Util 'blessed';
 
 BEGIN {
@@ -12,7 +15,7 @@ BEGIN {
 
 do {
     package Foo::Role;
-    use Squirrel::Role;
+    use Squirrel::Role; # loa Mouse::Role
 
     has foo => (
         isa => "Int",
@@ -26,13 +29,14 @@ do {
 # affecting its definition
 
 BEGIN {
-    plan skip_all => "Moose 0.68 required for this test" unless eval { require Moose::Role && Moose::Role->VERSION('0.68') };
+    eval{ require Moose::Role && Moose::Role->VERSION(Mouse::Spec->MooseVersion) };
+    plan skip_all => "Moose $Mouse::Spec::MooseVersion required for this test" if $@;
     plan tests => 6;
 }
 
 do {
     package Bar::Role;
-    use Squirrel::Role;
+    use Squirrel::Role; # load Moose::Role
 
     has foo => (
         isa => "Int",
@@ -43,12 +47,9 @@ do {
 };
 
 ok(!Foo::Role->can('has'), "Mouse::Role::has was unimported");
-SKIP: {
-    skip "ancient moose", 1 if $Moose::VERSION <= 0.50;
-    ok(!Bar::Role->can('has'), "Moose::Role::has was unimported");
-}
+ok(!Bar::Role->can('has'), "Moose::Role::has was unimported");
 
-eval "
+eval q{
     package Foo::Role;
     use Squirrel::Role;
 
@@ -58,7 +59,7 @@ eval "
     use Squirrel::Role;
 
     has bar => (is => 'rw');
-";
+};
 
 isa_ok(Foo::Role->meta, 'Mouse::Meta::Role');
 isa_ok(Foo::Role->meta, 'Mouse::Meta::Role');

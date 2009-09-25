@@ -24,3 +24,11 @@ sub _choose_backend {
 
 1;
 
+__END__
+
+=head1 NAME
+
+Squirrel::Role - Use Mouse::Role, unless Moose::Role is already loaded. (DEPRECATED)
+
+=cut
+

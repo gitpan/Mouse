@@ -4,8 +4,7 @@ use warnings;
 
 use Mouse::Util qw(not_supported english_list);
 use Mouse::Meta::Module;
-
-use base qw(Mouse::Meta::Module);
+our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
 
@@ -41,8 +40,7 @@ sub get_required_method_list{
 }
 
 sub add_required_methods {
-    my $self = shift;
-    my @methods = @_;
+    my($self, @methods) = @_;
     push @{$self->{required_methods}}, @methods;
 }
 
@@ -417,3 +415,14 @@ sub does_role {
 
 1;
 
+__END__
+
+=head1 NAME
+
+Mouse::Meta::Role - The Mouse Role metaclass
+
+=head1 SEE ALSO
+
+L<Moose::Meta::Role>
+
+=cut

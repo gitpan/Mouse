@@ -74,7 +74,7 @@ do {
     package A;
     our @VERSION;
 
-    package B;
+    package Bx; # 'B' conflicts the B module
     our $VERSION = 1;
 
     package C;
@@ -92,6 +92,7 @@ do {
     sub bar {}
 
     package I;
+    no warnings 'once'; # work around 5.6.2
     our $NOT_CODE = 1;
 };
 
@@ -105,7 +106,7 @@ do {
     );
 };
 
-for ('B', 'D'..'E', 'G::H') {
+for ('Bx', 'D'..'E', 'G::H') {
     lives_ok {
         ClassNameTests->new(class => $_);
     };

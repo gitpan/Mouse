@@ -1,7 +1,6 @@
 use strict;
 use warnings;
 use inc::Module::Install;
-use 5.008;
 
 name     'Mouse';
 all_from 'lib/Mouse.pm';
@@ -12,8 +11,11 @@ tests 't/*.t t/*/*.t';
 # > Fixed looks_like_number(undef) to return false for perl >= 5.009002
 requires 'Scalar::Util' => 1.14;
 
-test_requires 'Test::Exception' => 0.21;
-test_requires 'Test::More'      => 0.80;
+test_requires 'Test::More'      => 0.88;
+test_requires 'Test::Exception' => 0.27;
+test_requires 'Test::Output'    => 0.16;
+
+recommends 'MRO::Compat' if $] < 5.010;
 
 if ($Module::Install::AUTHOR) {
     local @INC = ('lib', @INC);
@@ -33,8 +35,7 @@ if ($Module::Install::AUTHOR) {
     system("author/generate-mouse-tiny.pl");
 }
 
-auto_include;
-WriteAll;
+WriteAll check_nmake => 0;
 
 sub create_moose_compatibility_test {
     require File::Path;
@@ -48,15 +49,12 @@ sub create_moose_compatibility_test {
     # some test does not pass... currently skip it.
     my %SKIP_TEST = (
         '016-trigger.t'    => "trigger's argument is incompatble :(",
-        '029-new.t'        => 'Class->new(undef) incompatible',
         '010-isa-or.t'     => 'Mouse has a [BUG]',
-        '044-attribute-metaclass.t' => 'Moose::Meta::Attribute does not have a "create"',
-        '047-attribute-metaclass-role.t' => 'Moose::Meta::Attribute does not have a "create"',
-        '201-squirrel.t'      => 'skip Squirrel',
-        '202-squirrel-role.t' => 'Squirrel is ...',
+
         '600-tiny-tiny.t'     => "Moose doesn't support ::Tiny",
         '601-tiny-mouse.t'    => "Moose doesn't support ::Tiny",
         '602-mouse-tiny.t'    => "Moose doesn't support ::Tiny",
+
         '031_roles_applied_in_create.t' => 't/lib/* classes are not Moose classes/roles',
     );
 
@@ -67,7 +65,10 @@ sub create_moose_compatibility_test {
             wanted => sub {
                 return unless -f $_;
 
-                return if /failing/; # skip tests in failing/ directories
+                return if /failing/; # skip tests in failing/ directories which  are Moose specific
+
+                return if /100_with_moose/; # tests with Moose
+                return if /deprecated/;
 
                 my $basename = File::Basename::basename($_);
                 return if $basename =~ /^\./;

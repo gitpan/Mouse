@@ -4,10 +4,11 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+
+use Mouse::Spec;
 BEGIN {
-    my $require_version = 0.68;
-    plan skip_all => "Moose $require_version required for this test" unless eval { require Moose  && Moose->VERSION($require_version) };
+    eval{ require Moose && Moose->VERSION(Mouse::Spec->MooseVersion) };
+    plan skip_all => "Moose $Mouse::Spec::MooseVersion required for this test" if $@;
     plan tests => 5;
 }
 

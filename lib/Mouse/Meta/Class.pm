@@ -9,8 +9,7 @@ use Mouse::Util qw/get_linear_isa not_supported/;
 use Mouse::Meta::Method::Constructor;
 use Mouse::Meta::Method::Destructor;
 use Mouse::Meta::Module;
-
-use base qw(Mouse::Meta::Module);
+our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Method' } # required for get_method()
 
@@ -67,7 +66,7 @@ sub find_method_by_name{
 
 sub get_all_methods {
     my($self) = @_;
-    return map{ $self->find_method_by_name($self) } $self->get_all_method_names;
+    return map{ $self->find_method_by_name($_) } $self->get_all_method_names;
 }
 
 sub get_all_method_names {
@@ -78,40 +77,48 @@ sub get_all_method_names {
             $self->linearized_isa;
 }
 
-sub _process_attribute{
-    my $self = shift;
-    my $name = shift;
-
-    my $args = (@_ == 1) ? $_[0] : { @_ };
-
-    defined($name)
-        or $self->throw_error('You must provide a name for the attribute');
-
-    if ($name =~ s/^\+//) {
-        my $inherited_attr;
-
-        foreach my $class($self->linearized_isa){
-            my $meta = Mouse::Meta::Module::get_metaclass_by_name($class) or next;
-            $inherited_attr = $meta->get_attribute($name) and last;
-        }
-
-        defined($inherited_attr)
-            or $self->throw_error("Could not find an attribute by the name of '$name' to inherit from in ".$self->name);
-
-        return $inherited_attr->clone_and_inherit_options($name, $args);
-    }
-    else{
-        return Mouse::Meta::Attribute->interpolate_class_and_new($name, $args);
-    }
-}
-
 sub add_attribute {
     my $self = shift;
 
-    my $attr = blessed($_[0]) ? $_[0] : $self->_process_attribute(@_);
+    my($attr, $name);
 
-    $attr->isa('Mouse::Meta::Attribute')
-        || $self->throw_error("Your attribute must be an instance of Mouse::Meta::Attribute (or a subclass)");
+    if(blessed $_[0]){
+        $attr = $_[0];
+
+        $attr->isa('Mouse::Meta::Attribute')
+            || $self->throw_error("Your attribute must be an instance of Mouse::Meta::Attribute (or a subclass)");
+
+        $name = $attr->name;
+    }
+    else{
+        # _process_attribute
+        $name = shift;
+
+        my %args = (@_ == 1) ? %{$_[0]} : @_;
+
+        defined($name)
+            or $self->throw_error('You must provide a name for the attribute');
+
+        if ($name =~ s/^\+//) { # inherited attributes
+            my $inherited_attr;
+
+            foreach my $class($self->linearized_isa){
+                my $meta = Mouse::Meta::Module::get_metaclass_by_name($class) or next;
+                $inherited_attr = $meta->get_attribute($name) and last;
+            }
+
+            defined($inherited_attr)
+                or $self->throw_error("Could not find an attribute by the name of '$name' to inherit from in ".$self->name);
+
+            $attr = $inherited_attr->clone_and_inherit_options($name, \%args);
+        }
+        else{
+            my($attribute_class, @traits) = Mouse::Meta::Attribute->interpolate_class($name, \%args);
+            $args{traits} = \@traits if @traits;
+
+            $attr = $attribute_class->new($name, \%args);
+        }
+    }
 
     weaken( $attr->{associated_class} = $self );
 
@@ -222,18 +229,10 @@ sub _initialize_instance{
 sub clone_object {
     my $class    = shift;
     my $instance = shift;
+    my %params   = (@_ == 1) ? %{$_[0]} : @_;
 
     (blessed($instance) && $instance->isa($class->name))
         || $class->throw_error("You must pass an instance of the metaclass (" . $class->name . "), not ($instance)");
-
-    $class->clone_instance($instance, @_);
-}
-
-sub clone_instance {
-    my ($class, $instance, %params) = @_;
-
-    (blessed($instance))
-        || $class->throw_error("You can only clone instances, ($instance) is not a blessed instance");
 
     my $clone = bless { %$instance }, ref $instance;
 
@@ -246,7 +245,13 @@ sub clone_instance {
     }
 
     return $clone;
+}
 
+sub clone_instance {
+    my ($class, $instance, %params) = @_;
+
+    Carp::cluck('clone_instance has been deprecated. Use clone_object instead');
+    return $class->clone_object($instance, %params);
 }
 
 sub make_immutable {
@@ -277,27 +282,90 @@ sub make_mutable { not_supported }
 sub is_immutable {  $_[0]->{is_immutable} }
 sub is_mutable   { !$_[0]->{is_immutable} }
 
+sub _install_modifier_pp{
+    my( $self, $into, $type, $name, $code ) = @_;
+
+    my $original = $into->can($name)
+        or $self->throw_error("The method '$name' is not found in the inheritance hierarchy for class $into");
+
+    my $modifier_table = $self->{modifiers}{$name};
+
+    if(!$modifier_table){
+        my(@before, @after, @around, $cache, $modified);
+
+        $cache = $original;
+
+        $modified = sub {
+            for my $c (@before) { $c->(@_) }
+
+            if(wantarray){ # list context
+                my @rval = $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return @rval;
+            }
+            elsif(defined wantarray){ # scalar context
+                my $rval = $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return $rval;
+            }
+            else{ # void context
+                $cache->(@_);
+
+                for my $c(@after){ $c->(@_) }
+                return;
+            }
+        };
+
+        $self->{modifiers}{$name} = $modifier_table = {
+            original => $original,
+
+            before   => \@before,
+            after    => \@after,
+            around   => \@around,
+
+            cache    => \$cache, # cache for around modifiers
+        };
+
+        $self->add_method($name => $modified);
+    }
+
+    if($type eq 'before'){
+        unshift @{$modifier_table->{before}}, $code;
+    }
+    elsif($type eq 'after'){
+        push @{$modifier_table->{after}}, $code;
+    }
+    else{ # around
+        push @{$modifier_table->{around}}, $code;
+
+        my $next = ${ $modifier_table->{cache} };
+        ${ $modifier_table->{cache} } = sub{ $code->($next, @_) };
+    }
+
+    return;
+}
+
 sub _install_modifier {
     my ( $self, $into, $type, $name, $code ) = @_;
 
-    # which is modifer class available?
-    my $modifier_class = do {
-        if (eval "require Class::Method::Modifiers::Fast; 1") {
-            'Class::Method::Modifiers::Fast';
-        } elsif (eval "require Class::Method::Modifiers; 1") {
-            'Class::Method::Modifiers';
-        } else {
-            Carp::croak("Method modifiers require the use of Class::Method::Modifiers or Class::Method::Modifiers::Fast. Please install it from CPAN and file a bug report with this application.");
-        }
+    # load Class::Method::Modifiers first
+    my $no_cmm_fast = do{
+        local $@;
+        eval q{ require Class::Method::Modifiers::Fast };
+        $@;
     };
-    my $modifier = $modifier_class->can('_install_modifier');
 
-    # replace this method itself :)
-    {
-        no warnings 'redefine';
-        *_install_modifier = sub {
+    my $impl;
+    if($no_cmm_fast){
+        $impl = \&_install_modifier_pp;
+    }
+    else{
+        my $install_modifier = Class::Method::Modifiers::Fast->can('_install_modifier');
+        $impl = sub {
             my ( $self, $into, $type, $name, $code ) = @_;
-            $modifier->(
+            $install_modifier->(
                 $into,
                 $type,
                 $name,
@@ -308,8 +376,13 @@ sub _install_modifier {
         };
     }
 
-    # call me. for first time.
-    $self->_install_modifier( $into, $type, $name, $code );
+    # replace this method itself :)
+    {
+        no warnings 'redefine';
+        *_install_modifier = $impl;
+    }
+
+    $self->$impl( $into, $type, $name, $code );
 }
 
 sub add_before_method_modifier {
@@ -363,49 +436,40 @@ __END__
 
 =head1 NAME
 
-Mouse::Meta::Class - hook into the Mouse MOP
+Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 METHODS
 
-=head2 initialize ClassName -> Mouse::Meta::Class
+=head2 C<< initialize(ClassName) -> Mouse::Meta::Class >>
 
 Finds or creates a Mouse::Meta::Class instance for the given ClassName. Only
 one instance should exist for a given class.
 
-=head2 new %args -> Mouse::Meta::Class
-
-Creates a new Mouse::Meta::Class. Don't call this directly.
-
-=head2 name -> ClassName
+=head2 C<< name -> ClassName >>
 
 Returns the name of the owner class.
 
-=head2 superclasses -> [ClassName]
+=head2 C<< superclasses -> ClassNames >> C<< superclass(ClassNames) >>
 
 Gets (or sets) the list of superclasses of the owner class.
 
-=head2 add_attribute (Mouse::Meta::Attribute| name => spec)
+=head2 C<< add_attribute(name => spec | Mouse::Meta::Attribute) >>
 
 Begins keeping track of the existing L<Mouse::Meta::Attribute> for the owner
 class.
 
-=head2 get_all_attributes -> (Mouse::Meta::Attribute)
+=head2 C<< get_all_attributes -> (Mouse::Meta::Attribute) >>
 
 Returns the list of all L<Mouse::Meta::Attribute> instances associated with
 this class and its superclasses.
 
-=head2 get_attribute_map -> { name => Mouse::Meta::Attribute }
-
-Returns a mapping of attribute names to their corresponding
-L<Mouse::Meta::Attribute> objects.
-
-=head2 get_attribute_list -> { name => Mouse::Meta::Attribute }
+=head2 C<< get_attribute_list -> { name => Mouse::Meta::Attribute } >>
 
 This returns a list of attribute names which are defined in the local
 class. If you want a list of all applicable attributes for a class,
 use the C<get_all_attributes> method.
 
-=head2 has_attribute Name -> Bool
+=head2 C<< has_attribute(Name) -> Bool >>
 
 Returns whether we have a L<Mouse::Meta::Attribute> with the given name.
 
@@ -413,19 +477,22 @@ Returns whether we have a L<Mouse::Meta::Attribute> with the given name.
 
 Returns the L<Mouse::Meta::Attribute> with the given name.
 
-=head2 linearized_isa -> [ClassNames]
+=head2 C<< linearized_isa -> [ClassNames] >>
 
 Returns the list of classes in method dispatch order, with duplicates removed.
 
-=head2 clone_object Instance -> Instance
+=head2 C<< new_object(Parameters) -> Instance >>
+
+Creates a new instance.
+
+=head2 C<< clone_object(Instance, Parameters) -> Instance >>
 
 Clones the given C<Instance> which must be an instance governed by this
 metaclass.
 
-=head2 clone_instance Instance, Parameters -> Instance
+=head1 SEE ALSO
 
-The clone_instance method has been made private.
-The public version is deprecated.
+L<Moose::Meta::Class>
 
 =cut
 

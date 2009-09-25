@@ -1,7 +1,8 @@
 package Mouse::Util::TypeConstraints;
 use strict;
 use warnings;
-use base 'Exporter';
+
+use Exporter;
 
 use Carp ();
 use Scalar::Util qw/blessed looks_like_number openhandle/;
@@ -10,6 +11,7 @@ use Mouse::Util qw(does_role not_supported);
 use Mouse::Meta::Module; # class_of
 use Mouse::Meta::TypeConstraint;
 
+our @ISA    = qw(Exporter);
 our @EXPORT = qw(
     as where message from via type subtype coerce class_type role_type enum
     find_type_constraint
@@ -582,21 +584,31 @@ Returns the simple type constraints that Mouse understands.
 
 =over 4
 
-=item B<subtype 'Name' => as 'Parent' => where { } ...>
+=item C<< subtype 'Name' => as 'Parent' => where { } ... -> Mouse::Meta::TypeConstraint >>
 
-=item B<subtype as 'Parent' => where { } ...>
+=item C<< subtype as 'Parent' => where { } ...  -> Mouse::Meta::TypeConstraint >>
 
-=item B<class_type ($class, ?$options)>
+=item C<< class_type ($class, ?$options) -> Mouse::Meta::TypeConstraint >>
 
-=item B<role_type ($role, ?$options)>
+=item C<< role_type ($role, ?$options) -> Mouse::Meta::TypeConstraint >>
 
-=item B<enum (\@values)>
+=item C<< enum (\@values) -> Mouse::Meta::TypeConstraint >>
+
+=back
+
+=over 4
+
+=item C<< find_type_constraint(Type) -> Mouse::Meta::TypeConstraint >>
 
 =back
 
 =head1 THANKS
 
-Much of this documentation was taken from L<Moose::Util::TypeConstraints>
+Much of this documentation was taken from C<Moose::Util::TypeConstraints>
+
+=head1 SEE ALSO
+
+L<Moose::Util::TypeConstraints>
 
 =cut
 

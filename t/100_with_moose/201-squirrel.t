@@ -4,6 +4,9 @@ use strict;
 use warnings;
 
 use Test::More;
+
+use Mouse::Spec;
+
 use Scalar::Util 'blessed';
 
 # Don't spew deprecation warnings onto the user's screen
@@ -13,7 +16,7 @@ BEGIN {
 
 do {
     package Foo;
-    use Squirrel;
+    use Squirrel; # load Mouse
 
     has foo => (
         isa => "Int",
@@ -25,15 +28,15 @@ do {
 
 # note that 'Foo' is defined before this, to prevent Moose being loaded from
 # affecting its definition
-
 BEGIN {
-    plan skip_all => "Moose 0.68 required for this test" unless eval { require Moose && Moose->VERSION('0.68') };
+    eval{ require Moose && Moose->VERSION(Mouse::Spec->MooseVersion) };
+    plan skip_all => "Moose $Mouse::Spec::MooseVersion required for this test" if $@;
     plan tests => 12;
 }
 
 do {
     package Bar;
-    use Squirrel;
+    use Squirrel; # load Moose
 
     has foo => (
         isa => "Int",
@@ -56,7 +59,7 @@ is($bar->foo, 3, "accessor");
 ok(!Foo->can('has'), "Mouse::has was unimported");
 ok(!Bar->can('has'), "Moose::has was unimported");
 
-eval "
+eval q{
     package Foo;
     use Squirrel;
 
@@ -68,7 +71,7 @@ eval "
 
     has bar => (is => 'rw');
     __PACKAGE__->meta->make_immutable;
-";
+};
 warn $@ if $@;
 
 is(blessed(Foo->meta->get_attribute('foo')), 'Mouse::Meta::Attribute');

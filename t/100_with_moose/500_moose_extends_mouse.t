@@ -4,9 +4,11 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+
+use Mouse::Spec;
 BEGIN {
-    plan skip_all => "Moose 0.68 required for this test" unless eval { require Moose  && Moose->VERSION('0.68') };
+    eval{ require Moose && Moose->VERSION(Mouse::Spec->MooseVersion) };
+    plan skip_all => "Moose $Mouse::Spec::MooseVersion required for this test" if $@;
     plan tests => 27;
 }
 
@@ -81,7 +83,6 @@ is( eval { $bar->bar }, undef, "no default value" );
 
 {
     local $TODO = "Moose not yet aware of Mouse meta";
-
 
     is_deeply(
         [ sort map { $_->name } Bar->meta->get_all_attributes ],

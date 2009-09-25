@@ -5,7 +5,7 @@ use warnings;
 use Carp ();
 use Scalar::Util qw/blessed weaken/;
 
-use Mouse::Util qw/get_code_info not_supported load_class/;
+use Mouse::Util qw/:meta get_code_info not_supported load_class/;
 
 {
     my %METACLASS_CACHE;
@@ -45,8 +45,6 @@ use Mouse::Util qw/get_code_info not_supported load_class/;
     sub remove_metaclass_by_name    { delete $METACLASS_CACHE{$_[0]}  }
 
 }
-
-sub meta{ Mouse::Meta::Class->initialize(ref $_[0] || $_[0]) }
 
 sub _new{ Carp::croak("Mouse::Meta::Module is an abstract class") }
 
@@ -104,7 +102,7 @@ sub _code_is_mine { # taken from Class::MOP::Class
 
     my ( $code_package, $code_name ) = get_code_info($code);
 
-    return $code_package && $code_package eq $self->name
+    return $code_package && $code_package eq $self->{package}
         || ( $code_package eq 'constant' && $code_name eq '__ANON__' );
 }
 
@@ -112,7 +110,8 @@ sub has_method {
     my($self, $method_name) = @_;
 
     return 1 if $self->{methods}->{$method_name};
-    my $code = $self->name->can($method_name);
+
+    my $code = $self->{package}->can($method_name);
 
     return $code && $self->_code_is_mine($code);
 }
@@ -301,6 +300,7 @@ __END__
 
 =head1 NAME
 
-Mouse::Meta::Module - Common base class for Mouse::Meta::Class and Mouse::Meta::Role
+Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Role
 
 =cut
+

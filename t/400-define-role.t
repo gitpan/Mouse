@@ -1,15 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More;
-BEGIN{
-    if(eval{ require Class::Method::Modifiers::Fast } || eval{ require Class::Method::Modifiers }){
-        plan tests => 11;
-    }
-    else{
-        plan skip_all => 'This test requires Class::Method::Modifiers(::Fast)?';
-    }
-}
+use Test::More tests => 11;
 use Test::Exception;
 
 lives_ok {
@@ -79,7 +71,8 @@ TODO: {
     eval {
         excludes 'excluded';
     };
-    local our $TODO = "Mouse::Role does not currently support 'excludes'";
+    our $TODO;
+    local $TODO = "Mouse::Role does not currently support 'excludes'";
     ::ok(!$@, "excludes");
 
     no Mouse::Role;

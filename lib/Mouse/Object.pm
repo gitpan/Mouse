@@ -2,7 +2,7 @@ package Mouse::Object;
 use strict;
 use warnings;
 
-use Mouse::Util;
+use Mouse::Util qw(does dump);
 
 sub new {
     my $class = shift;
@@ -22,6 +22,7 @@ sub BUILDARGS {
     if (scalar @_ == 1) {
         (ref($_[0]) eq 'HASH')
             || $class->meta->throw_error("Single parameters to new() must be a HASH ref");
+
         return {%{$_[0]}};
     }
     else {
@@ -29,7 +30,11 @@ sub BUILDARGS {
     }
 }
 
-sub DESTROY { shift->DEMOLISHALL }
+sub DESTROY {
+    my $self = shift;
+
+    $self->DEMOLISHALL();
+}
 
 sub BUILDALL {
     my $self = shift;
@@ -38,11 +43,10 @@ sub BUILDALL {
     return unless $self->can('BUILD');
 
     for my $class (reverse $self->meta->linearized_isa) {
-        no strict 'refs';
-        no warnings 'once';
-        my $code = *{ $class . '::BUILD' }{CODE}
+        my $build = do{ no strict 'refs'; *{ $class . '::BUILD' }{CODE} }
             or next;
-        $code->($self, @_);
+
+        $self->$build(@_);
     }
     return;
 }
@@ -59,31 +63,13 @@ sub DEMOLISHALL {
     # that time (at least tests suggest so ;)
 
     foreach my $class (@{ Mouse::Util::get_linear_isa(ref $self) }) {
-        my $demolish = do{ no strict 'refs'; *{"${class}::DEMOLISH"}{CODE} };
-        $self->$demolish()
-            if defined $demolish;
+        my $demolish = do{ no strict 'refs'; *{ $class . '::DEMOLISH'}{CODE} }
+            or next;
+
+        $self->$demolish();
     }
     return;
 }
-
-sub dump { 
-    my($self, $maxdepth) = @_;
-
-    require 'Data/Dumper.pm'; # we don't want to create its namespace
-    my $dd = Data::Dumper->new([$self]);
-    $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 2);
-    $dd->Indent(1);
-    return $dd->Dump();
-}
-
-
-sub does {
-    my ($self, $role_name) = @_;
-    (defined $role_name)
-        || $self->meta->throw_error("You must supply a role name to does()");
-
-    return $self->meta->does_role($role_name);
-};
 
 1;
 
@@ -95,43 +81,42 @@ Mouse::Object - we don't need to steenkin' constructor
 
 =head1 METHODS
 
-=head2 new arguments -> object
+=head2 C<< new arguments -> Object >>
 
-Instantiates a new Mouse::Object. This is obviously intended for subclasses.
+Instantiates a new C<Mouse::Object>. This is obviously intended for subclasses.
 
-=head2 BUILDALL \%args
-
-Calls L</BUILD> on each class in the class hierarchy. This is called at the
-end of L</new>.
-
-=head2 BUILD \%args
-
-You may put any business logic initialization in BUILD methods. You don't
-need to redispatch or return any specific value.
-
-=head2 BUILDARGS
+=head2 C<< BUILDARGS(@args) -> HashRef >>
 
 Lets you override the arguments that C<new> takes. Return a hashref of
 parameters.
 
-=head2 DEMOLISHALL
+=head2 C<< BUILDALL \%args >>
 
-Calls L</DEMOLISH> on each class in the class hierarchy. This is called at
-L</DESTROY> time.
+Calls C<BUILD> on each class in the class hierarchy. This is called at the
+end of C<new>.
 
-=head2 DEMOLISH
+=head2 C<< BUILD \%args >>
+
+You may put any business logic initialization in BUILD methods. You don't
+need to redispatch or return any specific value.
+
+=head2 C<< DEMOLISHALL >>
+
+Calls C<DEMOLISH> on each class in the class hierarchy. This is called at
+C<DESTROY> time.
+
+=head2 C<< DEMOLISH >>
 
 You may put any business logic deinitialization in DEMOLISH methods. You don't
 need to redispatch or return any specific value.
 
 
-=head2 does $role_name
+=head2 C<< does ($role_name) -> Bool >>
 
-This will check if the invocant's class "does" a given C<$role_name>.
+This will check if the invocant's class B<does> a given C<$role_name>.
 This is similar to "isa" for object, but it checks the roles instead.
 
-
-=head2 B<dump ($maxdepth)>
+=head2 C<<dump ($maxdepth) -> Str >>
 
 From the Moose POD:
 
@@ -144,6 +129,9 @@ From the Moose POD:
 
 The implementation was lifted directly from Moose::Object.
 
-=cut
+=head1 SEE ALSO
 
+L<Moose::Object>
+
+=cut
 

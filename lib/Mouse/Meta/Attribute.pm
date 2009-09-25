@@ -3,33 +3,14 @@ use strict;
 use warnings;
 
 use Carp ();
-use Scalar::Util qw(weaken);
 
-use Mouse::Util;
+use Mouse::Util qw(:meta);
 
 use Mouse::Meta::TypeConstraint;
 use Mouse::Meta::Method::Accessor;
 
-sub BUILDARGS{
-    my $class = shift;
-    my $name  = shift;
-    my %args  = (@_ == 1) ? %{$_[0]} : @_;
-
-    $args{name} = $name;
-
-    # XXX: for backward compatibility (with method modifiers)
-    if($class->can('canonicalize_args') != \&canonicalize_args){
-        %args = $class->canonicalize_args($name, %args);
-    }
-
-    return \%args;
-}
-
-sub new {
-    my $class = shift;
-    my $args  = $class->BUILDARGS(@_);
-
-    my $name = $args->{name};
+sub _process_options{
+    my($class, $name, $args) = @_;
 
     # taken from Class::MOP::Attribute::new
 
@@ -91,7 +72,8 @@ sub new {
         $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($args->{isa});
     }
     elsif(exists $args->{does}){
-        $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
+        # TODO
+        # $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
     }
     $tc = $args->{type_constraint};
 
@@ -137,11 +119,28 @@ sub new {
             || $class->throw_error("You cannot have lazy attribute ($name) without specifying a default value for it");
     }
 
-    my $instance = bless $args, $class;
+    # XXX: for backward compatibility (with method modifiers)
+    if($class->can('canonicalize_args') != \&canonicalize_args){
+        %{$args} = $class->canonicalize_args($name, %{$args});
+    }
+    return;
+}
+
+sub new {
+    my $class = shift;
+    my $name  = shift;
+
+    my %args  = (@_ == 1) ? %{ $_[0] } : @_;
+
+    $class->_process_options($name, \%args);
+
+    $args{name} = $name;
+
+    my $instance = bless \%args, $class;
 
     # extra attributes
     if($class ne __PACKAGE__){
-        $class->meta->_initialize_instance($instance, $args);
+        $class->meta->_initialize_instance($instance,\%args);
     }
 
 # XXX: there is no fast way to check attribute validity
@@ -153,16 +152,6 @@ sub new {
 
     return $instance
 }
-
-sub does {
-    my ($self, $role_name) = @_;
-    my $meta = Mouse::Meta::Class->initialize(ref($self) || $self);
-
-    (defined $role_name)
-        || $meta->throw_error("You must supply a role name to does()");
-
-    return $meta->does_role($role_name);
-};
 
 # readers
 
@@ -215,18 +204,16 @@ sub _create_args {
     $_[0]->{_create_args}
 }
 
-sub accessor_metaclass { 'Mouse::Meta::Method::Accessor' }
-
-sub interpolate_class_and_new{
+sub interpolate_class{
     my($class, $name, $args) = @_;
 
     if(my $metaclass = delete $args->{metaclass}){
         $class = Mouse::Util::resolve_metaclass_alias( Attribute => $metaclass );
     }
 
-
+    my @traits;
     if(my $traits_ref = delete $args->{traits}){
-        my @traits;
+
         for (my $i = 0; $i < @{$traits_ref}; $i++) {
             my $trait = Mouse::Util::resolve_metaclass_alias(Attribute => $traits_ref->[$i], trait => 1);
 
@@ -245,19 +232,17 @@ sub interpolate_class_and_new{
                 roles        => \@traits,
                 cache        => 1,
             )->name;
-
-            $args->{traits} = \@traits;
         }
     }
 
-    return $class->new($name, $args);
+    return( $class, @traits );
 }
 
 sub canonicalize_args{
     my ($self, $name, %args) = @_;
 
     Carp::cluck("$self->canonicalize_args has been deprecated."
-        . "Use \$self->BUILDARGS instead.");
+        . "Use \$self->_process_options instead.");
 
     return %args;
 }
@@ -291,7 +276,7 @@ sub verify_type_constraint_error {
 sub coerce_constraint { ## my($self, $value) = @_;
     my $type = $_[0]->{type_constraint}
         or return $_[1];
-    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $_[0]->type_constraint, $_[1]);
+    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $type, $_[1]);
 }
 
 sub _canonicalize_handles {
@@ -313,7 +298,7 @@ sub clone_and_inherit_options{
     my $self = shift;
     my $name = shift;
 
-    return ref($self)->new($name, %{$self}, @_ == 1 ? %{$_[0]} : @_);
+    return ref($self)->new($name, %{$self}, (@_ == 1) ? %{$_[0]} : @_);
 }
 
 sub clone_parent {
@@ -326,7 +311,7 @@ sub clone_parent {
         . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
 
 
-    $self->create($class, $name, %args);
+    $self->clone_and_inherited_args($class, $name, %args);
 }
 
 sub get_parent_args {
@@ -347,17 +332,19 @@ sub install_accessors{
     my($attribute) = @_;
 
     my $metaclass       = $attribute->{associated_class};
-    my $generator_class = $attribute->accessor_metaclass;
 
     foreach my $type(qw(accessor reader writer predicate clearer handles)){
         if(exists $attribute->{$type}){
             my $installer    = '_install_' . $type;
-            $generator_class->$installer($attribute, $attribute->{$type}, $metaclass);
+
+            Mouse::Meta::Method::Accessor->$installer($attribute, $attribute->{$type}, $metaclass);
+
             $attribute->{associated_methods}++;
         }
     }
 
     if($attribute->can('create') != \&create){
+        # backword compatibility
         $attribute->create($metaclass, $attribute->name, %{$attribute});
     }
 
@@ -381,85 +368,123 @@ Mouse::Meta::Attribute - attribute metaclass
 
 =head1 METHODS
 
-=head2 new %args -> Mouse::Meta::Attribute
+=head2 C<< new(%options) -> Mouse::Meta::Attribute >>
 
 Instantiates a new Mouse::Meta::Attribute. Does nothing else.
 
-=head2 create OwnerClass, AttributeName, %args -> Mouse::Meta::Attribute
+It adds the following options to the constructor:
 
-Creates a new attribute in OwnerClass. Accessors and helper methods are
-installed. Some error checking is done.
+=over 4
 
-=head2 name -> AttributeName
+=item C<< is => 'ro', 'rw', 'bare' >>
 
-=head2 associated_class -> OwnerClass
+This provides a shorthand for specifying the C<reader>, C<writer>, or
+C<accessor> names. If the attribute is read-only ('ro') then it will
+have a C<reader> method with the same attribute as the name.
 
-=head2 is_required -> Bool
+If it is read-write ('rw') then it will have an C<accessor> method
+with the same name. If you provide an explicit C<writer> for a
+read-write attribute, then you will have a C<reader> with the same
+name as the attribute, and a C<writer> with the name you provided.
 
-=head2 default -> Item
+Use 'bare' when you are deliberately not installing any methods
+(accessor, reader, etc.) associated with this attribute; otherwise,
+Moose will issue a deprecation warning when this attribute is added to a
+metaclass.
 
-=head2 has_default -> Bool
+=item C<< isa => Type >>
 
-=head2 is_lazy -> Bool
+This option accepts a type. The type can be a string, which should be
+a type name. If the type name is unknown, it is assumed to be a class
+name.
 
-=head2 predicate -> MethodName | Undef
+This option can also accept a L<Moose::Meta::TypeConstraint> object.
 
-=head2 has_predicate -> Bool
+If you I<also> provide a C<does> option, then your C<isa> option must
+be a class name, and that class must do the role specified with
+C<does>.
 
-=head2 clearer -> MethodName | Undef
+=item C<< does => Role >>
 
-=head2 has_clearer -> Bool
+This is short-hand for saying that the attribute's type must be an
+object which does the named role.
 
-=head2 handles -> { LocalName => RemoteName }
+B<This option is not yet supported.>
 
-=head2 has_handles -> Bool
+=item C<< coerce => Bool >>
 
-=head2 is_weak_ref -> Bool
+This option is only valid for objects with a type constraint
+(C<isa>). If this is true, then coercions will be applied whenever
+this attribute is set.
 
-=head2 init_arg -> Str
+You can make both this and the C<weak_ref> option true.
 
-=head2 type_constraint -> Str
+=item C<< trigger => CodeRef >>
 
-=head2 has_type_constraint -> Bool
+This option accepts a subroutine reference, which will be called after
+the attribute is set.
 
-=head2 trigger => CODE | Undef
+=item C<< required => Bool >>
 
-=head2 has_trigger -> Bool
+An attribute which is required must be provided to the constructor. An
+attribute which is required can also have a C<default> or C<builder>,
+which will satisfy its required-ness.
 
-=head2 builder => MethodName | Undef
+A required attribute must have a C<default>, C<builder> or a
+non-C<undef> C<init_arg>
 
-=head2 has_builder -> Bool
+=item C<< lazy => Bool >>
 
-=head2 is_lazy_build => Bool
+A lazy attribute must have a C<default> or C<builder>. When an
+attribute is lazy, the default value will not be calculated until the
+attribute is read.
 
-=head2 should_auto_deref -> Bool
+=item C<< weak_ref => Bool >>
 
-Informational methods.
+If this is true, the attribute's value will be stored as a weak
+reference.
 
-=head2 verify_against_type_constraint Item -> 1 | ERROR
+=item C<< auto_deref => Bool >>
 
-Checks that the given value passes this attribute's type constraint. Returns 1
+If this is true, then the reader will dereference the value when it is
+called. The attribute must have a type constraint which defines the
+attribute as an array or hash reference.
+
+=item C<< lazy_build => Bool >>
+
+Setting this to true makes the attribute lazy and provides a number of
+default methods.
+
+  has 'size' => (
+      is         => 'ro',
+      lazy_build => 1,
+  );
+
+is equivalent to this:
+
+  has 'size' => (
+      is        => 'ro',
+      lazy      => 1,
+      builder   => '_build_size',
+      clearer   => 'clear_size',
+      predicate => 'has_size',
+  );
+
+=back
+
+=head2 C<< verify_against_type_constraint(Item) -> TRUE | ERROR >>
+
+Checks that the given value passes this attribute's type constraint. Returns C<true>
 on success, otherwise C<confess>es.
 
-=head2 canonicalize_args Name, %args -> %args
+=head2 C<< clone_and_inherit_options(options) -> Mouse::Meta::Attribute >>
 
-Canonicalizes some arguments to create. In particular, C<lazy_build> is
-canonicalized into C<lazy>, C<builder>, etc.
-
-=head2 validate_args Name, \%args -> 1 | ERROR
-
-Checks that the arguments to create the attribute (ie those specified by
-C<has>) are valid.
-
-=head2 clone_parent OwnerClass, AttributeName, %args -> Mouse::Meta::Attribute
-
-Creates a new attribute in OwnerClass, inheriting options from parent classes.
+Creates a new attribute in the owner class, inheriting options from parent classes.
 Accessors and helper methods are installed. Some error checking is done.
 
-=head2 get_parent_args OwnerClass, AttributeName -> Hash
+=head1 SEE ALSO
 
-Returns the options that the parent class of C<OwnerClass> used for attribute
-C<AttributeName>.
+L<Moose::Meta::Attribute>
 
 =cut
 
