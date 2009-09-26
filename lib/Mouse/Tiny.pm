@@ -8,18 +8,18 @@ eval <<'END_OF_TINY';
 $INC{'Mouse.pm'} = __FILE__;
 $INC{'Mouse/Object.pm'} = __FILE__;
 $INC{'Mouse/Role.pm'} = __FILE__;
+$INC{'Mouse/Spec.pm'} = __FILE__;
 $INC{'Mouse/TypeRegistry.pm'} = __FILE__;
 $INC{'Mouse/Util.pm'} = __FILE__;
-$INC{'Mouse/Spec.pm'} = __FILE__;
 $INC{'Mouse/Meta/Attribute.pm'} = __FILE__;
 $INC{'Mouse/Meta/Class.pm'} = __FILE__;
-$INC{'Mouse/Meta/Role.pm'} = __FILE__;
-$INC{'Mouse/Meta/TypeConstraint.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method.pm'} = __FILE__;
 $INC{'Mouse/Meta/Module.pm'} = __FILE__;
+$INC{'Mouse/Meta/Role.pm'} = __FILE__;
+$INC{'Mouse/Meta/TypeConstraint.pm'} = __FILE__;
+$INC{'Mouse/Meta/Method/Accessor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Constructor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Destructor.pm'} = __FILE__;
-$INC{'Mouse/Meta/Method/Accessor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Role/Method.pm'} = __FILE__;
 $INC{'Mouse/Util/TypeConstraints.pm'} = __FILE__;
 
@@ -337,15 +337,13 @@ sub dump {
 sub does :method;
 *does = \&does_role; # alias
 
-1;
-
 package Mouse;
 use 5.006_002;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use Exporter;
 
@@ -532,8 +530,6 @@ sub unimport {
         }
     }
 }
-
-1;
 
 package Mouse::Meta::Attribute;
 use strict;
@@ -891,8 +887,6 @@ sub throw_error{
     my $metaclass = (ref $self && $self->associated_class) || 'Mouse::Meta::Class';
     $metaclass->throw_error(@_, depth => 1);
 }
-
-1;
 
 package Mouse::Meta::Class;
 use strict;
@@ -1323,8 +1317,6 @@ sub does_role {
     return 0;
 }
 
-1;
-
 package Mouse::Meta::Method;
 use strict;
 use warnings;
@@ -1350,8 +1342,6 @@ sub fully_qualified_name {
     my $self = shift;
     return $self->package_name . '::' . $self->name;
 }
-
-1;
 
 package Mouse::Meta::Method::Accessor;
 use strict;
@@ -1549,7 +1539,6 @@ sub _install_handles {
 }
 
 
-1;
 package Mouse::Meta::Method::Constructor;
 use strict;
 use warnings;
@@ -1742,7 +1731,6 @@ sub _generate_BUILDALL {
     return join "\n", @code;
 }
 
-1;
 package Mouse::Meta::Method::Destructor;
 use strict;
 use warnings;
@@ -2073,8 +2061,6 @@ sub throw_error{
         Carp::confess($message);
     }
 }
-
-1;
 
 package Mouse::Meta::Role;
 use strict;
@@ -2490,15 +2476,11 @@ sub does_role {
 }
 
 
-1;
-
 package Mouse::Meta::Role::Method;
 use strict;
 use warnings;
 
 our @ISA = qw(Mouse::Meta::Method);
-
-1;
 
 package Mouse::Meta::TypeConstraint;
 use strict;
@@ -2581,7 +2563,6 @@ sub is_a_type_of{
         || $self->name =~ /\A $tc_name \[/xms; # "ArrayRef" =~ "ArrayRef[Foo]"
 }
 
-1;
 package Mouse::Object;
 use strict;
 use warnings;
@@ -2654,8 +2635,6 @@ sub DEMOLISHALL {
     }
     return;
 }
-
-1;
 
 package Mouse::Role;
 use strict;
@@ -2817,13 +2796,11 @@ sub unimport {
     return;
 }
 
-1;
-
 package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
@@ -2831,7 +2808,6 @@ our $MooseVersion = '0.90';
 sub MouseVersion{ $MouseVersion }
 sub MooseVersion{ $MooseVersion }
 
-1;
 package Mouse::TypeRegistry;
 sub import {
     warn "Mouse::TypeRegistry is deprecated, please use Mouse::Util::TypeConstraints instead.";
@@ -3256,8 +3232,6 @@ sub find_or_create_isa_type_constraint {
     }
     return $tc;
 }
-
-1;
 
 END_OF_TINY
 } #unless

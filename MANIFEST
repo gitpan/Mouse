@@ -8,9 +8,11 @@ Changes
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
+inc/Module/Install/Include.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/WriteAll.pm
+inc/Test/Exception.pm
 lib/Mouse.pm
 lib/Mouse/Meta/Attribute.pm
 lib/Mouse/Meta/Class.pm
