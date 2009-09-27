@@ -33,6 +33,8 @@ use Exporter;
 
 use Carp qw(confess);
 
+use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
+
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw(
     find_meta
@@ -50,10 +52,11 @@ our @EXPORT_OK = qw(
     not_supported
 
     does meta dump
+    _MOUSE_VERBOSE
 );
 our %EXPORT_TAGS = (
     all  => \@EXPORT_OK,
-    meta => [qw(does meta dump)],
+    meta => [qw(does meta dump _MOUSE_VERBOSE)],
 );
 
 # Moose::Util compatible utilities
@@ -343,7 +346,7 @@ use 5.006_002;
 use strict;
 use warnings;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Exporter;
 
@@ -542,6 +545,12 @@ BEGIN { Mouse::Util->import(qw(:meta)) }
 sub _process_options{
     my($class, $name, $args) = @_;
 
+
+    # XXX: for backward compatibility (with method modifiers)
+    if($class->can('canonicalize_args') != \&canonicalize_args){
+        %{$args} = $class->canonicalize_args($name, %{$args});
+    }
+
     # taken from Class::MOP::Attribute::new
 
     defined($name)
@@ -649,10 +658,6 @@ sub _process_options{
             || $class->throw_error("You cannot have lazy attribute ($name) without specifying a default value for it");
     }
 
-    # XXX: for backward compatibility (with method modifiers)
-    if($class->can('canonicalize_args') != \&canonicalize_args){
-        %{$args} = $class->canonicalize_args($name, %{$args});
-    }
     return;
 }
 
@@ -772,7 +777,8 @@ sub canonicalize_args{
     my ($self, $name, %args) = @_;
 
     Carp::cluck("$self->canonicalize_args has been deprecated."
-        . "Use \$self->_process_options instead.");
+        . "Use \$self->_process_options instead.")
+            if _MOUSE_VERBOSE;
 
     return %args;
 }
@@ -781,7 +787,8 @@ sub create {
     my ($self, $class, $name, %args) = @_;
 
     Carp::cluck("$self->create has been deprecated."
-        . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
+        . "Use \$meta->add_attribute and \$attr->install_accessors instead.")
+            if _MOUSE_VERBOSE;
 
     # noop
     return $self;
@@ -838,8 +845,8 @@ sub clone_parent {
     my %args  = ($self->get_parent_args($class, $name), @_);
 
     Carp::cluck("$self->clone_parent has been deprecated."
-        . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
-
+        . "Use \$meta->add_attribute and \$attr->install_accessors instead.")
+        if _MOUSE_VERBOSE;
 
     $self->clone_and_inherited_args($class, $name, %args);
 }
@@ -856,6 +863,12 @@ sub get_parent_args {
     }
 
     $self->throw_error("Could not find an attribute by the name of '$name' to inherit from");
+}
+
+sub associate_method{
+    my ($attribute, $method) = @_;
+    $attribute->{associated_methods}++;
+    return;
 }
 
 sub install_accessors{
@@ -894,7 +907,7 @@ use warnings;
 
 use Scalar::Util qw/blessed weaken/;
 
-BEGIN { Mouse::Util->import(qw/get_linear_isa not_supported/) }
+BEGIN { Mouse::Util->import(qw/:meta get_linear_isa not_supported/) }
 
 our @ISA = qw(Mouse::Meta::Module);
 
@@ -1012,7 +1025,7 @@ sub add_attribute {
     $self->{attributes}{$attr->name} = $attr;
     $attr->install_accessors();
 
-    if(!$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
+    if(_MOUSE_VERBOSE && !$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
         Carp::cluck(qq{Attribute (}.$attr->name.qq{) of class }.$self->name.qq{ has no associated methods (did you mean to provide an "is" argument?)});
     }
     return $attr;
@@ -1137,7 +1150,8 @@ sub clone_object {
 sub clone_instance {
     my ($class, $instance, %params) = @_;
 
-    Carp::cluck('clone_instance has been deprecated. Use clone_object instead');
+    Carp::cluck('clone_instance has been deprecated. Use clone_object instead')
+        if _MOUSE_VERBOSE;
     return $class->clone_object($instance, %params);
 }
 
@@ -2066,7 +2080,7 @@ package Mouse::Meta::Role;
 use strict;
 use warnings;
 
-BEGIN { Mouse::Util->import(qw(not_supported english_list)) }
+BEGIN { Mouse::Util->import(qw(:meta not_supported english_list)) }
 our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
@@ -2800,7 +2814,7 @@ package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
