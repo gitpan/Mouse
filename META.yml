@@ -1,7 +1,7 @@
 ---
 abstract: 'Moose minus the antlers'
 author:
-  - 'Shawn M Moore, C<< <sartak at gmail.com> >>'
+  - 'Shawn M Moore, <sartak at gmail.com>'
 build_requires:
   ExtUtils::MakeMaker: 6.42
   Test::Exception: 0.27
@@ -25,4 +25,4 @@ requires:
   perl: 5.6.2
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.36
+version: 0.37

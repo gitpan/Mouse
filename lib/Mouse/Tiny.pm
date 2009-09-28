@@ -8,15 +8,15 @@ eval <<'END_OF_TINY';
 $INC{'Mouse.pm'} = __FILE__;
 $INC{'Mouse/Object.pm'} = __FILE__;
 $INC{'Mouse/Role.pm'} = __FILE__;
-$INC{'Mouse/Spec.pm'} = __FILE__;
-$INC{'Mouse/TypeRegistry.pm'} = __FILE__;
 $INC{'Mouse/Util.pm'} = __FILE__;
+$INC{'Mouse/TypeRegistry.pm'} = __FILE__;
+$INC{'Mouse/Spec.pm'} = __FILE__;
 $INC{'Mouse/Meta/Attribute.pm'} = __FILE__;
 $INC{'Mouse/Meta/Class.pm'} = __FILE__;
-$INC{'Mouse/Meta/Method.pm'} = __FILE__;
-$INC{'Mouse/Meta/Module.pm'} = __FILE__;
 $INC{'Mouse/Meta/Role.pm'} = __FILE__;
 $INC{'Mouse/Meta/TypeConstraint.pm'} = __FILE__;
+$INC{'Mouse/Meta/Method.pm'} = __FILE__;
+$INC{'Mouse/Meta/Module.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Accessor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Constructor.pm'} = __FILE__;
 $INC{'Mouse/Meta/Method/Destructor.pm'} = __FILE__;
@@ -32,6 +32,7 @@ use warnings;
 use Exporter;
 
 use Carp qw(confess);
+use B ();
 
 use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
 
@@ -48,6 +49,8 @@ our @EXPORT_OK = qw(
 
     get_linear_isa
     get_code_info
+
+    get_code_package
 
     not_supported
 
@@ -126,8 +129,6 @@ BEGIN {
         my ($coderef) = @_;
         ref($coderef) or return;
 
-        require B;
-
         my $cv = B::svref_2object($coderef);
         $cv->isa('B::CV') or return;
 
@@ -135,6 +136,18 @@ BEGIN {
         $gv->isa('B::GV') or return;
 
         return ($gv->STASH->NAME, $gv->NAME);
+    }
+
+    sub get_code_package{
+        my($coderef) = @_;
+
+        my $cv = B::svref_2object($coderef);
+        $cv->isa('B::CV') or return '';
+
+        my $gv = $cv->GV;
+        $gv->isa('B::GV') or return '';
+
+        return $gv->STASH->NAME;
     }
 }
 
@@ -346,14 +359,14 @@ use 5.006_002;
 use strict;
 use warnings;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use Exporter;
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
 
-BEGIN { Mouse::Util->import(qw(load_class is_class_loaded not_supported)) }
+BEGIN { Mouse::Util->import(qw(load_class is_class_loaded get_code_package not_supported)) }
 
 BEGIN { Mouse::Util::TypeConstraints->import(()) }
 
@@ -527,7 +540,7 @@ sub unimport {
         my $code;
         if(exists $is_removable{$keyword}
             && ($code = $caller->can($keyword))
-            && (Mouse::Util::get_code_info($code))[0] eq __PACKAGE__){
+            && get_code_package($code) eq __PACKAGE__){
 
             delete $stash->{$keyword};
         }
@@ -564,8 +577,12 @@ sub _process_options{
     my $can_be_required = defined( $args->{init_arg} );
 
     if(exists $args->{builder}){
+        # XXX:
+        # Moose refuses a CODE ref builder, but Mouse doesn't for backward compatibility
+        # This feature will be changed in a future. (gfx)
         $class->throw_error('builder must be a defined scalar value which is a method name')
-            if ref $args->{builder} || !(defined $args->{builder});
+            #if ref $args->{builder} || !defined $args->{builder};
+            if !defined $args->{builder};
 
         $can_be_required++;
     }
@@ -1737,6 +1754,7 @@ sub _generate_BUILDALL {
     my @code;
     for my $class ($metaclass->linearized_isa) {
         no strict 'refs';
+        no warnings 'once';
 
         if (*{ $class . '::BUILD' }{CODE}) {
             unshift  @code, qq{${class}::BUILD(\$instance, \$args);};
@@ -1787,7 +1805,7 @@ use warnings;
 use Carp ();
 use Scalar::Util qw/blessed weaken/;
 
-BEGIN { Mouse::Util->import(qw/:meta get_code_info not_supported load_class/) }
+BEGIN { Mouse::Util->import(qw/:meta get_code_package not_supported load_class/) }
 
 {
     my %METACLASS_CACHE;
@@ -1879,13 +1897,17 @@ sub add_method {
     *{ $pkg . '::' . $name } = $code;
 }
 
-sub _code_is_mine { # taken from Class::MOP::Class
-    my ( $self, $code ) = @_;
+# XXX: for backward compatibility
+my %foreign = map{ $_ => undef } qw(
+    Mouse Mouse::Role Mouse::Util Mouse::Util::TypeConstraints
+    Carp Scalar::Util
+);
+sub _code_is_mine{
+    my($self, $code) = @_;
 
-    my ( $code_package, $code_name ) = get_code_info($code);
+    my $package = get_code_package($code);
 
-    return $code_package && $code_package eq $self->{package}
-        || ( $code_package eq 'constant' && $code_name eq '__ANON__' );
+    return !exists $foreign{$package};
 }
 
 sub has_method {
@@ -1893,7 +1915,7 @@ sub has_method {
 
     return 1 if $self->{methods}->{$method_name};
 
-    my $code = $self->{package}->can($method_name);
+    my $code = do{ no strict 'refs'; *{$self->{package} . '::' . $method_name}{CODE} };
 
     return $code && $self->_code_is_mine($code);
 }
@@ -2080,7 +2102,7 @@ package Mouse::Meta::Role;
 use strict;
 use warnings;
 
-BEGIN { Mouse::Util->import(qw(:meta not_supported english_list)) }
+BEGIN { Mouse::Util->import(qw(:meta not_supported english_list get_code_info)) }
 our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
@@ -2659,7 +2681,7 @@ use Exporter;
 use Carp 'confess';
 use Scalar::Util 'blessed';
 
-BEGIN { Mouse::Util->import(qw(load_class not_supported)) }
+BEGIN { Mouse::Util->import(qw(load_class get_code_package not_supported)) }
 BEGIN { Mouse->import(()) }
 
 our @ISA = qw(Exporter);
@@ -2802,7 +2824,7 @@ sub unimport {
         my $code;
         if(exists $is_removable{$keyword}
             && ($code = $caller->can($keyword))
-            && (Mouse::Util::get_code_info($code))[0] eq __PACKAGE__){
+            && get_code_package($code) eq __PACKAGE__){
 
             delete $stash->{$keyword};
         }
@@ -2814,7 +2836,7 @@ package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';

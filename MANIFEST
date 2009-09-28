@@ -2,6 +2,7 @@
 author/generate-mouse-tiny.pl
 author/he-profile.pl
 author/munge-tests-for-moose.pl
+author/test-externals.pl
 benchmarks/basic.pl
 benchmarks/modifiers.pl
 Changes

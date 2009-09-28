@@ -4,14 +4,14 @@ use 5.006_002;
 use strict;
 use warnings;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use Exporter;
 
 use Carp 'confess';
 use Scalar::Util 'blessed';
 
-use Mouse::Util qw(load_class is_class_loaded not_supported);
+use Mouse::Util qw(load_class is_class_loaded get_code_package not_supported);
 
 use Mouse::Meta::Module;
 use Mouse::Meta::Class;
@@ -190,7 +190,7 @@ sub unimport {
         my $code;
         if(exists $is_removable{$keyword}
             && ($code = $caller->can($keyword))
-            && (Mouse::Util::get_code_info($code))[0] eq __PACKAGE__){
+            && get_code_package($code) eq __PACKAGE__){
 
             delete $stash->{$keyword};
         }
@@ -454,9 +454,9 @@ L<Class::MOP>
 
 =head1 AUTHORS
 
-Shawn M Moore, C<< <sartak at gmail.com> >>
+Shawn M Moore, E<lt>sartak at gmail.comE<gt>
 
-Yuval Kogman, C<< <nothingmuch at woobling.org> >>
+Yuval Kogman, E<lt>nothingmuch at woobling.orgE<gt>
 
 tokuhirom
 
@@ -464,7 +464,7 @@ Yappo
 
 wu-lee
 
-Goro Fuji (gfx) C<< <gfuji at cpan.org> >>
+Goro Fuji (gfx) E<lt>gfuji at cpan.orgE<gt>
 
 with plenty of code borrowed from L<Class::MOP> and L<Moose>
 
