@@ -156,7 +156,7 @@ sub new {
 #        Carp::cluck("Found unknown argument(s) passed to '$name' attribute constructor in '$class': @bad");
 #    }
 
-    return $instance
+    return $instance;
 }
 
 # readers
@@ -265,15 +265,32 @@ sub create {
     return $self;
 }
 
+sub _coerce_and_verify {
+    my($self, $value, $instance) = @_;
+
+    my $type_constraint = $self->{type_constraint};
+
+    return $value if !$type_constraint;
+
+    if ($self->should_coerce && $type_constraint->has_coercion) {
+        $value = $type_constraint->coerce($value);
+    }
+
+    return $value if $type_constraint->check($value);
+
+    $self->verify_against_type_constraint($value);
+
+    return $value;
+}
+
 sub verify_against_type_constraint {
     my ($self, $value) = @_;
-    my $tc = $self->type_constraint;
-    return 1 unless $tc;
 
-    local $_ = $value;
-    return 1 if $tc->check($value);
+    my $type_constraint = $self->{type_constraint};
+    return 1 if !$type_constraint;;
+    return 1 if $type_constraint->check($value);
 
-    $self->verify_type_constraint_error($self->name, $value, $tc);
+    $self->verify_type_constraint_error($self->name, $value, $type_constraint);
 }
 
 sub verify_type_constraint_error {
@@ -284,6 +301,9 @@ sub verify_type_constraint_error {
 sub coerce_constraint { ## my($self, $value) = @_;
     my $type = $_[0]->{type_constraint}
         or return $_[1];
+
+    Carp::cluck("coerce_constraint() has been deprecated, which was an internal utility anyway");
+
     return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $type, $_[1]);
 }
 
@@ -378,7 +398,7 @@ __END__
 
 =head1 NAME
 
-Mouse::Meta::Attribute - attribute metaclass
+Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 METHODS
 
@@ -486,6 +506,13 @@ is equivalent to this:
 
 =back
 
+=head2 C<< associate_method(Method) >>
+
+Associates a method with the attribute. Typically, this is called internally
+when an attribute generates its accessors.
+
+Currently the argument I<Method> is ignored in Mouse.
+
 =head2 C<< verify_against_type_constraint(Item) -> TRUE | ERROR >>
 
 Checks that the given value passes this attribute's type constraint. Returns C<true>
@@ -499,6 +526,8 @@ Accessors and helper methods are installed. Some error checking is done.
 =head1 SEE ALSO
 
 L<Moose::Meta::Attribute>
+
+L<Class::MOP::Attribute>
 
 =cut
 

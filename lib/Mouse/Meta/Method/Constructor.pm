@@ -12,9 +12,10 @@ sub generate_constructor_method_inline {
     my $buildargs     = $class->_generate_BUILDARGS($metaclass);
     my $processattrs  = $class->_generate_processattrs($metaclass, \@attrs);
 
-    my @compiled_constraints = map { $_ ? $_->{_compiled_type_constraint} : undef } map { $_->{type_constraint} } @attrs;
+    my @compiled_constraints = map { $_ ? $_->_compiled_type_constraint : undef }
+                               map { $_->type_constraint } @attrs;
 
-    my $code = <<"...";
+    my $code = sprintf("#line %d %s\n", __LINE__, __FILE__).<<"...";
     sub {
         my \$class = shift;
         return \$class->Mouse::Object::new(\@_)
@@ -47,38 +48,28 @@ sub _generate_processattrs {
         if (defined $attr->init_arg) {
             my $from = $attr->init_arg;
 
-            $code .= "if (exists \$args->{'$from'}) {\n";
+            $code .= "if (exists \$args->{q{$from}}) {\n";
 
-            if ($attr->should_coerce && $attr->type_constraint) {
-                $code .= "my \$value = Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, \$args->{'$from'});\n";
-            }
-            else {
-                $code .= "my \$value = \$args->{'$from'};\n";
-            }
-
-            if ($attr->has_type_constraint) {
-                if ($attr->type_constraint->{_compiled_type_constraint}) {
-                    $code .= "unless (\$compiled_constraints[$index](\$value)) {";
-                } else {
-                    $code .= "unless (\$attrs[$index]->{type_constraint}->check(\$value)) {";
+            my $value = "\$args->{q{$from}}";
+            if(my $type_constraint = $attr->type_constraint){
+                if($attr->should_coerce && $type_constraint->has_coercion){
+                    $code .= "my \$value = \$attrs[$index]->{type_constraint}->coerce(\$args->{q{$from}});\n";
+                    $value = '$value';
                 }
-                $code .= "
-                        \$attrs[$index]->verify_type_constraint_error(
-                            q{$key}, \$value, \$attrs[$index]->type_constraint
-                        )
-                    }
-                ";
+
+                $code .= "\$compiled_constraints[$index]->($value)\n";
+                $code .= "  or \$attrs[$index]->verify_type_constraint_error(q{$key}, $value, \$attrs[$index]->{type_constraint});\n";
             }
 
-            $code .= "\$instance->{q{$key}} = \$value;\n";
+            $code .= "\$instance->{q{$key}} = $value;\n";
 
             if ($attr->is_weak_ref) {
-                $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref( \$value );\n";
+                $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref($value);\n";
             }
 
             if ($attr->has_trigger) {
                 $has_triggers++;
-                $code .= "push \@triggers, [\$attrs[$index]->{trigger}, \$value];\n";
+                $code .= "push \@triggers, [\$attrs[$index]->{trigger}, $value];\n";
             }
 
             $code .= "\n} else {\n";
@@ -92,24 +83,24 @@ sub _generate_processattrs {
                 $code .= "my \$value = ";
 
                 if ($attr->should_coerce && $attr->type_constraint) {
-                    $code .= "Mouse::Util::TypeConstraints->typecast_constraints('".$attr->associated_class->name."', \$attrs[$index]->{type_constraint}, ";
+                    $code .= "\$attrs[$index]->_coerce_and_verify(";
                 }
 
-                    if ($attr->has_builder) {
-                        $code .= "\$instance->$builder";
-                    }
-                    elsif (ref($default) eq 'CODE') {
-                        $code .= "\$attrs[$index]->{default}->(\$instance)";
-                    }
-                    elsif (!defined($default)) {
-                        $code .= 'undef';
-                    }
-                    elsif ($default =~ /^\-?[0-9]+(?:\.[0-9]+)$/) {
-                        $code .= $default;
-                    }
-                    else {
-                        $code .= "'$default'";
-                    }
+                if ($attr->has_builder) {
+                    $code .= "\$instance->$builder()";
+                }
+                elsif (ref($default) eq 'CODE') {
+                    $code .= "\$attrs[$index]->{default}->(\$instance)";
+                }
+                elsif (!defined($default)) {
+                    $code .= 'undef';
+                }
+                elsif ($default =~ /^\-?[0-9]+(?:\.[0-9]+)$/) {
+                    $code .= $default;
+                }
+                else {
+                    $code .= "'$default'";
+                }
 
                 if ($attr->should_coerce) {
                     $code .= ");\n";

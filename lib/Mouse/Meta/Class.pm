@@ -103,7 +103,7 @@ sub add_attribute {
             my $inherited_attr;
 
             foreach my $class($self->linearized_isa){
-                my $meta = Mouse::Meta::Module::get_metaclass_by_name($class) or next;
+                my $meta = Mouse::Util::get_metaclass_by_name($class) or next;
                 $inherited_attr = $meta->get_attribute($name) and last;
             }
 
@@ -171,18 +171,13 @@ sub _initialize_instance{
         my $key  = $attribute->name;
 
         if (defined($from) && exists($args->{$from})) {
-            $args->{$from} = $attribute->coerce_constraint($args->{$from})
-                if $attribute->should_coerce;
-
-            $attribute->verify_against_type_constraint($args->{$from});
-
-            $instance->{$key} = $args->{$from};
+            $instance->{$key} = $attribute->_coerce_and_verify($args->{$from});
 
             weaken($instance->{$key})
                 if ref($instance->{$key}) && $attribute->is_weak_ref;
 
             if ($attribute->has_trigger) {
-                push @triggers_queue, [ $attribute->trigger, $args->{$from} ];
+                push @triggers_queue, [ $attribute->trigger, $instance->{$from} ];
             }
         }
         else {
@@ -190,17 +185,12 @@ sub _initialize_instance{
                 unless ($attribute->is_lazy) {
                     my $default = $attribute->default;
                     my $builder = $attribute->builder;
-                    my $value = $attribute->has_builder
-                              ? $instance->$builder
-                              : ref($default) eq 'CODE'
-                                  ? $default->($instance)
-                                  : $default;
+                    my $value =   $builder                ? $instance->$builder()
+                                : ref($default) eq 'CODE' ? $instance->$default()
+                                :                           $default;
 
-                    $value = $attribute->coerce_constraint($value)
-                        if $attribute->should_coerce;
-                    $attribute->verify_against_type_constraint($value);
-
-                    $instance->{$key} = $value;
+                    # XXX: we cannot use $attribute->set_value() because it invokes triggers.
+                    $instance->{$key} = $attribute->_coerce_and_verify($value, $instance);;
 
                     weaken($instance->{$key})
                         if ref($instance->{$key}) && $attribute->is_weak_ref;
@@ -419,7 +409,7 @@ sub does_role {
         || $self->throw_error("You must supply a role name to look for");
 
     for my $class ($self->linearized_isa) {
-        my $meta = Mouse::Meta::Module::class_of($class);
+        my $meta = Mouse::Util::get_metaclass_by_name($class);
         next unless $meta && $meta->can('roles');
 
         for my $role (@{ $meta->roles }) {
@@ -443,7 +433,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head2 C<< initialize(ClassName) -> Mouse::Meta::Class >>
 
-Finds or creates a Mouse::Meta::Class instance for the given ClassName. Only
+Finds or creates a C<Mouse::Meta::Class> instance for the given ClassName. Only
 one instance should exist for a given class.
 
 =head2 C<< name -> ClassName >>
@@ -454,29 +444,54 @@ Returns the name of the owner class.
 
 Gets (or sets) the list of superclasses of the owner class.
 
+=head2 C<< add_method(name => CodeRef) >>
+
+Adds a method to the owner class.
+
+=head2 C<< has_method(name) -> Bool >>
+
+Returns whether we have a method with the given name.
+
+=head2 C<< get_method(name) -> Mouse::Meta::Method | undef >>
+
+Returns a L<Mouse::Meta::Method> with the given name.
+
+Note that you can also use C<< $metaclass->name->can($name) >> for a method body.
+
+=head2 C<< get_method_list -> Names >>
+
+Returns a list of method names which are defined in the local class.
+If you want a list of all applicable methods for a class, use the
+C<get_all_methods> method.
+
+=head2 C<< get_all_methods -> (Mouse::Meta::Method) >>
+
+Return the list of all L<Mouse::Meta::Method> instances associated with
+the class and its superclasses.
+
 =head2 C<< add_attribute(name => spec | Mouse::Meta::Attribute) >>
 
 Begins keeping track of the existing L<Mouse::Meta::Attribute> for the owner
 class.
 
-=head2 C<< get_all_attributes -> (Mouse::Meta::Attribute) >>
-
-Returns the list of all L<Mouse::Meta::Attribute> instances associated with
-this class and its superclasses.
-
-=head2 C<< get_attribute_list -> { name => Mouse::Meta::Attribute } >>
-
-This returns a list of attribute names which are defined in the local
-class. If you want a list of all applicable attributes for a class,
-use the C<get_all_attributes> method.
-
 =head2 C<< has_attribute(Name) -> Bool >>
 
 Returns whether we have a L<Mouse::Meta::Attribute> with the given name.
 
-=head2 get_attribute Name -> Mouse::Meta::Attribute | undef
+=head2 C<< get_attribute Name -> Mouse::Meta::Attribute | undef >>
 
 Returns the L<Mouse::Meta::Attribute> with the given name.
+
+=head2 C<< get_attribute_list -> Names >>
+
+Returns a list of attribute names which are defined in the local
+class. If you want a list of all applicable attributes for a class,
+use the C<get_all_attributes> method.
+
+=head2 C<< get_all_attributes -> (Mouse::Meta::Attribute) >>
+
+Returns the list of all L<Mouse::Meta::Attribute> instances associated with
+this class and its superclasses.
 
 =head2 C<< linearized_isa -> [ClassNames] >>
 
@@ -488,12 +503,18 @@ Creates a new instance.
 
 =head2 C<< clone_object(Instance, Parameters) -> Instance >>
 
-Clones the given C<Instance> which must be an instance governed by this
+Clones the given instance which must be an instance governed by this
 metaclass.
+
+=head2 C<< throw_error(Message, Parameters) >>
+
+Throws an error with the given message.
 
 =head1 SEE ALSO
 
 L<Moose::Meta::Class>
+
+L<Class::MOP::Class>
 
 =cut
 
