@@ -42,9 +42,8 @@ $| = 1;
 
       my $dump = '';
 
-      my %attributes = %{ $self->meta->get_attribute_map };
-      for my $name ( sort keys %attributes ) {
-          my $attribute = $attributes{$name};
+      for my $name ( sort $self->meta->get_attribute_list ) {
+          my $attribute = $self->meta->get_attribute($name);
 
           if (   $attribute->does('MyApp::Meta::Attribute::Trait::Labeled')
               && $attribute->has_label ) {
@@ -54,8 +53,8 @@ $| = 1;
               $dump .= $name;
           }
 
-          my $reader = $attribute->get_read_method;
-          $dump .= ": " . $self->$reader . "\n";
+          my $reader = $attribute->get_read_method_ref;
+          $dump .= ": " . $reader->($self) . "\n";
       }
 
       return $dump;

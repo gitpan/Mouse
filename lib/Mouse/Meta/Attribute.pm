@@ -142,11 +142,11 @@ sub new {
 
     $args{name} = $name;
 
-    my $instance = bless \%args, $class;
+    my $self = bless \%args, $class;
 
     # extra attributes
     if($class ne __PACKAGE__){
-        $class->meta->_initialize_instance($instance,\%args);
+        $class->meta->_initialize_object($self, \%args);
     }
 
 # XXX: there is no fast way to check attribute validity
@@ -156,7 +156,7 @@ sub new {
 #        Carp::cluck("Found unknown argument(s) passed to '$name' attribute constructor in '$class': @bad");
 #    }
 
-    return $instance;
+    return $self;
 }
 
 # readers
@@ -185,9 +185,6 @@ sub builder              { $_[0]->{builder}                }
 sub should_auto_deref    { $_[0]->{auto_deref}             }
 sub should_coerce        { $_[0]->{coerce}                 }
 
-sub get_read_method      { $_[0]->{reader} || $_[0]->{accessor} }
-sub get_write_method     { $_[0]->{writer} || $_[0]->{accessor} }
-
 # predicates
 
 sub has_accessor         { exists $_[0]->{accessor}        }
@@ -205,13 +202,13 @@ sub has_builder          { exists $_[0]->{builder}         }
 sub has_read_method      { exists $_[0]->{reader} || exists $_[0]->{accessor} }
 sub has_write_method     { exists $_[0]->{writer} || exists $_[0]->{accessor} }
 
-sub _create_args {
+sub _create_args { # DEPRECATED
     $_[0]->{_create_args} = $_[1] if @_ > 1;
     $_[0]->{_create_args}
 }
 
 sub interpolate_class{
-    my($class, $name, $args) = @_;
+    my($class, $args) = @_;
 
     if(my $metaclass = delete $args->{metaclass}){
         $class = Mouse::Util::resolve_metaclass_alias( Attribute => $metaclass );
@@ -244,7 +241,7 @@ sub interpolate_class{
     return( $class, @traits );
 }
 
-sub canonicalize_args{
+sub canonicalize_args{ # DEPRECATED
     my ($self, $name, %args) = @_;
 
     Carp::cluck("$self->canonicalize_args has been deprecated."
@@ -298,7 +295,7 @@ sub verify_type_constraint_error {
     $self->throw_error("Attribute ($name) does not pass the type constraint because: " . $type->get_message($value));
 }
 
-sub coerce_constraint { ## my($self, $value) = @_;
+sub coerce_constraint { # DEPRECATED
     my $type = $_[0]->{type_constraint}
         or return $_[1];
 
@@ -323,13 +320,15 @@ sub _canonicalize_handles {
 }
 
 sub clone_and_inherit_options{
-    my $self = shift;
-    my $name = shift;
+    my($self, %args) = @_;
 
-    return ref($self)->new($name, %{$self}, (@_ == 1) ? %{$_[0]} : @_);
+    my($attribute_class, @traits) = ref($self)->interpolate_class(\%args);
+
+    $args{traits} = \@traits if @traits;
+    return $attribute_class->new($self->name, %{$self}, %args);
 }
 
-sub clone_parent {
+sub clone_parent { # DEPRECATED
     my $self  = shift;
     my $class = shift;
     my $name  = shift;
@@ -342,7 +341,7 @@ sub clone_parent {
     $self->clone_and_inherited_args($class, $name, %args);
 }
 
-sub get_parent_args {
+sub get_parent_args { # DEPRECATED
     my $self  = shift;
     my $class = shift;
     my $name  = shift;
@@ -354,6 +353,48 @@ sub get_parent_args {
     }
 
     $self->throw_error("Could not find an attribute by the name of '$name' to inherit from");
+}
+
+
+sub get_read_method { # DEPRECATED
+    $_[0]->{reader} || $_[0]->{accessor}
+}
+sub get_write_method { # DEPRECATED
+    $_[0]->{writer} || $_[0]->{accessor}
+}
+
+sub get_read_method_ref{
+    my($self) = @_;
+
+    $self->{_read_method_ref} ||= do{
+        my $metaclass = $self->associated_class
+            or $self->throw_error('No asocciated class for ' . $self->name);
+
+        my $reader = $self->{reader} || $self->{accessor};
+        if($reader){
+            $metaclass->name->can($reader);
+        }
+        else{
+            Mouse::Meta::Method::Accessor->_generate_reader($self, undef, $metaclass);
+        }
+    };
+}
+
+sub get_write_method_ref{
+    my($self) = @_;
+
+    $self->{_write_method_ref} ||= do{
+        my $metaclass = $self->associated_class
+            or $self->throw_error('No asocciated class for ' . $self->name);
+
+        my $reader = $self->{writer} || $self->{accessor};
+        if($reader){
+            $metaclass->name->can($reader);
+        }
+        else{
+            Mouse::Meta::Method::Accessor->_generate_writer($self, undef, $metaclass);
+        }
+    };
 }
 
 sub associate_method{
@@ -369,7 +410,7 @@ sub install_accessors{
 
     foreach my $type(qw(accessor reader writer predicate clearer handles)){
         if(exists $attribute->{$type}){
-            my $installer    = '_install_' . $type;
+            my $installer    = '_generate_' . $type;
 
             Mouse::Meta::Method::Accessor->$installer($attribute, $attribute->{$type}, $metaclass);
 
@@ -522,6 +563,15 @@ on success, otherwise C<confess>es.
 
 Creates a new attribute in the owner class, inheriting options from parent classes.
 Accessors and helper methods are installed. Some error checking is done.
+
+=head2 C<< get_read_method_ref >>
+
+=head2 C<< get_write_method_ref >>
+
+Returns the subroutine reference of a method suitable for reading or
+writing the attribute's value in the associated class. These methods
+always return a subroutine reference, regardless of whether or not the
+attribute is read- or write-only.
 
 =head1 SEE ALSO
 

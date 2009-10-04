@@ -10,9 +10,7 @@ use Mouse::Util qw/:meta get_code_package not_supported load_class/;
 
 my %METAS;
 
-# because Mouse doesn't introspect existing classes, we're forced to
-# only pay attention to other Mouse classes
-sub _metaclass_cache {
+sub _metaclass_cache { # DEPRECATED
     my($class, $name) = @_;
     return $METAS{$name};
 }
@@ -63,7 +61,11 @@ sub name { $_[0]->{package} }
 
 # add_attribute is an abstract method
 
-sub get_attribute_map {        $_[0]->{attributes}          }
+sub get_attribute_map { # DEPRECATED
+    Carp::cluck('get_attribute_map() has been deprecated');
+    return $_[0]->{attributes};
+}
+
 sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     {        $_[0]->{attributes}->{$_[1]} }
 sub get_attribute_list{ keys %{$_[0]->{attributes}}         }
@@ -86,7 +88,7 @@ sub add_method {
     }
 
     if(ref($code) ne 'CODE'){
-        not_supported 'add_method for a method object';
+        $code = \&{$code}; # coerce
     }
 
     $self->{methods}->{$name}++; # Moose stores meta object here.
@@ -112,6 +114,9 @@ sub _code_is_mine{
 
 sub has_method {
     my($self, $method_name) = @_;
+
+    defined($method_name)
+        or $self->throw_error('You must define a method name');
 
     return 1 if $self->{methods}->{$method_name};
 
@@ -146,43 +151,42 @@ sub get_method_list {
 
 {
     my $ANON_SERIAL = 0;
-    my $ANON_PREFIX = 'Mouse::Meta::Module::__ANON__::';
 
     my %IMMORTALS;
 
     sub create {
-        my ($class, $package_name, %options) = @_;
+        my($self, $package_name, %options) = @_;
 
-        $class->throw_error('You must pass a package name') if @_ == 1;
+        my $class = ref($self) || $self;
+        $self->throw_error('You must pass a package name') if @_ < 2;
 
-
+        my $superclasses;
         if(exists $options{superclasses}){
-            if($class->isa('Mouse::Meta::Class')){
-                (ref $options{superclasses} eq 'ARRAY')
-                    || $class->throw_error("You must pass an ARRAY ref of superclasses");
-            }
-            else{ # role
+            if($self->isa('Mouse::Meta::Role')){
                 delete $options{superclasses};
+            }
+            else{
+                $superclasses = delete $options{superclasses};
+                (ref $superclasses eq 'ARRAY')
+                    || $self->throw_error("You must pass an ARRAY ref of superclasses");
             }
         }
 
-        my $attributes;
-        if(exists $options{attributes}){
-            $attributes = delete $options{attributes};
-           (ref $attributes eq 'ARRAY' || ref $attributes eq 'HASH')
-               || $class->throw_error("You must pass an ARRAY ref of attributes")
-           }
-
-        (ref $options{methods} eq 'HASH')
-            || $class->throw_error("You must pass a HASH ref of methods")
-                if exists $options{methods};
-
-        (ref $options{roles} eq 'ARRAY')
-            || $class->throw_error("You must pass an ARRAY ref of roles")
-                if exists $options{roles};
-
-
-        my @extra_options;
+        my $attributes = delete $options{attributes};
+        if(defined $attributes){
+            (ref $attributes eq 'ARRAY' || ref $attributes eq 'HASH')
+                || $self->throw_error("You must pass an ARRAY ref of attributes");
+        }
+        my $methods = delete $options{methods};
+        if(defined $methods){
+            (ref $methods eq 'HASH')
+                || $self->throw_error("You must pass a HASH ref of methods");
+        }
+        my $roles = delete $options{roles};
+        if(defined $roles){
+            (ref $roles eq 'ARRAY')
+                || $self->throw_error("You must pass an ARRAY ref of roles");
+        }
         my $mortal;
         my $cache_key;
 
@@ -193,14 +197,13 @@ sub get_method_list {
             if(!$mortal){
                     # something like Super::Class|Super::Class::2=Role|Role::1
                     $cache_key = join '=' => (
-                        join('|',      @{$options{superclasses} || []}),
-                        join('|', sort @{$options{roles}        || []}),
+                        join('|',      @{$superclasses || []}),
+                        join('|', sort @{$roles        || []}),
                     );
                     return $IMMORTALS{$cache_key} if exists $IMMORTALS{$cache_key};
             }
-            $package_name = $ANON_PREFIX . ++$ANON_SERIAL;
-
-            push @extra_options, (anon_serial_id => $ANON_SERIAL);
+            $options{anon_serial_id} = ++$ANON_SERIAL;
+            $package_name = $class . '::__ANON__::' . $ANON_SERIAL;
         }
 
         # instantiate a module
@@ -210,26 +213,17 @@ sub get_method_list {
             ${ $package_name . '::AUTHORITY' } = delete $options{authority} if exists $options{authority};
         }
 
-        my %initialize_options = %options;
-        delete @initialize_options{qw(
-            package
-            superclasses
-            attributes
-            methods
-            roles
-        )};
-        my $meta = $class->initialize( $package_name, %initialize_options, @extra_options);
+        my $meta = $self->initialize( $package_name, %options);
 
         weaken $METAS{$package_name}
             if $mortal;
 
-        # FIXME totally lame
-        $meta->add_method('meta' => sub {
-            $class->initialize(ref($_[0]) || $_[0]);
+        $meta->add_method(meta => sub{
+            $self->initialize(ref($_[0]) || $_[0]);
         });
 
-        $meta->superclasses(@{$options{superclasses}})
-            if exists $options{superclasses};
+        $meta->superclasses(@{$superclasses})
+            if defined $superclasses;
 
         # NOTE:
         # process attributes first, so that they can
@@ -238,26 +232,28 @@ sub get_method_list {
         # I think this should be the order of things.
         if (defined $attributes) {
             if(ref($attributes) eq 'ARRAY'){
+                # array of Mouse::Meta::Attribute
                 foreach my $attr (@{$attributes}) {
-                    $meta->add_attribute($attr->{name} => $attr);
+                    $meta->add_attribute($attr);
                 }
             }
             else{
+                # hash map of name and attribute spec pairs
                 while(my($name, $attr) = each %{$attributes}){
                     $meta->add_attribute($name => $attr);
                 }
             }
         }
-        if (exists $options{methods}) {
-            foreach my $method_name (keys %{$options{methods}}) {
-                $meta->add_method($method_name, $options{methods}->{$method_name});
+        if (defined $methods) {
+            while(my($method_name, $method_body) = each %{$methods}){
+                $meta->add_method($method_name, $method_body);
             }
         }
-        if (exists $options{roles}){
-            Mouse::Util::apply_all_roles($package_name, @{$options{roles}});
+        if (defined $roles){
+            Mouse::Util::apply_all_roles($package_name, @{$roles});
         }
 
-        if(!$mortal && exists $meta->{anon_serial_id}){
+        if($cache_key){
             $IMMORTALS{$cache_key} = $meta;
         }
 
@@ -271,14 +267,19 @@ sub get_method_list {
 
         return if !$serial_id;
 
-        my $stash = $self->namespace;
-
+        # @ISA is a magical variable, so we clear it manually.
         @{$self->{superclasses}} = () if exists $self->{superclasses};
-        %{$stash} = ();
-        delete $METAS{$self->name};
+
+        # Then, clear the symbol table hash
+        %{$self->namespace} = ();
+
+        my $name = $self->name;
+        delete $METAS{$name};
+
+        $name =~ s/ $serial_id \z//xms;
 
         no strict 'refs';
-        delete ${$ANON_PREFIX}{ $serial_id . '::' };
+        delete ${$name}{ $serial_id . '::' };
 
         return;
     }

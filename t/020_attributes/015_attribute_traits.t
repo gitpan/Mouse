@@ -21,11 +21,11 @@ use Test::Mouse;
 
     after 'install_accessors' => sub {
         my $self = shift;
-        my $reader = $self->get_read_method;
+        my $reader = $self->get_read_method_ref;
 
         $self->associated_class->add_method(
             $self->alias_to,
-            sub { shift->$reader(@_) },
+            $reader,
         );
     };
 }

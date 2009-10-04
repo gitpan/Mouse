@@ -4,7 +4,7 @@ use 5.006_002;
 use strict;
 use warnings;
 
-our $VERSION = '0.37_01';
+our $VERSION = '0.37_02';
 
 use Exporter;
 
@@ -86,31 +86,36 @@ our @SUPER_ARGS;
 sub super {
     # This check avoids a recursion loop - see
     # t/100_bugs/020_super_recursion.t
-    return if defined $SUPER_PACKAGE && $SUPER_PACKAGE ne caller();
-    return unless $SUPER_BODY; $SUPER_BODY->(@SUPER_ARGS);
+    return if  defined $SUPER_PACKAGE && $SUPER_PACKAGE ne caller();
+    return if !defined $SUPER_BODY;
+    $SUPER_BODY->(@SUPER_ARGS);
 }
 
 sub override {
-    my $meta = Mouse::Meta::Class->initialize(caller);
-    my $pkg = $meta->name;
-
-    my $name = shift;
-    my $code = shift;
-
-    my $body = $pkg->can($name)
-        or confess "You cannot override '$name' because it has no super method";
-
-    $meta->add_method($name => sub {
-        local $SUPER_PACKAGE = $pkg;
-        local @SUPER_ARGS = @_;
-        local $SUPER_BODY = $body;
-
-        $code->(@_);
-    });
+    # my($name, $method) = @_;
+    Mouse::Meta::Class->initialize(scalar caller)->add_override_method_modifier(@_);
 }
 
-sub inner  { not_supported }
-sub augment{ not_supported }
+our %INNER_BODY;
+our %INNER_ARGS;
+
+sub inner {
+    my $pkg = caller();
+    if ( my $body = $INNER_BODY{$pkg} ) {
+        my $args = $INNER_ARGS{$pkg};
+        local $INNER_ARGS{$pkg};
+        local $INNER_BODY{$pkg};
+        return $body->(@{$args});
+    }
+    else {
+        return;
+    }
+}
+
+sub augment {
+    #my($name, $method) = @_;
+    Mouse::Meta::Class->initialize(scalar caller)->add_augment_method_modifier(@_);
+}
 
 sub init_meta {
     shift;
@@ -274,12 +279,6 @@ should upgrade to Moose. We don't need two parallel sets of extensions!
 
 If you really must write a Mouse extension, please contact the Moose mailing
 list or #moose on IRC beforehand.
-
-=head2 Maintenance
-
-The original author of this module has mostly stepped down from maintaining
-Mouse. See L<http://www.nntp.perl.org/group/perl.moose/2009/04/msg653.html>.
-If you would like to help maintain this module, please get in touch with us.
 
 =head1 KEYWORDS
 
