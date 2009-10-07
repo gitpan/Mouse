@@ -11,6 +11,7 @@ $INC{'Mouse/Role.pm'} = __FILE__;
 $INC{'Mouse/Util.pm'} = __FILE__;
 $INC{'Mouse/TypeRegistry.pm'} = __FILE__;
 $INC{'Mouse/Spec.pm'} = __FILE__;
+$INC{'Mouse/Exporter.pm'} = __FILE__;
 $INC{'Mouse/Meta/Attribute.pm'} = __FILE__;
 $INC{'Mouse/Meta/Class.pm'} = __FILE__;
 $INC{'Mouse/Meta/Role.pm'} = __FILE__;
@@ -26,44 +27,42 @@ $INC{'Mouse/Util/TypeConstraints.pm'} = __FILE__;
 # and now their contents
 
 package Mouse::Util;
-use strict;
-use warnings;
-
-use Exporter;
+BEGIN { Mouse::Exporte->import(r) } # enables strict and warnings
 
 use Carp qw(confess);
 use B ();
 
 use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
 
-our @ISA       = qw(Exporter);
-our @EXPORT_OK = qw(
-    find_meta
-    does_role
-    resolve_metaclass_alias
-    apply_all_roles
-    english_list
+Mouse::Exporter->setup_import_methods(
+    as_is => [qw(
+        find_meta
+        does_role
+        resolve_metaclass_alias
+        apply_all_roles
+        english_list
 
-    load_class
-    is_class_loaded
+        load_class
+        is_class_loaded
 
-    get_linear_isa
-    get_code_info
+        get_linear_isa
+        get_code_info
 
-    get_code_package
+        get_code_package
 
-    not_supported
+        not_supported
 
-    does meta dump
-    _MOUSE_VERBOSE
-);
-our %EXPORT_TAGS = (
-    all  => \@EXPORT_OK,
-    meta => [qw(does meta dump _MOUSE_VERBOSE)],
+        does meta dump
+        _MOUSE_VERBOSE
+    )],
+    groups => {
+        default => [], # export no functions by default
+        meta    => [qw(does meta dump _MOUSE_VERBOSE)],
+    },
+    _export_to_main => 1,
 );
 
 # aliases as public APIs
-
 # it must be 'require', not 'use', because Mouse::Meta::Module depends on Mouse::Util
 require Mouse::Meta::Module; # for the entities of metaclass cache utilities
 
@@ -368,35 +367,39 @@ sub does :method;
 package Mouse;
 use 5.006_002;
 
-use strict;
-use warnings;
+BEGIN { Mouse::Exporte->import(r) } # enables strict and warnings
 
-our $VERSION = '0.37_02';
+our $VERSION = '0.37_03';
 
-use Exporter;
-
-use Carp 'confess';
-use Scalar::Util 'blessed';
+use Carp qw(confess);
+use Scalar::Util qw(blessed);
 
 BEGIN { Mouse::Util->import(qw(load_class is_class_loaded get_code_package not_supported)) }
 
 BEGIN { Mouse::Util::TypeConstraints->import(()) }
 
-our @ISA = qw(Exporter);
+Mouse::Exporter->setup_import_methods(
+    as_is => [qw(
+        extends with
+        has
+        before after around
+        override super
+        augment  inner
+    ),
+        \&Scalar::Util::blessed,
+        \&Carp::confess,
+   ],
+);
 
+# XXX: for backward compatibility
 our @EXPORT = qw(
     extends with
     has
     before after around
     override super
     augment  inner
-
     blessed confess
 );
-
-our %is_removable = map{ $_ => undef } @EXPORT;
-delete $is_removable{blessed};
-delete $is_removable{confess};
 
 sub extends { Mouse::Meta::Class->initialize(scalar caller)->superclasses(@_) }
 
@@ -488,9 +491,6 @@ sub init_meta {
     my $base_class = $args{base_class} || 'Mouse::Object';
     my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
 
-    confess("The Metaclass $metaclass must be a subclass of Mouse::Meta::Class.")
-            unless $metaclass->isa('Mouse::Meta::Class');
-
     # make a subtype for each Mouse class
     Mouse::Util::TypeConstraints::class_type($class)
         unless Mouse::Util::TypeConstraints::find_type_constraint($class);
@@ -507,70 +507,236 @@ sub init_meta {
     return $meta;
 }
 
-sub import {
-    my $class = shift;
 
-    strict->import;
-    warnings->import;
+package Mouse::Exporter;
+use strict;
+use warnings;
 
-    my $opts = do {
-        if (ref($_[0]) && ref($_[0]) eq 'HASH') {
-            shift @_;
-        } else {
-            +{ };
+use Carp qw(confess);
+
+my %SPEC;
+
+my $strict_bits = strict::bits(qw(subs refs vars));
+
+# it must be "require", because Mouse::Util depends on Mouse::Exporter,
+# which depends on Mouse::Util::import()
+require Mouse::Util;
+
+sub import{
+    $^H              |= $strict_bits;         # strict->import;
+    ${^WARNING_BITS}  = $warnings::Bits{all}; # warnings->import;
+    return;
+}
+
+
+sub setup_import_methods{
+    my($class, %args) = @_;
+
+    my $exporting_package = $args{exporting_package} ||= caller();
+
+    $SPEC{$exporting_package} = \%args;
+
+    # canonicalize args
+    my @export_from;
+    if($args{also}){
+        my %seen;
+        my @stack = ($exporting_package);
+
+        while(my $current = shift @stack){
+            push @export_from, $current;
+
+            my $also = $SPEC{$current}{also} or next;
+            push @stack, grep{ !$seen{$_}++ } ref($also) ? @{ $also } : $also;
         }
-    };
-    my $level = delete $opts->{into_level};
-       $level = 0 unless defined $level;
-    my $caller = caller($level);
+    }
+    else{
+        @export_from = ($exporting_package);
+    }
 
-    # we should never export to main
-    if ($caller eq 'main') {
-        warn qq{$class does not export its sugar to the 'main' package.\n};
+    {
+        my %exports;
+        my @removables;
+        my @all;
+
+        my @init_meta_methods;
+
+        foreach my $package(@export_from){
+            my $spec = $SPEC{$package} or next;
+
+            if(my $as_is = $spec->{as_is}){
+                foreach my $thingy (@{$as_is}){
+                    my($code_package, $code_name, $code);
+
+                    if(ref($thingy)){
+                        $code = $thingy;
+                        ($code_package, $code_name) = Mouse::Util::get_code_info($code);
+                    }
+                    else{
+                        no strict 'refs';
+                        $code_package = $package;
+                        $code_name    = $thingy;
+                        $code         = \&{ $code_package . '::' . $code_name };
+                   }
+
+                    push @all, $code_name;
+                    $exports{$code_name} = $code;
+                    if($code_package eq $package){
+                        push @removables, $code_name;
+                    }
+                }
+            }
+
+            if(my $init_meta = $package->can('init_meta')){
+                if(!grep{ $_ == $init_meta } @init_meta_methods){
+                    unshift @init_meta_methods, $init_meta;
+                }
+            }
+        }
+        $args{EXPORTS}    = \%exports;
+        $args{REMOVABLES} = \@removables;
+
+        $args{groups}{all}     ||= \@all;
+
+        if(my $default_list = $args{groups}{default}){
+            my %default;
+            foreach my $keyword(@{$default_list}){
+                $default{$keyword} = $exports{$keyword}
+                    || confess(qq{The $exporting_package package does not export "$keyword"});
+            }
+            $args{DEFAULT} = \%default;
+        }
+        else{
+            $args{groups}{default} ||= \@all;
+            $args{DEFAULT}           = $args{EXPORTS};
+        }
+
+        if(@init_meta_methods){
+            $args{INIT_META} = \@init_meta_methods;
+        }
+    }
+
+    no strict 'refs';
+
+    *{$exporting_package . '::import'}    = \&do_import;
+    *{$exporting_package . '::unimport'}  = \&do_unimport;
+
+    # for backward compatibility
+
+    *{$exporting_package . '::export_to_level'} = sub{
+        my($package, $level, undef, @args) = @_; # the third argument is redundant
+        do_import($package, { into_level => $level + 1 }, @args);
+    };
+    *{$exporting_package . '::export'} = sub{
+        my($package, $into, @args) = @_;
+        do_import($package, { into => $into }, @args);
+    };
+
+    return;
+}
+
+
+# the entity of general import()
+sub do_import {
+    my($package, @args) = @_;
+
+    my $spec = $SPEC{$package}
+        || confess("The package $package package does not use Mouse::Exporter");
+
+    my $into = _get_caller_package(ref($args[0]) ? shift @args : undef);
+
+    my @exports;
+
+    foreach my $arg(@args){
+        if($arg =~ s/^-//){
+            Mouse::Util::not_supported("-$arg");
+        }
+        elsif($arg =~ s/^://){
+            my $group = $spec->{groups}{$arg}
+                || confess(qq{The $package package does not export the group "$arg"});
+            push @exports, @{$group};
+        }
+        else{
+            push @exports, $arg;
+        }
+    }
+
+    $^H              |= $strict_bits;         # strict->import;
+    ${^WARNING_BITS}  = $warnings::Bits{all}; # warnings->import;
+
+    if($into eq 'main' && !$spec->{_export_to_main}){
+        warn qq{$package does not export its sugar to the 'main' package.\n};
         return;
     }
 
-    $class->init_meta(
-        for_class  => $caller,
-    );
+    if($spec->{INIT_META}){
+        foreach my $init_meta(@{$spec->{INIT_META}}){
+            $into->$init_meta(for_class => $into);
+        }
 
-    if (@_) {
-        __PACKAGE__->export_to_level( $level+1, $class, @_);
-    } else {
-        # shortcut for the common case of no type character
-        no strict 'refs';
-        for my $keyword (@EXPORT) {
-            *{ $caller . '::' . $keyword } = *{__PACKAGE__ . '::' . $keyword};
+        # _apply_meta_traits($into); # TODO
+    }
+
+    if(@exports){
+        foreach my $keyword(@exports){
+            no strict 'refs';
+            *{$into.'::'.$keyword} = $spec->{EXPORTS}{$keyword}
+                || confess(qq{The $package package does not export "$keyword"});
         }
     }
+    else{
+        my $default = $spec->{DEFAULT};
+        while(my($keyword, $code) = each %{$default}){
+            no strict 'refs';
+            *{$into.'::'.$keyword} = $code;
+        }
+    }
+    return;
 }
 
-sub unimport {
-    my $caller = caller;
+# the entity of general unimport()
+sub do_unimport {
+    my($package, $arg) = @_;
+
+    my $spec = $SPEC{$package}
+        || confess("The package $package does not use Mouse::Exporter");
+
+    my $from = _get_caller_package($arg);
 
     my $stash = do{
         no strict 'refs';
-        \%{$caller . '::'}
+        \%{$from . '::'}
     };
 
-    for my $keyword (@EXPORT) {
-        my $code;
-        if(exists $is_removable{$keyword}
-            && ($code = $caller->can($keyword))
-            && get_code_package($code) eq __PACKAGE__){
-
+    for my $keyword (@{ $spec->{REMOVABLES} }) {
+        my $gv = \$stash->{$keyword};
+        if(ref($gv) eq 'GLOB' && *{$gv}{CODE} == $spec->{EXPORTS}{$keyword}){ # make sure it is from us
             delete $stash->{$keyword};
         }
+    }
+    return;
+}
+
+# 1 extra level because it's called by import so there's a layer
+# of indirection
+sub _LEVEL(){ 1 }
+
+sub _get_caller_package {
+    my($arg) = @_;
+
+    if(ref $arg){
+        return defined($arg->{into})       ? $arg->{into}
+             : defined($arg->{into_level}) ? scalar caller(_LEVEL + $arg->{into_level})
+             :                               scalar caller(_LEVEL);
+    }
+    else{
+        return scalar caller(_LEVEL);
     }
 }
 
 package Mouse::Meta::Attribute;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw(:meta)) } # enables strict and warnings
 
 use Carp ();
-
-BEGIN { Mouse::Util->import(qw(:meta)) }
 
 sub _process_options{
     my($class, $name, $args) = @_;
@@ -645,8 +811,7 @@ sub _process_options{
         $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($args->{isa});
     }
     elsif(exists $args->{does}){
-        # TODO
-        # $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
+        $args->{type_constraint} = Mouse::Util::TypeConstraints::find_or_create_does_type_constraint($args->{does});
     }
     $tc = $args->{type_constraint};
 
@@ -867,21 +1032,6 @@ sub coerce_constraint { # DEPRECATED
     return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $type, $_[1]);
 }
 
-sub _canonicalize_handles {
-    my $self    = shift;
-    my $handles = shift;
-
-    if (ref($handles) eq 'HASH') {
-        return %$handles;
-    }
-    elsif (ref($handles) eq 'ARRAY') {
-        return map { $_ => $_ } @$handles;
-    }
-    else {
-        $self->throw_error("Unable to canonicalize the 'handles' option with $handles");
-    }
-}
-
 sub clone_and_inherit_options{
     my($self, %args) = @_;
 
@@ -938,7 +1088,7 @@ sub get_read_method_ref{
             $metaclass->name->can($reader);
         }
         else{
-            Mouse::Meta::Method::Accessor->_generate_reader($self, undef, $metaclass);
+            $self->accessor_metaclass->_generate_reader($self, $metaclass);
         }
     };
 }
@@ -955,10 +1105,25 @@ sub get_write_method_ref{
             $metaclass->name->can($reader);
         }
         else{
-            Mouse::Meta::Method::Accessor->_generate_writer($self, undef, $metaclass);
+            $self->accessor_metaclass->_generate_writer($self, $metaclass);
         }
     };
 }
+
+sub _canonicalize_handles {
+    my($self, $handles) = @_;
+
+    if (ref($handles) eq 'HASH') {
+        return %$handles;
+    }
+    elsif (ref($handles) eq 'ARRAY') {
+        return map { $_ => $_ } @$handles;
+    }
+    else {
+        $self->throw_error("Unable to canonicalize the 'handles' option with $handles");
+    }
+}
+
 
 sub associate_method{
     my ($attribute, $method) = @_;
@@ -966,20 +1131,37 @@ sub associate_method{
     return;
 }
 
+sub accessor_metaclass(){ 'Mouse::Meta::Method::Accessor' }
+
 sub install_accessors{
     my($attribute) = @_;
 
-    my $metaclass       = $attribute->{associated_class};
+    my $metaclass      = $attribute->{associated_class};
+    my $accessor_class = $attribute->accessor_metaclass;
 
-    foreach my $type(qw(accessor reader writer predicate clearer handles)){
+    foreach my $type(qw(accessor reader writer predicate clearer)){
         if(exists $attribute->{$type}){
-            my $installer    = '_generate_' . $type;
-
-            Mouse::Meta::Method::Accessor->$installer($attribute, $attribute->{$type}, $metaclass);
-
-            $attribute->{associated_methods}++;
+            my $generator = '_generate_' . $type;
+            my $code      = $accessor_class->$generator($attribute, $metaclass);
+            $metaclass->add_method($attribute->{$type} => $code);
+            $attribute->associate_method($code);
         }
     }
+
+    # install delegation
+    if(exists $attribute->{handles}){
+        my %handles = $attribute->_canonicalize_handles($attribute->{handles});
+        my $reader  = $attribute->get_read_method_ref;
+
+        while(my($handle_name, $method_to_call) = each %handles){
+            my $code = $accessor_class->_generate_delegation($attribute, $metaclass,
+                $reader, $handle_name, $method_to_call);
+
+            $metaclass->add_method($handle_name => $code);
+            $attribute->associate_method($code);
+        }
+    }
+
 
     if($attribute->can('create') != \&create){
         # backword compatibility
@@ -997,17 +1179,17 @@ sub throw_error{
 }
 
 package Mouse::Meta::Class;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw/:meta get_linear_isa not_supported/) } # enables strict and warnings
 
 use Scalar::Util qw/blessed weaken/;
-
-BEGIN { Mouse::Util->import(qw/:meta get_linear_isa not_supported/) }
 
 our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass()    { 'Mouse::Meta::Method'    }
 sub attribute_metaclass() { 'Mouse::Meta::Attribute' }
+
+sub constructor_class()   { 'Mouse::Meta::Method::Constructor' }
+sub destructor_class()    { 'Mouse::Meta::Method::Destructor'  }
 
 sub _construct_meta {
     my($class, %args) = @_;
@@ -1254,13 +1436,13 @@ sub make_immutable {
     $self->{is_immutable}++;
 
     if ($args{inline_constructor}) {
-        # generate and install
-        Mouse::Meta::Method::Constructor->_generate_constructor_method($self, \%args);
+        $self->add_method($args{constructor_name} =>
+            $self->constructor_class->_generate_constructor($self, \%args));
     }
 
     if ($args{inline_destructor}) {
-        # generate and install
-        Mouse::Meta::Method::Destructor->_generate_destructor_method($self, \%args);
+        $self->add_method(DESTROY =>
+            $self->destructor_class->_generate_destructor($self, \%args));
     }
 
     # Moose's make_immutable returns true allowing calling code to skip setting an explicit true value
@@ -1453,10 +1635,7 @@ sub does_role {
 }
 
 package Mouse::Meta::Method;
-use strict;
-use warnings;
-
-BEGIN { Mouse::Util->import(qw(:meta)) }
+BEGIN { Mouse::Util->import(qw(:meta)) } # enables strict and warnings
 
 use overload
     '&{}' => 'body',
@@ -1479,12 +1658,11 @@ sub fully_qualified_name {
 }
 
 package Mouse::Meta::Method::Accessor;
-use strict;
-use warnings;
+BEGIN { Mouse::Uti->import(l) } # enables strict and warnings
 use Scalar::Util qw(blessed);
 
 sub _generate_accessor{
-    my (undef, $attribute, $method_name, $class, $type) = @_;
+    my (undef, $attribute, $class, $type) = @_;
 
     my $name          = $attribute->name;
     my $default       = $attribute->default;
@@ -1493,28 +1671,26 @@ sub _generate_accessor{
     my $trigger       = $attribute->trigger;
     my $is_weak       = $attribute->is_weak_ref;
     my $should_deref  = $attribute->should_auto_deref;
-    my $should_coerce = $attribute->should_coerce;
+    my $should_coerce = (defined($constraint) && $constraint->has_coercion && $attribute->should_coerce);
 
-    my $compiled_type_constraint = $constraint ? $constraint->_compiled_type_constraint : undef;
+    my $compiled_type_constraint = defined($constraint) ? $constraint->_compiled_type_constraint : undef;
 
     my $self  = '$_[0]';
-    my $key   = sprintf q{"%s"}, quotemeta $name;
+    my $key   = "q{$name}";
+    my $slot  = "$self\->{$key}";
 
     $type ||= 'accessor';
 
-    my $accessor = 
-        '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
-        "sub {\n";
+    my $accessor = sprintf(qq{#line 1 "%s for %s (%s)"\n}, $type, $name, __FILE__)
+                 . "sub {\n";
 
     if ($type eq 'accessor' || $type eq 'writer') {
         if($type eq 'accessor'){
             $accessor .= 
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                 'if (scalar(@_) >= 2) {' . "\n";
         }
         else{ # writer
             $accessor .= 
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                 'if(@_ < 2){ Carp::confess("Not enough arguments for the writer of '.$name.'") }'.
                 '{' . "\n";
         }
@@ -1522,32 +1698,26 @@ sub _generate_accessor{
         my $value = '$_[1]';
 
         if (defined $constraint) {
-            if(!$compiled_type_constraint){
-                Carp::confess("[BUG] Missing compiled type constraint for $constraint");
-            }
             if ($should_coerce) {
                 $accessor .=
                     "\n".
-                    '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                     'my $val = $constraint->coerce('.$value.');';
                 $value = '$val';
             }
             $accessor .= 
                 "\n".
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
-                'unless ($compiled_type_constraint->('.$value.')) {
-                    $attribute->verify_type_constraint_error($name, '.$value.', $attribute->{type_constraint});
-                }' . "\n";
+                '$compiled_type_constraint->('.$value.') or
+                    $attribute->verify_type_constraint_error($name, '.$value.', $constraint);' . "\n";
         }
 
         # if there's nothing left to do for the attribute we can return during
         # this setter
         $accessor .= 'return ' if !$is_weak && !$trigger && !$should_deref;
 
-        $accessor .= $self.'->{'.$key.'} = '.$value.';' . "\n";
+        $accessor .= "$slot = $value;\n";
 
         if ($is_weak) {
-            $accessor .= 'Scalar::Util::weaken('.$self.'->{'.$key.'}) if ref('.$self.'->{'.$key.'});' . "\n";
+            $accessor .= "Scalar::Util::weaken($slot) if ref $slot;\n";
         }
 
         if ($trigger) {
@@ -1563,41 +1733,42 @@ sub _generate_accessor{
         $class->throw_error("Unknown accessor type '$type'");
     }
 
-    if ($attribute->is_lazy) {
-        $accessor .= $self.'->{'.$key.'} = ';
+    # XXX: an anon class can be a runtime created class
+    if ($attribute->is_lazy || $class->is_anon_class) {
+        my $value;
 
-        if($should_coerce && defined($constraint)){
-            $accessor .= '$attribute->_coerce_and_verify(';
+        if (defined $builder){
+            $value = "$self->\$builder()";
         }
-        $accessor .=   $attribute->has_builder ? $self.'->$builder'
-                     : ref($default) eq 'CODE' ? '$default->('.$self.')'
-                     :                           '$default';
+        elsif (ref($default) eq 'CODE'){
+            $value = "$self->\$default()";
+        }
+        else{
+            $value = '$default';
+        }
 
-        if($should_coerce && defined $constraint){
-            $accessor .= ')';
+        if($should_coerce){
+            $value = "\$constraint->coerce($value)";
         }
-        $accessor .= ' if !exists '.$self.'->{'.$key.'};' . "\n";
+
+        $accessor .= "$slot = $value if !exists $slot;\n";
     }
 
     if ($should_deref) {
         if ($constraint->is_a_type_of('ArrayRef')) {
-            $accessor .= 'if (wantarray) {
-                return @{ '.$self.'->{'.$key.'} || [] };
-            }';
+            $accessor .= "return \@{ $slot || [] } if wantarray;\n";
         }
         elsif($constraint->is_a_type_of('HashRef')){
-            $accessor .= 'if (wantarray) {
-                return %{ '.$self.'->{'.$key.'} || {} };
-            }';
+            $accessor .= "return \%{ $slot || {} } if wantarray;\n";
         }
         else{
             $class->throw_error("Can not auto de-reference the type constraint " . $constraint->name);
         }
     }
 
-    $accessor .= 'return '.$self.'->{'.$key."};\n}";
+    $accessor .= "return $slot;\n}\n";
 
-    #print $accessor, "\n";
+    #print "# class ", $class->name, "\n", $accessor, "\n";
     my $code;
     my $e = do{
         local $@;
@@ -1605,10 +1776,6 @@ sub _generate_accessor{
         $@;
     };
     die $e if $e;
-
-    if(defined $method_name){
-        $class->add_method($method_name => $code);
-    }
 
     return $code;
 }
@@ -1625,93 +1792,80 @@ sub _generate_writer{
 
 
 sub _generate_predicate {
-    my (undef, $attribute, $method_name, $class) = @_;
+    my (undef, $attribute, $class) = @_;
 
     my $slot = $attribute->name;
-
-    $class->add_method($method_name => sub{
+    return sub{
         return exists $_[0]->{$slot};
-    });
-    return;
+    };
 }
 
 sub _generate_clearer {
-    my (undef, $attribute, $method_name, $class) = @_;
+    my (undef, $attribute, $class) = @_;
 
     my $slot = $attribute->name;
 
-    $class->add_method($method_name => sub{
+   return sub{
         delete $_[0]->{$slot};
-    });
-    return;
+    };
 }
 
-sub _generate_handles {
-    my (undef, $attribute, $handles, $class) = @_;
+sub _generate_delegation{
+    my (undef, $attribute, $class, $reader, $handle_name, $method_to_call) = @_;
 
-    my $reader  = $attribute->reader || $attribute->accessor
-        or $class->throw_error("You must pass a reader method for '".$attribute->name."'");
+    return sub {
+        my $instance = shift;
+        my $proxy    = $instance->$reader();
 
-    my %handles = $attribute->_canonicalize_handles($handles);
-
-    foreach my $handle_name (keys %handles) {
-        my $method_to_call = $handles{$handle_name};
-
-        my $code = sub {
-            my $instance = shift;
-            my $proxy    = $instance->$reader();
-
-            my $error = !defined($proxy)                ? ' is not defined'
-                      : ref($proxy) && !blessed($proxy) ? qq{ is not an object (got '$proxy')}
-                                                        : undef;
-            if ($error) {
-                $instance->meta->throw_error(
-                    "Cannot delegate $handle_name to $method_to_call because "
-                        . "the value of "
-                        . $attribute->name
-                        . $error
-                 );
-            }
-            $proxy->$method_to_call(@_);
-        };
-        $class->add_method($handle_name => $code);
-    }
-    return;
+        my $error = !defined($proxy)                ? ' is not defined'
+                  : ref($proxy) && !blessed($proxy) ? qq{ is not an object (got '$proxy')}
+                                                    : undef;
+        if ($error) {
+            $instance->meta->throw_error(
+                "Cannot delegate $handle_name to $method_to_call because "
+                    . "the value of "
+                    . $attribute->name
+                    . $error
+             );
+        }
+        $proxy->$method_to_call(@_);
+    };
 }
 
 
 package Mouse::Meta::Method::Constructor;
-use strict;
-use warnings;
+BEGIN { Mouse::Uti->import(l) } # enables strict and warnings
 
-sub _generate_constructor_method {
+sub _generate_constructor {
     my ($class, $metaclass, $args) = @_;
 
     my $associated_metaclass_name = $metaclass->name;
+
     my @attrs         = $metaclass->get_all_attributes;
 
     my $buildall      = $class->_generate_BUILDALL($metaclass);
     my $buildargs     = $class->_generate_BUILDARGS($metaclass);
     my $processattrs  = $class->_generate_processattrs($metaclass, \@attrs);
 
-    my @compiled_constraints = map { $_ ? $_->_compiled_type_constraint : undef }
-                               map { $_->type_constraint } @attrs;
-
-
+    my @checks = map { $_ && $_->_compiled_type_constraint }
+                 map { $_->type_constraint } @attrs;
 
     my $source = sprintf("#line %d %s\n", __LINE__, __FILE__).<<"...";
         sub \{
             my \$class = shift;
             return \$class->Mouse::Object::new(\@_)
                 if \$class ne q{$associated_metaclass_name};
+            # BUILDARGS
             $buildargs;
             my \$instance = bless {}, \$class;
+            # process attributes
             $processattrs;
+            # BUILDALL
             $buildall;
             return \$instance;
         }
 ...
-
+    #warn $source;
     my $code;
     my $e = do{
         local $@;
@@ -1719,9 +1873,7 @@ sub _generate_constructor_method {
         $@;
     };
     die $e if $e;
-
-    $metaclass->add_method($args->{constructor_name} => $code);
-    return;
+    return $code;
 }
 
 sub _generate_processattrs {
@@ -1731,35 +1883,50 @@ sub _generate_processattrs {
     my $has_triggers;
 
     for my $index (0 .. @$attrs - 1) {
-        my $attr = $attrs->[$index];
-        my $key  = $attr->name;
         my $code = '';
 
-        if (defined $attr->init_arg) {
-            my $from = $attr->init_arg;
+        my $attr = $attrs->[$index];
+        my $key  = $attr->name;
 
-            $code .= "if (exists \$args->{q{$from}}) {\n";
+        my $init_arg        = $attr->init_arg;
+        my $type_constraint = $attr->type_constraint;
+        my $need_coercion;
 
-            my $value = "\$args->{q{$from}}";
-            if(my $type_constraint = $attr->type_constraint){
-                if($attr->should_coerce && $type_constraint->has_coercion){
-                    $code .= "my \$value = \$attrs[$index]->{type_constraint}->coerce(\$args->{q{$from}});\n";
-                    $value = '$value';
-                }
+        my $instance_slot  = "\$instance->{q{$key}}";
+        my $attr_var       = "\$attrs[$index]";
+        my $constraint_var;
 
-                $code .= "\$compiled_constraints[$index]->($value)\n";
-                $code .= "  or \$attrs[$index]->verify_type_constraint_error(q{$key}, $value, \$attrs[$index]->{type_constraint});\n";
+        if(defined $type_constraint){
+             $constraint_var = "$attr_var\->{type_constraint}";
+             $need_coercion  = ($attr->should_coerce && $type_constraint->has_coercion);
+        }
+
+        $code .= "# initialize $key\n";
+
+        my $post_process = '';
+        if(defined $type_constraint){
+            $post_process .= "\$checks[$index]->($instance_slot)";
+            $post_process .= "  or $attr_var->verify_type_constraint_error(q{$key}, $instance_slot, $constraint_var);\n";
+        }
+        if($attr->is_weak_ref){
+            $post_process .= "Scalar::Util::weaken($instance_slot) if ref $instance_slot;\n";
+        }
+
+        if (defined $init_arg) {
+            my $value = "\$args->{q{$init_arg}}";
+
+            $code .= "if (exists $value) {\n";
+
+            if($need_coercion){
+                $value = "$instance_slot = $constraint_var->coerce($value);\n";
             }
 
-            $code .= "\$instance->{q{$key}} = $value;\n";
-
-            if ($attr->is_weak_ref) {
-                $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref($value);\n";
-            }
+            $code .= "$instance_slot = $value;\n";
+            $code .= $post_process;
 
             if ($attr->has_trigger) {
                 $has_triggers++;
-                $code .= "push \@triggers, [\$attrs[$index]->{trigger}, $value];\n";
+                $code .= "push \@triggers, [$attr_var\->{trigger}, $value];\n";
             }
 
             $code .= "\n} else {\n";
@@ -1770,55 +1937,32 @@ sub _generate_processattrs {
                 my $default = $attr->default;
                 my $builder = $attr->builder;
 
-                $code .= "my \$value = ";
-
-                if ($attr->should_coerce && $attr->type_constraint) {
-                    $code .= "\$attrs[$index]->_coerce_and_verify(";
-                }
-
-                if ($attr->has_builder) {
-                    $code .= "\$instance->$builder()";
+                my $value;
+                if (defined($builder)) {
+                    $value = "\$instance->$builder()";
                 }
                 elsif (ref($default) eq 'CODE') {
-                    $code .= "\$attrs[$index]->{default}->(\$instance)";
+                    $value = "$attr_var\->{default}->(\$instance)";
                 }
-                elsif (!defined($default)) {
-                    $code .= 'undef';
-                }
-                elsif ($default =~ /^\-?[0-9]+(?:\.[0-9]+)$/) {
-                    $code .= $default;
+                elsif (defined($default)) {
+                    $value = "$attr_var\->{default}";
                 }
                 else {
-                    $code .= "'$default'";
+                    $value = 'undef';
                 }
 
-                if ($attr->should_coerce) {
-                    $code .= ");\n";
-                }
-                else {
-                    $code .= ";\n";
+                if($need_coercion){
+                    $value = "$constraint_var->coerce($value)";
                 }
 
-                if ($attr->has_type_constraint) {
-                    $code .= "{
-                        unless (\$attrs[$index]->{type_constraint}->check(\$value)) {
-                            \$attrs[$index]->verify_type_constraint_error(q{$key}, \$value, \$attrs[$index]->type_constraint)
-                        }
-                    }";
-                }
-
-                $code .= "\$instance->{q{$key}} = \$value;\n";
-
-                if ($attr->is_weak_ref) {
-                    $code .= "Scalar::Util::weaken( \$instance->{q{$key}} ) if ref( \$value );\n";
-                }
+                $code .= "$instance_slot = $value;\n";
             }
         }
         elsif ($attr->is_required) {
             $code .= "Carp::confess('Attribute ($key) is required');";
         }
 
-        $code .= "}\n" if defined $attr->init_arg;
+        $code .= "}\n" if defined $init_arg;
 
         push @res, $code;
     }
@@ -1836,9 +1980,10 @@ sub _generate_processattrs {
 }
 
 sub _generate_BUILDARGS {
-    my($self, $metaclass) = @_;
+    my(undef, $metaclass) = @_;
 
-    if ($metaclass->name->can('BUILDARGS') && $metaclass->name->can('BUILDARGS') != \&Mouse::Object::BUILDARGS) {
+    my $class = $metaclass->name;
+    if ( $class->can('BUILDARGS') && $class->can('BUILDARGS') != \&Mouse::Object::BUILDARGS ) {
         return 'my $args = $class->BUILDARGS(@_)';
     }
 
@@ -1856,7 +2001,7 @@ sub _generate_BUILDARGS {
 }
 
 sub _generate_BUILDALL {
-    my ($class, $metaclass) = @_;
+    my (undef, $metaclass) = @_;
 
     return '' unless $metaclass->name->can('BUILD');
 
@@ -1873,56 +2018,47 @@ sub _generate_BUILDALL {
 }
 
 package Mouse::Meta::Method::Destructor;
-use strict;
-use warnings;
+BEGIN { Mouse::Uti->import(l) } # enables strict and warnings
 
-sub _empty_destroy{ }
+sub _empty_DESTROY{ }
 
-sub _generate_destructor_method {
-    my ($class, $metaclass) = @_;
+sub _generate_destructor{
+    my (undef, $metaclass) = @_;
 
-    my $demolishall = do {
-        if ($metaclass->name->can('DEMOLISH')) {
-            my @code = ();
-            for my $class ($metaclass->linearized_isa) {
-                no strict 'refs';
-                if (*{$class . '::DEMOLISH'}{CODE}) {
-                    push @code, "${class}::DEMOLISH(\$self);";
-                }
-            }
-            join "\n", @code;
-        } else {
-            $metaclass->add_method(DESTROY => \&_empty_destroy);
-            return;
+    if(!$metaclass->name->can('DEMOLISH')){
+        return \&_empty_DESTROY;
+    }
+
+    my $demolishall = '';
+    for my $class ($metaclass->linearized_isa) {
+        no strict 'refs';
+        if (*{$class . '::DEMOLISH'}{CODE}) {
+            $demolishall .= "${class}::DEMOLISH(\$self);\n";
         }
-    };
+    }
 
-    my $destructor_name = $metaclass->name . '::DESTROY';
     my $source = sprintf("#line %d %s\n", __LINE__, __FILE__) . <<"...";
-    sub $destructor_name \{
+    sub {
         my \$self = shift;
         $demolishall;
     }
 ...
 
+    my $code;
     my $e = do{
         local $@;
-        eval $source;
+        $code = eval $source;
         $@;
     };
     die $e if $e;
-    return;
+    return $code;
 }
 
 package Mouse::Meta::Module;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw/:meta get_code_package load_class not_supported/) } # enables strict and warnings
 
 use Carp ();
 use Scalar::Util qw/blessed weaken/;
-
-BEGIN { Mouse::Util->import(qw/:meta get_code_package not_supported load_class/) }
-
 
 my %METAS;
 
@@ -2216,10 +2352,8 @@ sub throw_error{
 }
 
 package Mouse::Meta::Role;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw(:meta not_supported english_list)) } # enables strict and warnings
 
-BEGIN { Mouse::Util->import(qw(:meta not_supported english_list get_code_info)) }
 our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass(){ 'Mouse::Meta::Role::Method' } # required for get_method()
@@ -2277,16 +2411,22 @@ sub add_attribute {
 sub _canonicalize_apply_args{
     my($self, $applicant, %args) = @_;
 
-    if($applicant->isa('Mouse::Meta::Class')){
+    if($applicant->isa('Mouse::Meta::Class')){ # Application::ToClass
         $args{_to} = 'class';
     }
-    elsif($applicant->isa('Mouse::Meta::Role')){
+    elsif($applicant->isa('Mouse::Meta::Role')){ # Application::ToRole
         $args{_to} = 'role';
     }
-    else{
-        $args{_to} = 'instance';
+    else{ # Appplication::ToInstance
+        $args{_to} = 'class';
 
-        not_supported 'Application::ToInstance';
+        my $metaclass = $applicant->meta->create_anon_class(
+            superclasses => [ref $applicant],
+            cache        => 1,
+        );
+        bless $applicant, $metaclass->name; # rebless
+
+        $applicant = $metaclass;
     }
 
     if($args{alias} && !exists $args{-alias}){
@@ -2306,7 +2446,7 @@ sub _canonicalize_apply_args{
         }
     }
 
-    return \%args;
+    return( $applicant, \%args );
 }
 
 sub _check_required_methods{
@@ -2339,7 +2479,7 @@ sub _check_required_methods{
                 . " to be implemented by '$class_name'");
         }
     }
-    elsif($args->{_to} eq 'role'){
+    else {
         # apply role($role) to role($class)
         foreach my $method_name($role->get_required_method_list){
             next if $class->has_method($method_name); # already has it
@@ -2400,7 +2540,7 @@ sub _apply_attributes{
             $class->add_attribute($attr_name => %{$spec});
         }
     }
-    elsif($args->{_to} eq 'role'){
+    else {
         # apply role to role
         for my $attr_name ($role->get_attribute_list) {
             next if $class->has_attribute($attr_name);
@@ -2446,8 +2586,9 @@ sub _append_roles{
 sub apply {
     my $self      = shift;
     my $applicant = shift;
+    my $args;
 
-    my $args = $self->_canonicalize_apply_args($applicant, @_);
+    ($applicant, $args) = $self->_canonicalize_apply_args($applicant, @_);
 
     $self->_check_required_methods($applicant, $args);
     $self->_apply_methods($applicant, $args);
@@ -2458,11 +2599,9 @@ sub apply {
 }
 
 sub combine_apply {
-    my(undef, $class, @roles) = @_;
+    my($role_class, $applicant, @roles) = @_;
 
-    if($class->isa('Mouse::Object')){
-        not_supported 'Application::ToInstance';
-    }
+    ($applicant) = $role_class->_canonicalize_apply_args($applicant);
 
     # check conflicting
     my %method_provided;
@@ -2476,7 +2615,7 @@ sub combine_apply {
 
         # methods
         foreach my $method_name($role->get_method_list){
-            next if $class->has_method($method_name); # manually resolved
+            next if $applicant->has_method($method_name); # manually resolved
 
             my $code = do{ no strict 'refs'; \&{ $role_name . '::' . $method_name } };
 
@@ -2496,7 +2635,7 @@ sub combine_apply {
             my $attr = $role->get_attribute($attr_name);
             my $c    = $attr_provided{$attr_name};
             if($c && $c != $attr){
-                $class->throw_error("We have encountered an attribute conflict with '$attr_name' "
+                $role_class->throw_error("We have encountered an attribute conflict with '$attr_name' "
                                    . "during composition. This is fatal error and cannot be disambiguated.")
             }
             else{
@@ -2509,7 +2648,7 @@ sub combine_apply {
             my $override = $role->get_override_method_modifier($method_name);
             my $c        = $override_provided{$method_name};
             if($c && $c != $override){
-                $class->throw_error( "We have encountered an 'override' method conflict with '$method_name' during "
+                $role_class->throw_error( "We have encountered an 'override' method conflict with '$method_name' during "
                                    . "composition (Two 'override' methods of the same name encountered). "
                                    . "This is fatal error.")
             }
@@ -2523,9 +2662,9 @@ sub combine_apply {
 
         if(@method_conflicts == 1){
             my($code, $method_name, @roles) = @{$method_conflicts[0]};
-            $class->throw_error(
+            $role_class->throw_error(
                 sprintf q{Due to a method name conflict in roles %s, the method '%s' must be implemented or excluded by '%s'},
-                    english_list(map{ sprintf q{'%s'}, $_->name } @roles), $method_name, $class->name
+                    english_list(map{ sprintf q{'%s'}, $_->name } @roles), $method_name, $applicant->name
             );
         }
         else{
@@ -2536,9 +2675,9 @@ sub combine_apply {
                 map{ my($code, $method_name, @roles) = @{$_}; @roles } @method_conflicts
             );
 
-            $class->throw_error(
+            $role_class->throw_error(
                 sprintf q{Due to method name conflicts in roles %s, the methods %s must be implemented or excluded by '%s'},
-                    $roles, $methods, $class->name
+                    $roles, $methods, $applicant->name
             );
         }
     }
@@ -2548,13 +2687,13 @@ sub combine_apply {
 
         my $role = $role_name->meta;
 
-        $args = $role->_canonicalize_apply_args($class, %{$args});
+        ($applicant, $args) = $role->_canonicalize_apply_args($applicant, %{$args});
 
-        $role->_check_required_methods($class, $args, @roles);
-        $role->_apply_methods($class, $args);
-        $role->_apply_attributes($class, $args);
-        $role->_apply_modifiers($class, $args);
-        $role->_append_roles($class, $args);
+        $role->_check_required_methods($applicant, $args, @roles);
+        $role->_apply_methods($applicant, $args);
+        $role->_apply_attributes($applicant, $args);
+        $role->_apply_modifiers($applicant, $args);
+        $role->_append_roles($applicant, $args);
     }
     return;
 }
@@ -2632,14 +2771,12 @@ sub does_role {
 
 
 package Mouse::Meta::Role::Method;
-use strict;
-use warnings;
+BEGIN { Mouse::Uti->import(l) } # enables strict and warnings
 
 our @ISA = qw(Mouse::Meta::Method);
 
 package Mouse::Meta::TypeConstraint;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw(:meta)) } # enables strict and warnings
 
 use overload
     '""'     => sub { shift->{name} },   # stringify to tc name
@@ -2647,8 +2784,6 @@ use overload
 
 use Carp qw(confess);
 use Scalar::Util qw(blessed reftype);
-
-BEGIN { Mouse::Util->import(qw(:meta)) }
 
 my $null_check = sub { 1 };
 
@@ -2886,10 +3021,7 @@ sub is_a_type_of{
 
 
 package Mouse::Object;
-use strict;
-use warnings;
-
-BEGIN { Mouse::Util->import(qw(does dump)) }
+BEGIN { Mouse::Util->import(qw(does dump)) } # enables strict and warnings
 
 sub new {
     my $class = shift;
@@ -2959,19 +3091,28 @@ sub DEMOLISHALL {
 }
 
 package Mouse::Role;
-use strict;
-use warnings;
+BEGIN { Mouse::Util->import(qw(not_supported)) } # enables strict and warnings
 
-use Exporter;
+use Carp qw(confess);
+use Scalar::Util qw(blessed);
 
-use Carp 'confess';
-use Scalar::Util 'blessed';
-
-BEGIN { Mouse::Util->import(qw(load_class get_code_package not_supported)) }
 BEGIN { Mouse->import(()) }
+Mouse::Exporter->setup_import_methods(
+    as_is => [qw(
+        extends with
+        has
+        before after around
+        override super
+        augment  inner
 
-our @ISA = qw(Exporter);
+        requires excludes
+    ),
+        \&Scalar::Util::blessed,
+        \&Carp::confess,
+    ],
+);
 
+# XXX: for backward compatibility
 our @EXPORT = qw(
     extends with
     has
@@ -2983,10 +3124,6 @@ our @EXPORT = qw(
 
     blessed confess
 );
-
-our %is_removable = map{ $_ => undef } @EXPORT;
-delete $is_removable{confess};
-delete $is_removable{blessed};
 
 sub before {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
@@ -3061,52 +3198,28 @@ sub excludes {
     not_supported;
 }
 
-sub import {
-    my $class = shift;
+sub init_meta{
+    my($class, %args) = @_;
 
-    strict->import;
-    warnings->import;
+    my $for_class = $args{for_class}
+        or Carp::confess("Cannot call init_meta without specifying a for_class");
 
-    my $caller = caller;
+    my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Role';
 
-    # we should never export to main
-    if ($caller eq 'main') {
-        warn qq{$class does not export its sugar to the 'main' package.\n};
-        return;
-    }
+    my $meta = $metaclass->initialize($for_class);
 
-    Mouse::Meta::Role->initialize($caller)->add_method(meta => sub {
-        return Mouse::Meta::Role->initialize(ref($_[0]) || $_[0]);
+    $meta->add_method(meta => sub{
+        $metaclass->initialize(ref($_[0]) || $_[0]);
     });
 
-    Mouse::Role->export_to_level(1, @_);
-}
-
-sub unimport {
-    my $caller = caller;
-
-    my $stash = do{
-        no strict 'refs';
-        \%{$caller . '::'}
-    };
-
-    for my $keyword (@EXPORT) {
-        my $code;
-        if(exists $is_removable{$keyword}
-            && ($code = $caller->can($keyword))
-            && get_code_package($code) eq __PACKAGE__){
-
-            delete $stash->{$keyword};
-        }
-    }
-    return;
+    return $meta;
 }
 
 package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.37_02';
+our $VERSION = '0.37_03';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
@@ -3132,19 +3245,19 @@ sub unimport {
 }
 
 package Mouse::Util::TypeConstraints;
-use strict;
-use warnings;
-
-use Exporter;
+BEGIN { Mouse::Util->import(qw(does_role not_supported)) } # enables strict and warnings
 
 use Carp qw(confess);
 use Scalar::Util qw/blessed looks_like_number openhandle/;
 
-BEGIN { Mouse::Util->import(qw(does_role not_supported)) }
-our @ISA    = qw(Exporter);
-our @EXPORT = qw(
-    as where message from via type subtype coerce class_type role_type enum
-    find_type_constraint
+Mouse::Exporter->setup_import_methods(
+    as_is => [qw(
+        as where message from via
+        type subtype coerce class_type role_type enum
+        find_type_constraint
+    )],
+
+    _export_to_main => 1,
 );
 
 my %TYPE;
@@ -3433,9 +3546,9 @@ sub _find_or_create_parameterized_type{
     }
 }
 sub _find_or_create_union_type{
-    my @types = map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
+    my @types = sort{ $a cmp $b } map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
 
-    my $name = join '|', map{ $_->name } @types;
+    my $name = join '|', @types;
 
     $TYPE{$name} ||= do{
         return Mouse::Meta::TypeConstraint->new(
@@ -3528,7 +3641,7 @@ sub find_or_parse_type_constraint {
 }
 
 sub find_or_create_does_type_constraint{
-    my $type = find_or_parse_type_constriant(@_) || role_type(@_);
+    my $type = find_or_parse_type_constraint(@_) || role_type(@_);
 
     if($type->{type} && $type->{type} ne 'Role'){
         Carp::cluck("$type is not a role type");
@@ -3545,6 +3658,8 @@ END_OF_TINY
 
 package Mouse::Tiny;
 use base 'Mouse';
+
+Mouse::Exporter->setup_import_methods(also => 'Mouse');
 
 1;
 

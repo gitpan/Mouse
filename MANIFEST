@@ -18,6 +18,7 @@ inc/Module/Install/Metadata.pm
 inc/Module/Install/WriteAll.pm
 inc/Test/Exception.pm
 lib/Mouse.pm
+lib/Mouse/Exporter.pm
 lib/Mouse/Meta/Attribute.pm
 lib/Mouse/Meta/Class.pm
 lib/Mouse/Meta/Method.pm
@@ -107,11 +108,16 @@ t/030_roles/003_apply_role.t
 t/030_roles/004_role_composition_errors.t
 t/030_roles/005_role_conflict_detection.t
 t/030_roles/009_more_role_edge_cases.t
+t/030_roles/010_run_time_role_composition.t
+t/030_roles/015_runtime_roles_and_attrs.t
+t/030_roles/017_extending_role_attrs.t
+t/030_roles/018_runtime_roles_w_params.t
 t/030_roles/019_build.t
 t/030_roles/031_roles_applied_in_create.t
 t/030_roles/034_create_role.t
 t/030_roles/035_anonymous_roles.t
 t/030_roles/036_free_anonymous_roles.t
+t/030_roles/037_create_role_subclass.t
 t/030_roles/041_empty_method_modifiers_meta_bug.t
 t/030_roles/042_compose_overloading.t
 t/031-clone.t
@@ -143,6 +149,7 @@ t/051_throw_error.t
 t/052-undefined-type-in-union.t
 t/053-extends-meta.t
 t/054-anon-leak.t
+t/055-exporter.t
 t/100-meta-class.t
 t/100_with_moose/201-squirrel.t
 t/100_with_moose/202-squirrel-role.t
@@ -189,6 +196,7 @@ t/800_shikabased/013-compatibility-get_method_list.t
 t/800_shikabased/014-subtype-as.t
 t/900_bug/001_immutable_types.t
 t/900_bug/002_does_role_should_search_parent.t
+t/990_deprecated/001-export_to_level.t
 t/990_deprecated/044-attribute-metaclass.t
 t/990_deprecated/047-attribute-metaclass-role.t
 t/lib/Bar.pm

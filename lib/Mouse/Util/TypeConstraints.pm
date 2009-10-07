@@ -1,19 +1,20 @@
 package Mouse::Util::TypeConstraints;
-use strict;
-use warnings;
-
-use Exporter;
+use Mouse::Util qw(does_role not_supported); # enables strict and warnings
 
 use Carp qw(confess);
 use Scalar::Util qw/blessed looks_like_number openhandle/;
 
-use Mouse::Util qw(does_role not_supported);
 use Mouse::Meta::TypeConstraint;
+use Mouse::Exporter;
 
-our @ISA    = qw(Exporter);
-our @EXPORT = qw(
-    as where message from via type subtype coerce class_type role_type enum
-    find_type_constraint
+Mouse::Exporter->setup_import_methods(
+    as_is => [qw(
+        as where message from via
+        type subtype coerce class_type role_type enum
+        find_type_constraint
+    )],
+
+    _export_to_main => 1,
 );
 
 my %TYPE;
@@ -302,9 +303,9 @@ sub _find_or_create_parameterized_type{
     }
 }
 sub _find_or_create_union_type{
-    my @types = map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
+    my @types = sort{ $a cmp $b } map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
 
-    my $name = join '|', map{ $_->name } @types;
+    my $name = join '|', @types;
 
     $TYPE{$name} ||= do{
         return Mouse::Meta::TypeConstraint->new(
@@ -397,7 +398,7 @@ sub find_or_parse_type_constraint {
 }
 
 sub find_or_create_does_type_constraint{
-    my $type = find_or_parse_type_constriant(@_) || role_type(@_);
+    my $type = find_or_parse_type_constraint(@_) || role_type(@_);
 
     if($type->{type} && $type->{type} ne 'Role'){
         Carp::cluck("$type is not a role type");

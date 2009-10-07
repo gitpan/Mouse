@@ -1,10 +1,9 @@
 package Mouse::Meta::Method::Accessor;
-use strict;
-use warnings;
+use Mouse::Util; # enables strict and warnings
 use Scalar::Util qw(blessed);
 
 sub _generate_accessor{
-    my (undef, $attribute, $method_name, $class, $type) = @_;
+    my (undef, $attribute, $class, $type) = @_;
 
     my $name          = $attribute->name;
     my $default       = $attribute->default;
@@ -13,28 +12,26 @@ sub _generate_accessor{
     my $trigger       = $attribute->trigger;
     my $is_weak       = $attribute->is_weak_ref;
     my $should_deref  = $attribute->should_auto_deref;
-    my $should_coerce = $attribute->should_coerce;
+    my $should_coerce = (defined($constraint) && $constraint->has_coercion && $attribute->should_coerce);
 
-    my $compiled_type_constraint = $constraint ? $constraint->_compiled_type_constraint : undef;
+    my $compiled_type_constraint = defined($constraint) ? $constraint->_compiled_type_constraint : undef;
 
     my $self  = '$_[0]';
-    my $key   = sprintf q{"%s"}, quotemeta $name;
+    my $key   = "q{$name}";
+    my $slot  = "$self\->{$key}";
 
     $type ||= 'accessor';
 
-    my $accessor = 
-        '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
-        "sub {\n";
+    my $accessor = sprintf(qq{#line 1 "%s for %s (%s)"\n}, $type, $name, __FILE__)
+                 . "sub {\n";
 
     if ($type eq 'accessor' || $type eq 'writer') {
         if($type eq 'accessor'){
             $accessor .= 
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                 'if (scalar(@_) >= 2) {' . "\n";
         }
         else{ # writer
             $accessor .= 
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                 'if(@_ < 2){ Carp::confess("Not enough arguments for the writer of '.$name.'") }'.
                 '{' . "\n";
         }
@@ -42,32 +39,26 @@ sub _generate_accessor{
         my $value = '$_[1]';
 
         if (defined $constraint) {
-            if(!$compiled_type_constraint){
-                Carp::confess("[BUG] Missing compiled type constraint for $constraint");
-            }
             if ($should_coerce) {
                 $accessor .=
                     "\n".
-                    '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
                     'my $val = $constraint->coerce('.$value.');';
                 $value = '$val';
             }
             $accessor .= 
                 "\n".
-                '#line ' . __LINE__ . ' "' . __FILE__ . "\"\n" .
-                'unless ($compiled_type_constraint->('.$value.')) {
-                    $attribute->verify_type_constraint_error($name, '.$value.', $attribute->{type_constraint});
-                }' . "\n";
+                '$compiled_type_constraint->('.$value.') or
+                    $attribute->verify_type_constraint_error($name, '.$value.', $constraint);' . "\n";
         }
 
         # if there's nothing left to do for the attribute we can return during
         # this setter
         $accessor .= 'return ' if !$is_weak && !$trigger && !$should_deref;
 
-        $accessor .= $self.'->{'.$key.'} = '.$value.';' . "\n";
+        $accessor .= "$slot = $value;\n";
 
         if ($is_weak) {
-            $accessor .= 'Scalar::Util::weaken('.$self.'->{'.$key.'}) if ref('.$self.'->{'.$key.'});' . "\n";
+            $accessor .= "Scalar::Util::weaken($slot) if ref $slot;\n";
         }
 
         if ($trigger) {
@@ -83,41 +74,42 @@ sub _generate_accessor{
         $class->throw_error("Unknown accessor type '$type'");
     }
 
-    if ($attribute->is_lazy) {
-        $accessor .= $self.'->{'.$key.'} = ';
+    # XXX: an anon class can be a runtime created class
+    if ($attribute->is_lazy || $class->is_anon_class) {
+        my $value;
 
-        if($should_coerce && defined($constraint)){
-            $accessor .= '$attribute->_coerce_and_verify(';
+        if (defined $builder){
+            $value = "$self->\$builder()";
         }
-        $accessor .=   $attribute->has_builder ? $self.'->$builder'
-                     : ref($default) eq 'CODE' ? '$default->('.$self.')'
-                     :                           '$default';
+        elsif (ref($default) eq 'CODE'){
+            $value = "$self->\$default()";
+        }
+        else{
+            $value = '$default';
+        }
 
-        if($should_coerce && defined $constraint){
-            $accessor .= ')';
+        if($should_coerce){
+            $value = "\$constraint->coerce($value)";
         }
-        $accessor .= ' if !exists '.$self.'->{'.$key.'};' . "\n";
+
+        $accessor .= "$slot = $value if !exists $slot;\n";
     }
 
     if ($should_deref) {
         if ($constraint->is_a_type_of('ArrayRef')) {
-            $accessor .= 'if (wantarray) {
-                return @{ '.$self.'->{'.$key.'} || [] };
-            }';
+            $accessor .= "return \@{ $slot || [] } if wantarray;\n";
         }
         elsif($constraint->is_a_type_of('HashRef')){
-            $accessor .= 'if (wantarray) {
-                return %{ '.$self.'->{'.$key.'} || {} };
-            }';
+            $accessor .= "return \%{ $slot || {} } if wantarray;\n";
         }
         else{
             $class->throw_error("Can not auto de-reference the type constraint " . $constraint->name);
         }
     }
 
-    $accessor .= 'return '.$self.'->{'.$key."};\n}";
+    $accessor .= "return $slot;\n}\n";
 
-    #print $accessor, "\n";
+    #print "# class ", $class->name, "\n", $accessor, "\n";
     my $code;
     my $e = do{
         local $@;
@@ -125,10 +117,6 @@ sub _generate_accessor{
         $@;
     };
     die $e if $e;
-
-    if(defined $method_name){
-        $class->add_method($method_name => $code);
-    }
 
     return $code;
 }
@@ -145,58 +133,44 @@ sub _generate_writer{
 
 
 sub _generate_predicate {
-    my (undef, $attribute, $method_name, $class) = @_;
+    my (undef, $attribute, $class) = @_;
 
     my $slot = $attribute->name;
-
-    $class->add_method($method_name => sub{
+    return sub{
         return exists $_[0]->{$slot};
-    });
-    return;
+    };
 }
 
 sub _generate_clearer {
-    my (undef, $attribute, $method_name, $class) = @_;
+    my (undef, $attribute, $class) = @_;
 
     my $slot = $attribute->name;
 
-    $class->add_method($method_name => sub{
+   return sub{
         delete $_[0]->{$slot};
-    });
-    return;
+    };
 }
 
-sub _generate_handles {
-    my (undef, $attribute, $handles, $class) = @_;
+sub _generate_delegation{
+    my (undef, $attribute, $class, $reader, $handle_name, $method_to_call) = @_;
 
-    my $reader  = $attribute->reader || $attribute->accessor
-        or $class->throw_error("You must pass a reader method for '".$attribute->name."'");
+    return sub {
+        my $instance = shift;
+        my $proxy    = $instance->$reader();
 
-    my %handles = $attribute->_canonicalize_handles($handles);
-
-    foreach my $handle_name (keys %handles) {
-        my $method_to_call = $handles{$handle_name};
-
-        my $code = sub {
-            my $instance = shift;
-            my $proxy    = $instance->$reader();
-
-            my $error = !defined($proxy)                ? ' is not defined'
-                      : ref($proxy) && !blessed($proxy) ? qq{ is not an object (got '$proxy')}
-                                                        : undef;
-            if ($error) {
-                $instance->meta->throw_error(
-                    "Cannot delegate $handle_name to $method_to_call because "
-                        . "the value of "
-                        . $attribute->name
-                        . $error
-                 );
-            }
-            $proxy->$method_to_call(@_);
-        };
-        $class->add_method($handle_name => $code);
-    }
-    return;
+        my $error = !defined($proxy)                ? ' is not defined'
+                  : ref($proxy) && !blessed($proxy) ? qq{ is not an object (got '$proxy')}
+                                                    : undef;
+        if ($error) {
+            $instance->meta->throw_error(
+                "Cannot delegate $handle_name to $method_to_call because "
+                    . "the value of "
+                    . $attribute->name
+                    . $error
+             );
+        }
+        $proxy->$method_to_call(@_);
+    };
 }
 
 
