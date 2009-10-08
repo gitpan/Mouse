@@ -48,7 +48,13 @@ sub superclasses {
     my $self = shift;
 
     if (@_) {
-        Mouse::load_class($_) for @_;
+        foreach my $super(@_){
+            Mouse::Util::load_class($super);
+            my $meta = Mouse::Util::get_metaclass_by_name($super);
+            if($meta && $meta->isa('Mouse::Meta::Role')){
+                $self->throw_error("You cannot inherit from a Mouse Role ($super)");
+            }
+        }
         @{ $self->{superclasses} } = @_;
     }
 
@@ -279,7 +285,8 @@ sub is_immutable {  $_[0]->{is_immutable} }
 sub is_mutable   { !$_[0]->{is_immutable} }
 
 sub _install_modifier_pp{
-    my( $self, $into, $type, $name, $code ) = @_;
+    my( $self, $type, $name, $code ) = @_;
+    my $into = $self->name;
 
     my $original = $into->can($name)
         or $self->throw_error("The method '$name' is not found in the inheritance hierarchy for class $into");
@@ -344,7 +351,7 @@ sub _install_modifier_pp{
 }
 
 sub _install_modifier {
-    my ( $self, $into, $type, $name, $code ) = @_;
+    my ( $self, $type, $name, $code ) = @_;
 
     # load Class::Method::Modifiers first
     my $no_cmm_fast = do{
@@ -360,14 +367,14 @@ sub _install_modifier {
     else{
         my $install_modifier = Class::Method::Modifiers::Fast->can('_install_modifier');
         $impl = sub {
-            my ( $self, $into, $type, $name, $code ) = @_;
-            $install_modifier->(
-                $into,
-                $type,
-                $name,
-                $code
-            );
-            $self->{methods}{$name}++; # register it to the method map
+            my ( $self, $type, $name, $code ) = @_;
+            my $into = $self->name;
+            $install_modifier->($into, $type, $name, $code);
+
+            $self->add_method($name => do{
+                no strict 'refs';
+                \&{ $into . '::' . $name };
+            });
             return;
         };
     }
@@ -378,22 +385,22 @@ sub _install_modifier {
         *_install_modifier = $impl;
     }
 
-    $self->$impl( $into, $type, $name, $code );
+    $self->$impl( $type, $name, $code );
 }
 
 sub add_before_method_modifier {
     my ( $self, $name, $code ) = @_;
-    $self->_install_modifier( $self->name, 'before', $name, $code );
+    $self->_install_modifier( 'before', $name, $code );
 }
 
 sub add_around_method_modifier {
     my ( $self, $name, $code ) = @_;
-    $self->_install_modifier( $self->name, 'around', $name, $code );
+    $self->_install_modifier( 'around', $name, $code );
 }
 
 sub add_after_method_modifier {
     my ( $self, $name, $code ) = @_;
-    $self->_install_modifier( $self->name, 'after', $name, $code );
+    $self->_install_modifier( 'after', $name, $code );
 }
 
 sub add_override_method_modifier {
@@ -445,8 +452,8 @@ sub does_role {
         || $self->throw_error("You must supply a role name to look for");
 
     for my $class ($self->linearized_isa) {
-        my $meta = Mouse::Util::get_metaclass_by_name($class);
-        next unless $meta && $meta->can('roles');
+        my $meta = Mouse::Util::get_metaclass_by_name($class)
+            or next;
 
         for my $role (@{ $meta->roles }) {
 
@@ -458,7 +465,6 @@ sub does_role {
 }
 
 1;
-
 __END__
 
 =head1 NAME

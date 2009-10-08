@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.37_03';
+our $VERSION = '0.37_04';
 
 use Carp qw(confess);
 use Scalar::Util qw(blessed);
@@ -45,6 +45,9 @@ sub extends { Mouse::Meta::Class->initialize(scalar caller)->superclasses(@_) }
 sub has {
     my $meta = Mouse::Meta::Class->initialize(scalar caller);
     my $name = shift;
+
+    $meta->throw_error(q{Usage: has 'name' => ( key => value, ... )})
+        if @_ % 2; # odd number of arguments
 
     $meta->add_attribute($_ => @_) for ref($name) ? @{$name} : $name;
 }

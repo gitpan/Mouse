@@ -2,6 +2,7 @@ package Mouse::Util;
 use Mouse::Exporter; # enables strict and warnings
 
 use Carp qw(confess);
+use Scalar::Util qw(blessed);
 use B ();
 
 use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
@@ -266,7 +267,7 @@ sub is_class_loaded {
 
 
 sub apply_all_roles {
-    my $meta = Mouse::Meta::Class->initialize(shift);
+    my $applicant = blessed($_[0]) ? shift : Mouse::Meta::Class->initialize(shift);
 
     my @roles;
 
@@ -274,22 +275,23 @@ sub apply_all_roles {
     my $max = scalar(@_);
     for (my $i = 0; $i < $max ; $i++) {
         if ($i + 1 < $max && ref($_[$i + 1])) {
-            push @roles, [ $_[$i++] => $_[$i] ];
+            push @roles, [ $_[$i] => $_[++$i] ];
         } else {
-            push @roles, [ $_[$i]   => undef ];
+            push @roles, [ $_[$i] => undef ];
         }
         my $role_name = $roles[-1][0];
         load_class($role_name);
-        ( $role_name->can('meta') && $role_name->meta->isa('Mouse::Meta::Role') )
-            || $meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
+        my $metarole = get_metaclass_by_name($role_name);
+        ( $metarole && $metarole->isa('Mouse::Meta::Role') )
+            || $applicant->meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
     }
 
     if ( scalar @roles == 1 ) {
-        my ( $role, $params ) = @{ $roles[0] };
-        $role->meta->apply( $meta, ( defined $params ? %$params : () ) );
+        my ( $role_name, $params ) = @{ $roles[0] };
+        get_metaclass_by_name($role_name)->apply( $applicant, defined $params ? $params : () );
     }
     else {
-        Mouse::Meta::Role->combine_apply($meta, @roles);
+        Mouse::Meta::Role->combine(@roles)->apply($applicant);
     }
     return;
 }
@@ -319,11 +321,13 @@ sub not_supported{
     Carp::confess("Mouse does not currently support $feature");
 }
 
-sub meta{
+# general meta() method
+sub meta :method{
     return Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
 }
 
-sub dump { 
+# general dump() method
+sub dump :method {
     my($self, $maxdepth) = @_;
 
     require 'Data/Dumper.pm'; # we don't want to create its namespace
@@ -333,6 +337,7 @@ sub dump {
     return $dd->Dump();
 }
 
+# general does() method
 sub does :method;
 *does = \&does_role; # alias
 

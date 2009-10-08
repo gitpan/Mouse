@@ -88,11 +88,23 @@ sub _generate_accessor{
             $value = '$default';
         }
 
+        $accessor .= "if(!exists $slot){\n";
         if($should_coerce){
-            $value = "\$constraint->coerce($value)";
+            $accessor .= "$slot = \$constraint->coerce($value)";
         }
+        elsif(defined $constraint){
+            $accessor .= "my \$tmp = $value;\n";
+            #XXX: The following 'defined and' check is for backward compatibility
+            $accessor .= "defined(\$tmp) and ";
 
-        $accessor .= "$slot = $value if !exists $slot;\n";
+            $accessor .= "\$compiled_type_constraint->(\$tmp)";
+            $accessor .= " || \$attribute->verify_type_constraint_error(\$name, \$tmp, \$constraint);\n";
+            $accessor .= "$slot = \$tmp;\n";
+        }
+        else{
+            $accessor .= "$slot = $value;\n";
+        }
+        $accessor .= "}\n";
     }
 
     if ($should_deref) {
