@@ -1,5 +1,14 @@
 Revision history for Mouse
 
+0.37_05 Fri Oct  9 15:21:43 2009
+    * Mouse::Exporter
+        - Add build_import_methods() (gfx)
+
+    * Mouse::Spec
+    * Add notes about Moose::Cookbook (gfx)
+
+    * Fix some minor bugs (gfx)
+
 0.37_04 Thu Oct  8 20:49:11 2009
     * Mouse::Meta::Role::Composite
         - Fix and improve role composition mechanism (gfx)

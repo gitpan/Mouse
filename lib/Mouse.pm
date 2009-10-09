@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.37_04';
+our $VERSION = '0.37_05';
 
 use Carp qw(confess);
 use Scalar::Util qw(blessed);
@@ -151,12 +151,15 @@ sub init_meta {
 
 
 1;
-
 __END__
 
 =head1 NAME
 
 Mouse - Moose minus the antlers
+
+=head1 VERSION
+
+This document describes Mouse version 0.37_05
 
 =head1 SYNOPSIS
 
