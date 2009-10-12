@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.37_05';
+our $VERSION = '0.37_06';
 
 use Carp qw(confess);
 use Scalar::Util qw(blessed);
@@ -130,12 +130,9 @@ sub init_meta {
 
     my $class = $args{for_class}
                     or confess("Cannot call init_meta without specifying a for_class");
+
     my $base_class = $args{base_class} || 'Mouse::Object';
     my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
-
-    # make a subtype for each Mouse class
-    Mouse::Util::TypeConstraints::class_type($class)
-        unless Mouse::Util::TypeConstraints::find_type_constraint($class);
 
     my $meta = $metaclass->initialize($class);
 
@@ -145,6 +142,10 @@ sub init_meta {
 
     $meta->superclasses($base_class)
         unless $meta->superclasses;
+
+    # make a class type for each Mouse class
+    Mouse::Util::TypeConstraints::class_type($class)
+        unless Mouse::Util::TypeConstraints::find_type_constraint($class);
 
     return $meta;
 }
@@ -159,7 +160,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.37_05
+This document describes Mouse version 0.37_06
 
 =head1 SYNOPSIS
 

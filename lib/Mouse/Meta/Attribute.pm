@@ -248,7 +248,7 @@ sub canonicalize_args{ # DEPRECATED
     return %args;
 }
 
-sub create {
+sub create { # DEPRECATED
     my ($self, $class, $name, %args) = @_;
 
     Carp::cluck("$self->create has been deprecated."
@@ -263,14 +263,11 @@ sub _coerce_and_verify {
     my($self, $value, $instance) = @_;
 
     my $type_constraint = $self->{type_constraint};
-
-    return $value if !$type_constraint;
+    return $value if !defined $type_constraint;
 
     if ($self->should_coerce && $type_constraint->has_coercion) {
         $value = $type_constraint->coerce($value);
     }
-
-    return $value if $type_constraint->check($value);
 
     $self->verify_against_type_constraint($value);
 
@@ -281,7 +278,7 @@ sub verify_against_type_constraint {
     my ($self, $value) = @_;
 
     my $type_constraint = $self->{type_constraint};
-    return 1 if !$type_constraint;;
+    return 1 if !$type_constraint;
     return 1 if $type_constraint->check($value);
 
     $self->verify_type_constraint_error($self->name, $value, $type_constraint);
@@ -289,7 +286,8 @@ sub verify_against_type_constraint {
 
 sub verify_type_constraint_error {
     my($self, $name, $value, $type) = @_;
-    $self->throw_error("Attribute ($name) does not pass the type constraint because: " . $type->get_message($value));
+    $self->throw_error("Attribute ($name) does not pass the type constraint because: "
+        . $type->get_message($value));
 }
 
 sub coerce_constraint { # DEPRECATED
@@ -387,6 +385,15 @@ sub _canonicalize_handles {
     }
     elsif (ref($handles) eq 'ARRAY') {
         return map { $_ => $_ } @$handles;
+    }
+    elsif (ref($handles) eq 'Regexp') {
+        my $class_or_role = ($self->{isa} || $self->{does})
+            || $self->throw_error("Cannot delegate methods based on a Regexp without a type constraint (isa)");
+
+        my $meta = Mouse::Meta::Class->initialize("$class_or_role"); # "" for stringify
+        return map  { $_ => $_ }
+               grep { $_ ne 'meta' && !Mouse::Object->can($_) && $_ =~ $handles }
+                   $meta->isa('Mouse::Meta::Class') ? $meta->get_all_method_names : $meta->get_method_list;
     }
     else {
         $self->throw_error("Unable to canonicalize the 'handles' option with $handles");
