@@ -91,7 +91,7 @@ sub add_method {
 
     my $pkg = $self->name;
     no strict 'refs';
-    no warnings 'redefine';
+    no warnings 'redefine', 'once';
     *{ $pkg . '::' . $name } = $code;
 }
 
@@ -118,6 +118,7 @@ sub has_method {
 
     my $code = do{
         no strict 'refs';
+        no warnings 'once';
         *{ $self->{package} . '::' . $method_name }{CODE};
     };
 
@@ -131,7 +132,11 @@ sub get_method_body{
         or $self->throw_error('You must define a method name');
 
     return $self->{methods}{$method_name} ||= do{
-        my $code = do{ no strict 'refs'; *{$self->{package} . '::' . $method_name}{CODE} };
+        my $code = do{
+            no strict 'refs';
+            no warnings 'once';
+            *{$self->{package} . '::' . $method_name}{CODE};
+        };
 
         ($code && $self->_code_is_mine($code)) ? $code : undef;
     };
@@ -321,7 +326,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.38
+This document describes Mouse version 0.39
 
 =head1 SEE ALSO
 
