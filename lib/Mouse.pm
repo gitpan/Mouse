@@ -3,9 +3,9 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.37_06';
+our $VERSION = '0.38';
 
-use Carp qw(confess);
+use Carp         qw(confess);
 use Scalar::Util qw(blessed);
 
 use Mouse::Util qw(load_class is_class_loaded get_code_package not_supported);
@@ -160,7 +160,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.37_06
+This document describes Mouse version 0.38
 
 =head1 SYNOPSIS
 
@@ -202,9 +202,8 @@ latter, if possible.
 Mouse aims to alleviate this by providing a subset of Moose's functionality,
 faster.
 
-We're also going as light on dependencies as possible.
-L<Class::Method::Modifiers::Fast> or L<Class::Method::Modifiers> is required
-if you want support for L</before>, L</after>, and L</around>.
+We're also going as light on dependencies as possible. Mouse currently has
+B<no dependencies> except for testing modules.
 
 =head2 MOOSE COMPATIBILITY
 
@@ -223,6 +222,8 @@ Moose, if you run into weird errors, it would be worth running:
 
 to see if the bug is caused by Mouse. Moose's diagnostics and validation are
 also much better.
+
+See also L<Mouse::Spec> for compatibility and incompatibility with Moose.
 
 =head2 MouseX
 
@@ -398,6 +399,8 @@ We have a public git repository:
 Perl 5.6.2 or later.
 
 =head1 SEE ALSO
+
+L<Mouse::Spec>
 
 L<Moose>
 

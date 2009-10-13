@@ -414,6 +414,10 @@ __END__
 
 Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
+=head1 VERSION
+
+This document describes Mouse version 0.38
+
 =head2 SYNOPSIS
 
   use Mouse::Util::TypeConstraints;
