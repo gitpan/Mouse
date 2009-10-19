@@ -2,7 +2,7 @@ package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.90';
@@ -19,7 +19,7 @@ Mouse::Spec - To what extent Mouse is compatible with Moose
 
 =head1 VERSION
 
-This document describes Mouse version 0.39
+This document describes Mouse version 0.40
 
 =head1 SYNOPSIS
 
@@ -41,7 +41,7 @@ This document describes Mouse version 0.39
 Any MOP has no attributes, so
 C<< $metaclass->meta->make_immutable() >> does not yet work as you expect.
 
-=head3 C<Mouse::Meta::Instance>
+=head3 Mouse::Meta::Instance
 
 Meta instance mechanism is not implemented.
 
@@ -49,7 +49,7 @@ Meta instance mechanism is not implemented.
 
 Role exclusion, C<exclude()>, is not implemented.
 
-=head3 C<-traits> and C<-metaclass> in Mouse::Exporter
+=head3 -traits and -metaclass in Mouse::Exporter
 
 C<< use Mouse -traits => ... >> and C<< use Mouse -metaclass => ... >> are not
 yet implemented.
@@ -129,6 +129,12 @@ L<Moose::Cookbook::Extending::Recipe3> - Providing an alternate base object clas
 =head1 SEE ALSO
 
 L<Mouse>
+
+L<Moose>
+
+L<Moose::Manual>
+
+L<Moose::Cookbook>
 
 =cut
 

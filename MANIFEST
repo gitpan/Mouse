@@ -96,7 +96,6 @@ t/001_mouse/034-apply_all_roles.t
 t/001_mouse/035-apply-roles-to-roles.t
 t/001_mouse/036-with-method-alias.t
 t/001_mouse/037-dont-load-test-exception.t
-t/001_mouse/038-main.t
 t/001_mouse/039-subtype.t
 t/001_mouse/040-existing-subclass.t
 t/001_mouse/041-enum.t
@@ -114,6 +113,7 @@ t/001_mouse/053-extends-meta.t
 t/001_mouse/054-anon-leak.t
 t/001_mouse/055-exporter.t
 t/001_mouse/056-role-combine.t
+t/001_mouse/057_subtype_without_where.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -139,7 +139,6 @@ t/010_basics/011_moose_respects_type_constraints.t
 t/010_basics/013_create.t
 t/010_basics/014_create_anon.t
 t/010_basics/015_buildargs.t
-t/010_basics/016_load_into_main.t
 t/010_basics/017_error_handling.t
 t/010_basics/019-destruction.t
 t/020_attributes/002_attribute_writer_generation.t
@@ -186,6 +185,8 @@ t/030_roles/037_create_role_subclass.t
 t/030_roles/041_empty_method_modifiers_meta_bug.t
 t/030_roles/042_compose_overloading.t
 t/040_type_constraints/003_util_std_type_constraints.t
+t/040_type_constraints/005_util_type_coercion.t
+t/040_type_constraints/007_util_more_type_coercion.t
 t/040_type_constraints/009_union_types_and_coercions.t
 t/040_type_constraints/015_enum.t
 t/040_type_constraints/017_subtyping_union_types.t
