@@ -1,5 +1,10 @@
 package Mouse::Meta::Method::Constructor;
-use Mouse::Util; # enables strict and warnings
+use Mouse::Util qw(get_code_ref); # enables strict and warnings
+
+sub _inline_slot{
+    my(undef, $self_var, $attr_name) = @_;
+    return sprintf '%s->{q{%s}}', $self_var, $attr_name;
+}
 
 sub _generate_constructor {
     my ($class, $metaclass, $args) = @_;
@@ -42,7 +47,7 @@ sub _generate_constructor {
 }
 
 sub _generate_processattrs {
-    my ($class, $metaclass, $attrs) = @_;
+    my ($method_class, $metaclass, $attrs) = @_;
     my @res;
 
     my $has_triggers;
@@ -57,7 +62,7 @@ sub _generate_processattrs {
         my $type_constraint = $attr->type_constraint;
         my $need_coercion;
 
-        my $instance_slot  = "\$instance->{q{$key}}";
+        my $instance_slot  = $method_class->_inline_slot('$instance', $key);
         my $attr_var       = "\$attrs[$index]";
         my $constraint_var;
 
@@ -172,10 +177,7 @@ sub _generate_BUILDALL {
 
     my @code;
     for my $class ($metaclass->linearized_isa) {
-        no strict 'refs';
-        no warnings 'once';
-
-        if (*{ $class . '::BUILD' }{CODE}) {
+        if (get_code_ref($class, 'BUILD')) {
             unshift  @code, qq{${class}::BUILD(\$instance, \$args);};
         }
     }
@@ -191,7 +193,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head1 SEE ALSO
 

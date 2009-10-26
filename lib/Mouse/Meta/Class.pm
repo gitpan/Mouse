@@ -38,11 +38,9 @@ sub create_anon_class{
     return $self->create(undef, @_);
 }
 
-sub is_anon_class{
-    return exists $_[0]->{anon_serial_id};
-}
+sub is_anon_class;
 
-sub roles { $_[0]->{roles} }
+sub roles;
 
 sub calculate_all_roles {
     my $self = shift;
@@ -58,7 +56,7 @@ sub superclasses {
         foreach my $super(@_){
             Mouse::Util::load_class($super);
             my $meta = Mouse::Util::get_metaclass_by_name($super);
-            if($meta && $meta->isa('Mouse::Meta::Role')){
+            if(Mouse::Util::TypeConstraints::_is_a_metarole($meta)){
                 $self->throw_error("You cannot inherit from a Mouse Role ($super)");
             }
         }
@@ -173,7 +171,7 @@ sub get_all_attributes {
     return @attr;
 }
 
-sub linearized_isa { @{ get_linear_isa($_[0]->name) } }
+sub linearized_isa;
 
 sub new_object {
     my $self = shift;
@@ -481,7 +479,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head1 METHODS
 

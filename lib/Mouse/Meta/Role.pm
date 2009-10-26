@@ -29,11 +29,9 @@ sub create_anon_role{
     return $self->create(undef, @_);
 }
 
-sub is_anon_role{
-    return exists $_[0]->{anon_serial_id};
-}
+sub is_anon_role;
 
-sub get_roles { $_[0]->{roles} }
+sub get_roles;
 
 sub calculate_all_roles {
     my $self = shift;
@@ -188,10 +186,10 @@ sub apply {
 
     my $instance;
 
-    if($applicant->isa('Mouse::Meta::Class')){  # Application::ToClass
+    if(Mouse::Util::TypeConstraints::_is_a_metaclass($applicant)){  # Application::ToClass
         $args{_to} = 'class';
     }
-    elsif($applicant->isa('Mouse::Meta::Role')){ # Application::ToRole
+    elsif(Mouse::Util::TypeConstraints::_is_a_metarole($applicant)){ # Application::ToRole
         $args{_to} = 'role';
     }
     else{                                       # Appplication::ToInstance
@@ -323,7 +321,7 @@ Mouse::Meta::Role - The Mouse Role metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head1 SEE ALSO
 

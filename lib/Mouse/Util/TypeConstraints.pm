@@ -32,32 +32,28 @@ BEGIN {
         Item       => undef, # null check
         Maybe      => undef, # null check
 
-        Bool       => sub { $_[0] ? $_[0] eq '1' : 1 },
-        Undef      => sub { !defined($_[0]) },
-        Defined    => sub { defined($_[0]) },
-        Value      => sub { defined($_[0]) && !ref($_[0]) },
-        Num        => sub { !ref($_[0]) && looks_like_number($_[0]) },
-        Int        => sub { defined($_[0]) && !ref($_[0]) && $_[0] =~ /^-?[0-9]+$/ },
-        Str        => sub { defined($_[0]) && !ref($_[0]) },
-        Ref        => sub { ref($_[0]) },
+        Bool       => \&Bool,
+        Undef      => \&Undef,
+        Defined    => \&Defined,
+        Value      => \&Value,
+        Num        => \&Num,
+        Int        => \&Int,
+        Str        => \&Str,
+        Ref        => \&Ref,
 
-        ScalarRef  => sub { ref($_[0]) eq 'SCALAR' },
-        ArrayRef   => sub { ref($_[0]) eq 'ARRAY'  },
-        HashRef    => sub { ref($_[0]) eq 'HASH'   },
-        CodeRef    => sub { ref($_[0]) eq 'CODE'   },
-        RegexpRef  => sub { ref($_[0]) eq 'Regexp' },
-        GlobRef    => sub { ref($_[0]) eq 'GLOB'   },
+        ScalarRef  => \&ScalarRef,
+        ArrayRef   => \&ArrayRef,
+        HashRef    => \&HashRef,
+        CodeRef    => \&CodeRef,
+        RegexpRef  => \&RegexpRef,
+        GlobRef    => \&GlobRef,
 
-        FileHandle => sub {
-            ref($_[0]) eq 'GLOB' && openhandle($_[0])
-            or
-            blessed($_[0]) && $_[0]->isa("IO::Handle")
-        },
+        FileHandle => \&FileHandle,
 
-        Object     => sub { blessed($_[0]) && blessed($_[0]) ne 'Regexp' },
+        Object     => \&Object,
 
-        ClassName  => sub { Mouse::Util::is_class_loaded($_[0]) },
-        RoleName   => sub { (Mouse::Util::find_meta($_[0]) || return 0)->isa('Mouse::Meta::Role') },
+        ClassName  => \&ClassName,
+        RoleName   => \&RoleName,
     );
 
     while (my ($name, $code) = each %builtins) {
@@ -77,6 +73,14 @@ BEGIN {
 
     sub list_all_type_constraints         { keys %TYPE }
 }
+
+# is-a predicates
+BEGIN{
+    _generate_class_type_for('Mouse::Meta::TypeConstraint' => '_is_a_type_constraint');
+    _generate_class_type_for('Mouse::Meta::Class'          => '_is_a_metaclass');
+    _generate_class_type_for('Mouse::Meta::Role'           => '_is_a_metarole');
+}
+
 
 sub _create_type{
     my $mode = shift;
@@ -159,15 +163,16 @@ sub class_type {
     if ($conf && $conf->{class}) {
         # No, you're using this wrong
         warn "class_type() should be class_type(ClassName). Perhaps you're looking for subtype $name => as '$conf->{class}'?";
-        _create_type 'type', $name => (
+        _create_type 'subtype', $name => (
             as   => $conf->{class},
 
             type => 'Class',
        );
     }
     else {
-        _create_type 'type', $name => (
-            optimized_as => sub { blessed($_[0]) && $_[0]->isa($name) },
+        _create_type 'subtype', $name => (
+            as           => 'Object',
+            optimized_as => _generate_class_type_for($name),
 
             type => 'Class',
         );
@@ -177,7 +182,8 @@ sub class_type {
 sub role_type {
     my($name, $conf) = @_;
     my $role = ($conf && $conf->{role}) ? $conf->{role} : $name;
-    _create_type 'type', $name => (
+    _create_type 'subtype', $name => (
+        as           => 'Object',
         optimized_as => sub { blessed($_[0]) && does_role($_[0], $role) },
 
         type => 'Role',
@@ -224,27 +230,12 @@ sub _find_or_create_regular_type{
         return;
     }
 
-    my $check;
-    my $type;
-    if($meta->isa('Mouse::Meta::Role')){
-        $check = sub{
-            return blessed($_[0]) && $_[0]->does($spec);
-        };
-        $type = 'Role';
+    if(_is_a_metarole($meta)){
+        return role_type($spec);
     }
     else{
-        $check = sub{
-            return blessed($_[0]) && $_[0]->isa($spec);
-        };
-        $type = 'Class';
+        return class_type($spec);
     }
-
-    return $TYPE{$spec} = Mouse::Meta::TypeConstraint->new(
-        name      => $spec,
-        optimized => $check,
-
-        type      => $type,
-    );
 }
 
 $TYPE{ArrayRef}{constraint_generator} = sub {
@@ -388,7 +379,7 @@ sub _parse_type{
 
 sub find_type_constraint {
     my($spec) = @_;
-    return $spec if blessed($spec) && $spec->isa('Mouse::Meta::TypeConstraint');
+    return $spec if _is_a_type_constraint($spec);
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec};
@@ -396,7 +387,7 @@ sub find_type_constraint {
 
 sub find_or_parse_type_constraint {
     my($spec) = @_;
-    return $spec if blessed($spec) && $spec->isa('Mouse::Meta::TypeConstraint');
+    return $spec if _is_a_type_constraint($spec);
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec} || do{
@@ -423,7 +414,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head2 SYNOPSIS
 

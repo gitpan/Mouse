@@ -1,5 +1,7 @@
 package Mouse::Meta::Module;
-use Mouse::Util qw/:meta get_code_package load_class not_supported/; # enables strict and warnings
+use Mouse::Util qw/:meta get_code_package get_code_ref load_class not_supported/; # enables strict and warnings
+
+use Mouse::Util::TypeConstraints ();
 
 use Carp ();
 use Scalar::Util qw/blessed weaken/;
@@ -38,9 +40,9 @@ sub get_metaclass_by_name       { $METAS{$_[0]}         }
 #sub does_metaclass_exist        { defined $METAS{$_[0]} }
 #sub remove_metaclass_by_name    { delete $METAS{$_[0]}  }
 
+sub name;
 
-
-sub name { $_[0]->{package} }
+sub namespace;
 
 # The followings are Class::MOP specific methods
 
@@ -66,12 +68,6 @@ sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     {        $_[0]->{attributes}->{$_[1]} }
 sub get_attribute_list{ keys %{$_[0]->{attributes}}         }
 sub remove_attribute  { delete $_[0]->{attributes}->{$_[1]} }
-
-sub namespace{
-    my $name = $_[0]->{package};
-    no strict 'refs';
-    return \%{ $name . '::' };
-}
 
 sub add_method {
     my($self, $name, $code) = @_;
@@ -116,11 +112,7 @@ sub has_method {
 
     return 1 if $self->{methods}{$method_name};
 
-    my $code = do{
-        no strict 'refs';
-        no warnings 'once';
-        *{ $self->{package} . '::' . $method_name }{CODE};
-    };
+    my $code = get_code_ref($self->{package}, $method_name);
 
     return $code && $self->_code_is_mine($code);
 }
@@ -132,12 +124,7 @@ sub get_method_body{
         or $self->throw_error('You must define a method name');
 
     return $self->{methods}{$method_name} ||= do{
-        my $code = do{
-            no strict 'refs';
-            no warnings 'once';
-            *{$self->{package} . '::' . $method_name}{CODE};
-        };
-
+        my $code = get_code_ref($self->{package}, $method_name);
         ($code && $self->_code_is_mine($code)) ? $code : undef;
     };
 }
@@ -149,11 +136,11 @@ sub get_method{
         my $method_metaclass = $self->method_metaclass;
         load_class($method_metaclass);
 
-        my $package = $self->name;
-        return $method_metaclass->new(
-            body    => $package->can($method_name),
-            name    => $method_name,
-            package => $package,
+        return $method_metaclass->wrap(
+            body                 => $self->get_method_body($method_name),
+            name                 => $method_name,
+            package              => $self->name,
+            associated_metaclass => $self,
         );
     }
 
@@ -179,7 +166,7 @@ sub get_method_list {
 
         my $superclasses;
         if(exists $options{superclasses}){
-            if($self->isa('Mouse::Meta::Role')){
+            if(Mouse::Util::TypeConstraints::_is_a_metarole($self)){
                 delete $options{superclasses};
             }
             else{
@@ -326,7 +313,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head1 SEE ALSO
 

@@ -2,7 +2,7 @@ package Mouse::Meta::TypeConstraint;
 use Mouse::Util qw(:meta); # enables strict and warnings
 
 use overload
-    '""'     => sub { shift->{name} },   # stringify to tc name
+    '""'     => sub { $_[0]->name },   # stringify to tc name
     fallback => 1;
 
 use Carp qw(confess);
@@ -30,11 +30,6 @@ sub new {
     }
 
     $check = $args{constraint};
-
-    if(blessed($check)){
-        Carp::cluck("Constraint for $args{name} must be a CODE reference");
-        $check = $check->{compiled_type_constraint};
-    }
 
     if(defined($check) && ref($check) ne 'CODE'){
         confess("Constraint for $args{name} is not a CODE reference");
@@ -86,13 +81,6 @@ sub create_child_type{
    );
 }
 
-sub name    { $_[0]->{name}    }
-sub parent  { $_[0]->{parent}  }
-sub message { $_[0]->{message} }
-
-sub _compiled_type_constraint{ $_[0]->{compiled_type_constraint} }
-
-sub has_coercion{ exists $_[0]->{_compiled_type_coercion} }
 
 sub compile_type_constraint{
     my($self) = @_;
@@ -195,13 +183,11 @@ sub check {
 
 sub coerce {
     my $self = shift;
-    if(!$self->{_compiled_type_coercion}){
-        confess("Cannot coerce without a type coercion ($self)");
-    }
 
     return $_[0] if $self->_compiled_type_constraint->(@_);
 
-    return $self->{_compiled_type_coercion}->(@_);
+    my $coercion = $self->_compiled_type_coercion;
+    return $coercion ? $coercion->(@_) : $_[0];
 }
 
 sub get_message {
@@ -249,7 +235,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40
+This document describes Mouse version 0.40_01
 
 =head1 DESCRIPTION
 
