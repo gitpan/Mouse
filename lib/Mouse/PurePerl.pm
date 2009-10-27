@@ -1,3 +1,5 @@
+package Mouse::PurePerl;
+
 package
     Mouse::Util;
 
@@ -77,10 +79,12 @@ sub get_code_ref{
 package
     Mouse::Util::TypeConstraints;
 
+use Scalar::Util qw(blessed looks_like_number openhandle);
+
 sub _generate_class_type_for{
     my($for_class, $name) = @_;
 
-    my $predicate = sub{ Scalar::Util::blessed($_[0]) && $_[0]->isa($for_class) };
+    my $predicate = sub{ blessed($_[0]) && $_[0]->isa($for_class) };
 
     if(defined $name){
         no strict 'refs';
@@ -124,13 +128,40 @@ sub RoleName   { (Mouse::Util::class_of($_[0]) || return 0)->isa('Mouse::Meta::R
 package
     Mouse::Meta::Module;
 
-sub name { $_[0]->{package} }
+sub name          { $_[0]->{package} }
+
+sub _method_map   { $_[0]->{methods} }
+sub _attribute_map{ $_[0]->{attribute_map} }
 
 sub namespace{
     my $name = $_[0]->{package};
     no strict 'refs';
     return \%{ $name . '::' };
 }
+
+sub add_method {
+    my($self, $name, $code) = @_;
+
+    if(!defined $name){
+        $self->throw_error('You must pass a defined name');
+    }
+    if(!defined $code){
+        $self->throw_error('You must pass a defined code');
+    }
+
+    if(ref($code) ne 'CODE'){
+        $code = \&{$code}; # coerce
+    }
+
+    $self->{methods}->{$name} = $code; # Moose stores meta object here.
+
+    my $pkg = $self->name;
+    no strict 'refs';
+    no warnings 'redefine', 'once';
+    *{ $pkg . '::' . $name } = $code;
+    return;
+}
+
 
 package
     Mouse::Meta::Class;
@@ -214,8 +245,21 @@ sub _compiled_type_constraint{ $_[0]->{compiled_type_constraint} }
 
 sub _compiled_type_coercion  { $_[0]->{_compiled_type_coercion}  }
 
-
 sub has_coercion{ exists $_[0]->{_compiled_type_coercion} }
 
 1;
 __END__
+
+=head1 NAME
+
+Mouse::PurePerl - A Mouse guts in pure Perl
+
+=head1 VERSION
+
+This document describes Mouse version 0.40_02
+
+=head1 SEE ALSO
+
+L<Mouse::XS>
+
+=cut

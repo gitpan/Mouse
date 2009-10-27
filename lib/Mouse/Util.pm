@@ -5,13 +5,18 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_01';
+    our $VERSION = '0.40_02';
 
     my $need_pp = !!$ENV{MOUSE_PUREPERL};
 
     if(!$need_pp && !exists $INC{'Mouse/PurePerl.pm'}){
         local $@;
-        $need_pp = !eval{
+
+        # XXX: XSLoader tries to get the object path from caller's file name
+        #      $hack_mouse_file fools its mechanism
+
+        (my $hack_mouse_file = __FILE__) =~ s/.Util//; # .../Mouse/Util.pm -> .../Mouse.pm
+        $need_pp = !eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
         };
@@ -24,8 +29,8 @@ BEGIN{
 }
 
 
-use Carp qw(confess);
-use Scalar::Util qw(blessed);
+use Carp         ();
+use Scalar::Util ();
 
 use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
 
@@ -193,7 +198,7 @@ sub load_first_existing_class {
     }
 
     # not found
-    confess join(
+    Carp::confess join(
         "\n",
         map {
             sprintf( "Could not load class (%s) because : %s",
@@ -209,7 +214,7 @@ sub _try_load_one_class {
 
     unless ( is_valid_class_name($class) ) {
         my $display = defined($class) ? $class : 'undef';
-        confess "Invalid class name ($display)";
+        Carp::confess "Invalid class name ($display)";
     }
 
     return undef if $is_class_loaded_cache{$class} ||= is_class_loaded($class);
@@ -228,7 +233,7 @@ sub _try_load_one_class {
 sub load_class {
     my $class = shift;
     my $e = _try_load_one_class($class);
-    confess "Could not load class ($class) because : $e" if $e;
+    Carp::confess "Could not load class ($class) because : $e" if $e;
 
     return 1;
 }
@@ -237,7 +242,9 @@ sub is_class_loaded;
 
 
 sub apply_all_roles {
-    my $applicant = blessed($_[0]) ? shift : Mouse::Meta::Class->initialize(shift);
+    my $applicant = Scalar::Util::blessed($_[0])
+        ?                                shift   # instance
+        : Mouse::Meta::Class->initialize(shift); # class or role name
 
     my @roles;
 
@@ -321,7 +328,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_01
+This document describes Mouse version 0.40_02
 
 =head1 IMPLEMENTATIONS FOR
 

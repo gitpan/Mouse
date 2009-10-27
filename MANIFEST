@@ -24,6 +24,7 @@ inc/Module/Install/Metadata.pm
 inc/Module/Install/With.pm
 inc/Module/Install/WriteAll.pm
 inc/Module/Install/XSUtil.pm
+inc/Sub/Uplevel.pm
 inc/Test/Exception.pm
 lib/Mouse.pm
 lib/Mouse/Exporter.pm
@@ -46,6 +47,7 @@ lib/Mouse/Spec.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
 lib/Mouse/Util/TypeConstraints.pm
+lib/Mouse/XS.pod
 lib/ouse.pm
 lib/Squirrel.pm
 lib/Squirrel/Role.pm
@@ -163,6 +165,7 @@ t/010_basics/013_create.t
 t/010_basics/014_create_anon.t
 t/010_basics/015_buildargs.t
 t/010_basics/017_error_handling.t
+t/010_basics/018_methods.t
 t/010_basics/019-destruction.t
 t/020_attributes/002_attribute_writer_generation.t
 t/020_attributes/003_attribute_accessor_generation.t
@@ -208,6 +211,7 @@ t/030_roles/037_create_role_subclass.t
 t/030_roles/041_empty_method_modifiers_meta_bug.t
 t/030_roles/042_compose_overloading.t
 t/040_type_constraints/003_util_std_type_constraints.t
+t/040_type_constraints/004_util_find_type_constraint.t
 t/040_type_constraints/005_util_type_coercion.t
 t/040_type_constraints/007_util_more_type_coercion.t
 t/040_type_constraints/009_union_types_and_coercions.t

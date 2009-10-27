@@ -2,7 +2,7 @@ package Mouse::Util::TypeConstraints;
 use Mouse::Util qw(does_role not_supported); # enables strict and warnings
 
 use Carp qw(confess);
-use Scalar::Util qw/blessed looks_like_number openhandle/;
+use Scalar::Util ();
 
 use Mouse::Meta::TypeConstraint;
 use Mouse::Exporter;
@@ -18,9 +18,9 @@ Mouse::Exporter->setup_import_methods(
 
 my %TYPE;
 
-sub as          ($) { (as => $_[0]) }
-sub where       (&) { (where => $_[0]) }
-sub message     (&) { (message => $_[0]) }
+sub as          ($) { (as          => $_[0]) }
+sub where       (&) { (where       => $_[0]) }
+sub message     (&) { (message     => $_[0]) }
 sub optimize_as (&) { (optimize_as => $_[0]) }
 
 sub from    { @_ }
@@ -159,32 +159,22 @@ sub coerce {
 }
 
 sub class_type {
-    my($name, $conf) = @_;
-    if ($conf && $conf->{class}) {
-        # No, you're using this wrong
-        warn "class_type() should be class_type(ClassName). Perhaps you're looking for subtype $name => as '$conf->{class}'?";
-        _create_type 'subtype', $name => (
-            as   => $conf->{class},
+    my($name, $options) = @_;
+    my $class = $options->{class} || $name;
+    return _create_type 'subtype', $name => (
+        as           => 'Object',
+        optimized_as => _generate_class_type_for($class),
 
-            type => 'Class',
-       );
-    }
-    else {
-        _create_type 'subtype', $name => (
-            as           => 'Object',
-            optimized_as => _generate_class_type_for($name),
-
-            type => 'Class',
-        );
-    }
+        type => 'Class',
+    );
 }
 
 sub role_type {
-    my($name, $conf) = @_;
-    my $role = ($conf && $conf->{role}) ? $conf->{role} : $name;
-    _create_type 'subtype', $name => (
+    my($name, $options) = @_;
+    my $role = $options->{role} || $name;
+    return _create_type 'subtype', $name => (
         as           => 'Object',
-        optimized_as => sub { blessed($_[0]) && does_role($_[0], $role) },
+        optimized_as => sub { Scalar::Util::blessed($_[0]) && does_role($_[0], $role) },
 
         type => 'Role',
     );
@@ -224,11 +214,8 @@ sub _find_or_create_regular_type{
 
     return $TYPE{$spec} if exists $TYPE{$spec};
 
-    my $meta  = Mouse::Util::get_metaclass_by_name($spec);
-
-    if(!$meta){
-        return;
-    }
+    my $meta = Mouse::Util::get_metaclass_by_name($spec)
+        or return undef;
 
     if(_is_a_metarole($meta)){
         return role_type($spec);
@@ -397,10 +384,12 @@ sub find_or_parse_type_constraint {
 }
 
 sub find_or_create_does_type_constraint{
+    # XXX: Moose does not register a new role_type, but Mouse does.
     return find_or_parse_type_constraint(@_) || role_type(@_);
 }
 
 sub find_or_create_isa_type_constraint {
+    # XXX: Moose does not register a new class_type, but Mouse does.
     return find_or_parse_type_constraint(@_) || class_type(@_);
 }
 
@@ -414,7 +403,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_01
+This document describes Mouse version 0.40_02
 
 =head2 SYNOPSIS
 
