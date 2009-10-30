@@ -263,35 +263,20 @@ sub _find_or_create_parameterized_type{
 
     my $name = sprintf '%s[%s]', $base->name, $param->name;
 
-    $TYPE{$name} ||= do{
-        my $generator = $base->{constraint_generator};
-
-        if(!$generator){
-            confess("The $name constraint cannot be used, because $param doesn't subtype from a parameterizable type");
-        }
-
-        Mouse::Meta::TypeConstraint->new(
-            name               => $name,
-            parent             => $base,
-            constraint         => $generator->($param),
-
-            type               => 'Parameterized',
-        );
-    }
+    $TYPE{$name} ||= $base->parameterize($param, $name);
 }
+
 sub _find_or_create_union_type{
-    my @types = sort{ $a cmp $b } map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
+    my @types = sort map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
 
     my $name = join '|', @types;
 
-    $TYPE{$name} ||= do{
-        return Mouse::Meta::TypeConstraint->new(
-            name              => $name,
-            type_constraints  => \@types,
+    $TYPE{$name} ||= Mouse::Meta::TypeConstraint->new(
+        name              => $name,
+        type_constraints  => \@types,
 
-            type              => 'Union',
-        );
-    };
+        type              => 'Union',
+    );
 }
 
 # The type parser
@@ -403,7 +388,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_02
+This document describes Mouse version 0.40_03
 
 =head2 SYNOPSIS
 

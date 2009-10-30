@@ -2,7 +2,17 @@ package Mouse::Meta::TypeConstraint;
 use Mouse::Util qw(:meta); # enables strict and warnings
 
 use overload
+    'bool'   => sub { 1 },             # always true
+
     '""'     => sub { $_[0]->name },   # stringify to tc name
+
+    '|'      => sub {                  # or-combination
+        require Mouse::Util::TypeConstraints;
+        return Mouse::Util::TypeConstraints::find_or_parse_type_constraint(
+            "$_[0] | $_[1]",
+        );
+    },
+
     fallback => 1;
 
 use Carp         ();
@@ -224,6 +234,28 @@ sub is_a_type_of{
     return 0;
 }
 
+# See also Moose::Meta::TypeConstraint::Parameterizable
+sub parameterize{
+    my($self, $param, $name) = @_;
+
+    if(!ref $param){
+        require Mouse::Util::TypeConstraints;
+        $param = Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($param);
+    }
+
+    $name ||= sprintf '%s[%s]', $self->name, $param->name;
+
+    my $generator = $self->{constraint_generator}
+        || Carp::confess("The $name constraint cannot be used, because $param doesn't subtype from a parameterizable type");
+
+    return Mouse::Meta::TypeConstraint->new(
+        name               => $name,
+        parent             => $self,
+        constraint         => $generator->($param),
+
+        type               => 'Parameterized',
+    );
+}
 
 1;
 __END__
@@ -234,7 +266,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_02
+This document describes Mouse version 0.40_03
 
 =head1 DESCRIPTION
 
