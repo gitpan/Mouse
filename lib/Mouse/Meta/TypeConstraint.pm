@@ -17,8 +17,6 @@ use overload
 
 use Carp         ();
 
-my $null_check = sub { 1 };
-
 sub new {
     my($class, %args) = @_;
 
@@ -88,61 +86,6 @@ sub create_child_type{
         # and its parent
         parent => $self,
    );
-}
-
-
-sub compile_type_constraint{
-    my($self) = @_;
-
-    # add parents first
-    my @checks;
-    for(my $parent = $self->parent; defined $parent; $parent = $parent->parent){
-         if($parent->{hand_optimized_type_constraint}){
-            unshift @checks, $parent->{hand_optimized_type_constraint};
-            last; # a hand optimized constraint must include all the parents
-        }
-        elsif($parent->{constraint}){
-            unshift @checks, $parent->{constraint};
-        }
-    }
-
-    # then add child
-    if($self->{constraint}){
-        push @checks, $self->{constraint};
-    }
-
-    if($self->{type_constraints}){ # Union
-        my @types = map{ $_->_compiled_type_constraint } @{ $self->{type_constraints} };
-        push @checks, sub{
-            foreach my $c(@types){
-                return 1 if $c->($_[0]);
-            }
-            return 0;
-        };
-    }
-
-    if(@checks == 0){
-        $self->{compiled_type_constraint} = $null_check;
-    }
-    elsif(@checks == 1){
-        my $c = $checks[0];
-        $self->{compiled_type_constraint} = sub{
-            my(@args) = @_;
-            local $_ = $args[0];
-            return $c->(@args);
-        };
-    }
-    else{
-        $self->{compiled_type_constraint} =  sub{
-            my(@args) = @_;
-            local $_ = $args[0];
-            foreach my $c(@checks){
-                return undef if !$c->(@args);
-            }
-            return 1;
-        };
-    }
-    return;
 }
 
 sub _add_type_coercions{
@@ -249,11 +192,12 @@ sub parameterize{
         || Carp::confess("The $name constraint cannot be used, because $param doesn't subtype from a parameterizable type");
 
     return Mouse::Meta::TypeConstraint->new(
-        name               => $name,
-        parent             => $self,
-        constraint         => $generator->($param),
+        name        => $name,
+        parent      => $self,
+        parameter   => $param,
+        constraint  => $generator->($param), # must be 'constraint', not 'optimized'
 
-        type               => 'Parameterized',
+        type        => 'Parameterized',
     );
 }
 
@@ -266,7 +210,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 DESCRIPTION
 

@@ -361,7 +361,7 @@ sub _canonicalize_handles {
         my $meta = Mouse::Meta::Class->initialize("$class_or_role"); # "" for stringify
         return map  { $_ => $_ }
                grep { $_ ne 'meta' && !Mouse::Object->can($_) && $_ =~ $handles }
-                   Mouse::Util::TypeConstraints::_is_a_metarole($meta)
+                   Mouse::Util::is_a_metarole($meta)
                         ? $meta->get_method_list
                         : $meta->get_all_method_names;
     }
@@ -371,7 +371,7 @@ sub _canonicalize_handles {
 }
 
 sub associate_method{
-    my ($attribute, $method) = @_;
+    my ($attribute, $method_name) = @_;
     $attribute->{associated_methods}++;
     return;
 }
@@ -390,7 +390,7 @@ sub install_accessors{
             my $generator = '_generate_' . $type;
             my $code      = $accessor_class->$generator($attribute, $metaclass);
             $metaclass->add_method($attribute->{$type} => $code);
-            $attribute->associate_method($code);
+            $attribute->associate_method($attribute->{$type});
         }
     }
 
@@ -405,7 +405,7 @@ sub install_accessors{
                 $reader, $handle_name, $method_to_call);
 
             $metaclass->add_method($handle_name => $code);
-            $attribute->associate_method($code);
+            $attribute->associate_method($handle_name);
         }
     }
 
@@ -435,7 +435,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 METHODS
 
@@ -543,12 +543,12 @@ is equivalent to this:
 
 =back
 
-=head2 C<< associate_method(Method) >>
+=head2 C<< associate_method(MethodName) >>
 
 Associates a method with the attribute. Typically, this is called internally
 when an attribute generates its accessors.
 
-Currently the argument I<Method> is ignored in Mouse.
+Currently the argument I<MethodName> is ignored in Mouse.
 
 =head2 C<< verify_against_type_constraint(Item) -> TRUE | ERROR >>
 

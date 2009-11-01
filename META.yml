@@ -29,4 +29,4 @@ requires:
   perl: 5.6.2
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.40_03
+version: 0.40_04

@@ -186,10 +186,10 @@ sub apply {
 
     my $instance;
 
-    if(Mouse::Util::TypeConstraints::_is_a_metaclass($applicant)){  # Application::ToClass
+    if(Mouse::Util::is_a_metaclass($applicant)){  # Application::ToClass
         $args{_to} = 'class';
     }
-    elsif(Mouse::Util::TypeConstraints::_is_a_metarole($applicant)){ # Application::ToRole
+    elsif(Mouse::Util::is_a_metarole($applicant)){ # Application::ToRole
         $args{_to} = 'role';
     }
     else{                                       # Appplication::ToInstance
@@ -330,7 +330,7 @@ Mouse::Meta::Role - The Mouse Role metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 SEE ALSO
 

@@ -76,15 +76,10 @@ sub get_code_ref{
     return *{$package . '::' . $name}{CODE};
 }
 
-package
-    Mouse::Util::TypeConstraints;
-
-use Scalar::Util qw(blessed looks_like_number openhandle);
-
-sub _generate_class_type_for{
+sub generate_isa_predicate_for {
     my($for_class, $name) = @_;
 
-    my $predicate = sub{ blessed($_[0]) && $_[0]->isa($for_class) };
+    my $predicate = sub{ Scalar::Util::blessed($_[0]) && $_[0]->isa($for_class) };
 
     if(defined $name){
         no strict 'refs';
@@ -95,6 +90,11 @@ sub _generate_class_type_for{
     return $predicate;
 }
 
+
+package
+    Mouse::Util::TypeConstraints;
+
+use Scalar::Util qw(blessed looks_like_number openhandle);
 
 sub Any        { 1 }
 sub Item       { 1 }
@@ -123,6 +123,41 @@ sub Object     { blessed($_[0]) && blessed($_[0]) ne 'Regexp' }
 
 sub ClassName  { Mouse::Util::is_class_loaded($_[0]) }
 sub RoleName   { (Mouse::Util::class_of($_[0]) || return 0)->isa('Mouse::Meta::Role') }
+
+sub _parameterize_ArrayRef_for {
+    my($type_parameter) = @_;
+    my $check = $type_parameter->_compiled_type_constraint;
+
+    return sub {
+        foreach my $value (@{$_}) {
+            return undef unless $check->($value);
+        }
+        return 1;
+    }
+}
+
+sub _parameterize_HashRef_for {
+    my($type_parameter) = @_;
+    my $check = $type_parameter->_compiled_type_constraint;
+
+    return sub {
+        foreach my $value(values %{$_}){
+            return undef unless $check->($value);
+        }
+        return 1;
+    };
+}
+
+# 'Maybe' type accepts 'Any', so it requires parameters
+sub _parameterize_Maybe_for {
+    my($type_parameter) = @_;
+    my $check = $type_parameter->_compiled_type_constraint;
+
+    return sub{
+        return !defined($_) || $check->($_);
+    };
+};
+
 
 
 package
@@ -247,6 +282,55 @@ sub _compiled_type_coercion  { $_[0]->{_compiled_type_coercion}  }
 
 sub has_coercion{ exists $_[0]->{_compiled_type_coercion} }
 
+
+sub compile_type_constraint{
+    my($self) = @_;
+
+    # add parents first
+    my @checks;
+    for(my $parent = $self->{parent}; defined $parent; $parent = $parent->{parent}){
+         if($parent->{hand_optimized_type_constraint}){
+            unshift @checks, $parent->{hand_optimized_type_constraint};
+            last; # a hand optimized constraint must include all the parents
+        }
+        elsif($parent->{constraint}){
+            unshift @checks, $parent->{constraint};
+        }
+    }
+
+    # then add child
+    if($self->{constraint}){
+        push @checks, $self->{constraint};
+    }
+
+    if($self->{type_constraints}){ # Union
+        my @types = map{ $_->{compiled_type_constraint} } @{ $self->{type_constraints} };
+        push @checks, sub{
+            foreach my $c(@types){
+                return 1 if $c->($_[0]);
+            }
+            return 0;
+        };
+    }
+
+    if(@checks == 0){
+        $self->{compiled_type_constraint} = \&Mouse::Util::TypeConstraints::Any;
+    }
+    else{
+        $self->{compiled_type_constraint} =  sub{
+            my(@args) = @_;
+            local $_ = $args[0];
+            foreach my $c(@checks){
+                return undef if !$c->(@args);
+            }
+            return 1;
+        };
+    }
+    return;
+}
+
+
+
 1;
 __END__
 
@@ -256,7 +340,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 SEE ALSO
 

@@ -74,14 +74,6 @@ BEGIN {
     sub list_all_type_constraints         { keys %TYPE }
 }
 
-# is-a predicates
-BEGIN{
-    _generate_class_type_for('Mouse::Meta::TypeConstraint' => '_is_a_type_constraint');
-    _generate_class_type_for('Mouse::Meta::Class'          => '_is_a_metaclass');
-    _generate_class_type_for('Mouse::Meta::Role'           => '_is_a_metarole');
-}
-
-
 sub _create_type{
     my $mode = shift;
 
@@ -163,7 +155,7 @@ sub class_type {
     my $class = $options->{class} || $name;
     return _create_type 'subtype', $name => (
         as           => 'Object',
-        optimized_as => _generate_class_type_for($class),
+        optimized_as => Mouse::Util::generate_isa_predicate_for($class),
 
         type => 'Class',
     );
@@ -217,7 +209,7 @@ sub _find_or_create_regular_type{
     my $meta = Mouse::Util::get_metaclass_by_name($spec)
         or return undef;
 
-    if(_is_a_metarole($meta)){
+    if(Mouse::Util::is_a_metarole($meta)){
         return role_type($spec);
     }
     else{
@@ -225,38 +217,9 @@ sub _find_or_create_regular_type{
     }
 }
 
-$TYPE{ArrayRef}{constraint_generator} = sub {
-    my($type_parameter) = @_;
-    my $check = $type_parameter->_compiled_type_constraint;
-
-    return sub{
-        foreach my $value (@{$_}) {
-            return undef unless $check->($value);
-        }
-        return 1;
-    }
-};
-$TYPE{HashRef}{constraint_generator} = sub {
-    my($type_parameter) = @_;
-    my $check = $type_parameter->_compiled_type_constraint;
-
-    return sub{
-        foreach my $value(values %{$_}){
-            return undef unless $check->($value);
-        }
-        return 1;
-    };
-};
-
-# 'Maybe' type accepts 'Any', so it requires parameters
-$TYPE{Maybe}{constraint_generator} = sub {
-    my($type_parameter) = @_;
-    my $check = $type_parameter->_compiled_type_constraint;
-
-    return sub{
-        return !defined($_) || $check->($_);
-    };
-};
+$TYPE{ArrayRef}{constraint_generator} = \&_parameterize_ArrayRef_for;
+$TYPE{HashRef}{constraint_generator}  = \&_parameterize_HashRef_for;
+$TYPE{Maybe}{constraint_generator}    = \&_parameterize_Maybe_for;
 
 sub _find_or_create_parameterized_type{
     my($base, $param) = @_;
@@ -351,7 +314,7 @@ sub _parse_type{
 
 sub find_type_constraint {
     my($spec) = @_;
-    return $spec if _is_a_type_constraint($spec);
+    return $spec if Mouse::Util::is_a_type_constraint($spec);
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec};
@@ -359,7 +322,7 @@ sub find_type_constraint {
 
 sub find_or_parse_type_constraint {
     my($spec) = @_;
-    return $spec if _is_a_type_constraint($spec);
+    return $spec if Mouse::Util::is_a_type_constraint($spec);
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec} || do{
@@ -388,7 +351,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head2 SYNOPSIS
 

@@ -5,7 +5,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_03';
+    our $VERSION = '0.40_04';
 
     my $need_pp = !!$ENV{MOUSE_PUREPERL};
 
@@ -73,7 +73,13 @@ BEGIN {
     *get_metaclass_by_name       = \&Mouse::Meta::Module::get_metaclass_by_name;
     *get_all_metaclass_instances = \&Mouse::Meta::Module::get_all_metaclass_instances;
     *get_all_metaclass_names     = \&Mouse::Meta::Module::get_all_metaclass_names;
+
+    # is-a predicates
+    generate_isa_predicate_for('Mouse::Meta::TypeConstraint' => 'is_a_type_constraint');
+    generate_isa_predicate_for('Mouse::Meta::Class'          => 'is_a_metaclass');
+    generate_isa_predicate_for('Mouse::Meta::Role'           => 'is_a_metarole');
 }
+
 
 # Moose::Util compatible utilities
 
@@ -259,7 +265,7 @@ sub apply_all_roles {
         my $role_name = $roles[-1][0];
         load_class($role_name);
 
-        Mouse::Util::TypeConstraints::_is_a_metarole( get_metaclass_by_name($role_name) )
+        is_a_metarole( get_metaclass_by_name($role_name) )
             || $applicant->meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
     }
 
@@ -328,7 +334,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 IMPLEMENTATIONS FOR
 

@@ -14,7 +14,7 @@ require Mouse::Util;
 
 sub import{
     $^H              |= _strict_bits;         # strict->import;
-    ${^WARNING_BITS}  = $warnings::Bits{all}; # warnings->import;
+    ${^WARNING_BITS} |= $warnings::Bits{all}; # warnings->import;
     return;
 }
 
@@ -166,7 +166,7 @@ sub do_import {
     }
 
     $^H              |= _strict_bits;         # strict->import;
-    ${^WARNING_BITS}  = $warnings::Bits{all}; # warnings->import;
+    ${^WARNING_BITS} |= $warnings::Bits{all}; # warnings->import;
 
     if($spec->{INIT_META}){
         my $meta;
@@ -258,7 +258,7 @@ Mouse::Exporter - make an import() and unimport() just like Mouse.pm
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 SYNOPSIS
 

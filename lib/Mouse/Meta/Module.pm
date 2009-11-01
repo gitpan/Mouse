@@ -143,7 +143,7 @@ sub get_method_list {
 
         my $superclasses;
         if(exists $options{superclasses}){
-            if(Mouse::Util::TypeConstraints::_is_a_metarole($self)){
+            if(Mouse::Util::is_a_metarole($self)){
                 delete $options{superclasses};
             }
             else{
@@ -290,7 +290,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_03
+This document describes Mouse version 0.40_04
 
 =head1 SEE ALSO
 

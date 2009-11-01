@@ -42,9 +42,9 @@ find({
 my $mouse_tiny = '';
 
 for my $file (uniq
+        'lib/Mouse/PurePerl.pm',
         'lib/Mouse/Exporter.pm',
         'lib/Mouse/Util.pm',
-        'lib/Mouse/PurePerl.pm',
         'lib/Mouse/Meta/TypeConstraint.pm',
         'lib/Mouse/Util/TypeConstraints.pm',
             sort @files) {
@@ -54,7 +54,7 @@ for my $file (uniq
     $contents =~ s/__END__\b.*//s;          # remove documentation
     $contents =~ s/1;\n*$//;                # remove success indicator
 
-    $mouse_tiny .= "BEGIN{ # #file\n";
+    $mouse_tiny .= "BEGIN{ # $file\n";
     $mouse_tiny .= $contents;
     $mouse_tiny .= "}\n";
 }

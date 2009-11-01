@@ -12,7 +12,9 @@ benchmarks/coercion.pl
 benchmarks/load_class.pl
 benchmarks/modifiers.pl
 benchmarks/subtype.pl
+benchmarks/type_constraints.pl
 Changes
+inc/Carp/Always.pm
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
@@ -281,10 +283,8 @@ t/lib/SyntaxError.pm
 t/lib/Test/Mouse.pm
 t/lib/Unsweetened.pm
 xs-src/Mouse.xs
-xs-src/mouse_accessor.xs
-xs-src/mouse_instance.xs
-xs-src/mouse_simple_accessor.xs
-xs-src/mouse_type_constraint.xs
-xs-src/mouse_util.xs
+xs-src/MouseAccessor.xs
+xs-src/MouseTypeConstraints.xs
+xs-src/MouseUtil.xs
 xt/01_pod.t
 xt/02_pod_spell.t
