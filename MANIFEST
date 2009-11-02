@@ -128,6 +128,7 @@ t/001_mouse/054-anon-leak.t
 t/001_mouse/055-exporter.t
 t/001_mouse/056-role-combine.t
 t/001_mouse/057_subtype_without_where.t
+t/001_mouse/058-accessor-leaks.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -139,7 +140,7 @@ t/001_mouse/404-role-overrides.t
 t/001_mouse/600-tiny-tiny.t
 t/001_mouse/601-tiny-mouse.t
 t/001_mouse/602-mouse-tiny.t
-t/001_mouse/603-octal-defaults.t
+t/001_mouse/603-mouse-pureperl.t
 t/001_mouse/801-coerce.t
 t/001_mouse/802-coerce_multi_class.t
 t/001_mouse/804-immutable-demolish.t

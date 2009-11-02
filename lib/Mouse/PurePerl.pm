@@ -1,5 +1,7 @@
 package Mouse::PurePerl;
 
+require Mouse::Util;
+
 package
     Mouse::Util;
 
@@ -340,7 +342,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_04
+This document describes Mouse version 0.40_05
 
 =head1 SEE ALSO
 

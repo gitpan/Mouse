@@ -1,8 +1,6 @@
 package Mouse::Meta::Module;
 use Mouse::Util qw/:meta get_code_package get_code_ref load_class not_supported/; # enables strict and warnings
 
-use Mouse::Util::TypeConstraints ();
-
 use Carp         ();
 use Scalar::Util ();
 
@@ -290,7 +288,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_04
+This document describes Mouse version 0.40_05
 
 =head1 SEE ALSO
 

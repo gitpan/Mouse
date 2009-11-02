@@ -5,27 +5,29 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_04';
+    our $VERSION = '0.40_05';
 
-    my $need_pp = !!$ENV{MOUSE_PUREPERL};
+    my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
-    if(!$need_pp && !exists $INC{'Mouse/PurePerl.pm'}){
+    if($xs){
         local $@;
 
         # XXX: XSLoader tries to get the object path from caller's file name
         #      $hack_mouse_file fools its mechanism
 
         (my $hack_mouse_file = __FILE__) =~ s/.Util//; # .../Mouse/Util.pm -> .../Mouse.pm
-        $need_pp = !eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
+        $xs = eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
         };
         #warn $@ if $@;
     }
 
-    if($need_pp){
+    if(!$xs){
         require 'Mouse/PurePerl.pm'; # we don't want to create its namespace
     }
+
+    *_MOUSE_XS = sub(){ $xs };
 }
 
 
@@ -99,10 +101,10 @@ sub does_role{
 }
 
 BEGIN {
-    my $impl;
+    my $get_linear_isa;
     if ($] >= 5.009_005) {
         require mro;
-        $impl = \&mro::get_linear_isa;
+        $get_linear_isa = \&mro::get_linear_isa;
     } else {
         my $e = do {
             local $@;
@@ -110,7 +112,7 @@ BEGIN {
             $@;
         };
         if (!$e) {
-            $impl = \&mro::get_linear_isa;
+            $get_linear_isa = \&mro::get_linear_isa;
         } else {
 #       VVVVV   CODE TAKEN FROM MRO::COMPAT   VVVVV
             my $_get_linear_isa_dfs; # this recurses so it isn't pretty
@@ -132,13 +134,13 @@ BEGIN {
                 return \@lin;
             };
 #       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
-            $impl = $_get_linear_isa_dfs;
+            $get_linear_isa = $_get_linear_isa_dfs;
         }
     }
 
 
     no warnings 'once';
-    *get_linear_isa = $impl;
+    *get_linear_isa = $get_linear_isa;
 }
 
 
@@ -334,7 +336,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_04
+This document describes Mouse version 0.40_05
 
 =head1 IMPLEMENTATIONS FOR
 
