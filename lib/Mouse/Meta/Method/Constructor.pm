@@ -1,5 +1,5 @@
 package Mouse::Meta::Method::Constructor;
-use Mouse::Util qw(get_code_ref); # enables strict and warnings
+use Mouse::Util; # enables strict and warnings
 
 sub _inline_slot{
     my(undef, $self_var, $attr_name) = @_;
@@ -177,7 +177,7 @@ sub _generate_BUILDALL {
 
     my @code;
     for my $class ($metaclass->linearized_isa) {
-        if (get_code_ref($class, 'BUILD')) {
+        if (Mouse::Util::get_code_ref($class, 'BUILD')) {
             unshift  @code, qq{${class}::BUILD(\$instance, \$args);};
         }
     }
@@ -193,7 +193,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SEE ALSO
 

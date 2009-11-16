@@ -3,7 +3,7 @@ package Module::Install::XSUtil;
 
 use 5.005_03;
 
-$VERSION = '0.16';
+$VERSION = '0.17';
 
 use Module::Install::Base;
 @ISA     = qw(Module::Install::Base);
@@ -16,6 +16,10 @@ use File::Spec;
 use File::Find;
 
 use constant _VERBOSE => $ENV{MI_VERBOSE} ? 1 : 0;
+
+my %ConfigureRequires = (
+    'ExtUtils::CBuilder' => 0.25, # for have_compiler()
+);
 
 my %BuildRequires = (
     'ExtUtils::ParseXS' => 2.21, # the newer, the better
@@ -41,9 +45,15 @@ sub _xs_initialize{
     unless($self->{xsu_initialized}){
         $self->{xsu_initialized} = 1;
 
-        $self->requires_external_cc();
+        if(!$self->cc_available()){
+            print "This package requires a C compiler, but it's not available.\n";
+            exit(0);
+        }
+
+        $self->configure_requires(%ConfigureRequires);
         $self->build_requires(%BuildRequires);
         $self->requires(%Requires);
+
         $self->makemaker_args(OBJECT => '$(O_FILES)');
 
         if($self->_xs_debugging()){
@@ -70,6 +80,14 @@ sub _is_msvc{
     return $Config{cc} =~ /\A cl \b /xmsi;
 }
 
+sub cc_available {
+    local $@;
+    return eval{
+        require ExtUtils::CBuilder;
+        ExtUtils::CBuilder->new(quiet => 1)->have_compiler();
+    };
+}
+
 sub use_ppport{
     my($self, $dppp_version) = @_;
 
@@ -82,13 +100,18 @@ sub use_ppport{
 
     print "Writing $filename\n";
 
-    eval qq{
-        use Devel::PPPort;
-        Devel::PPPort::WriteFile(q{$filename});
-        1;
-    } or warn("Cannot create $filename: $@");
+    my $e = do{
+        local $@;
+        eval qq{
+            use Devel::PPPort;
+            Devel::PPPort::WriteFile(q{$filename});
+        };
+        $@;
+    };
+    if($e){
+         print "Cannot create $filename because: $@\n";
+    }
 
-    
     if(-e $filename){
         $self->clean_files($filename);
         $self->cc_define('-DUSE_PPPORT');
@@ -104,11 +127,11 @@ sub cc_warnings{
 
     if(_is_gcc()){
         # Note: MSVC++ doesn't support C99, so -Wdeclaration-after-statement helps ensure C89 specs.
-        $self->cc_append_to_ccflags(qw(-Wall -Wdeclaration-after-statement));
+        $self->cc_append_to_ccflags(qw(-Wall));
 
         no warnings 'numeric';
         if($Config{gccversion} >= 4.00){
-            $self->cc_append_to_ccflags('-Wextra');
+            $self->cc_append_to_ccflags('-Wextra -Wdeclaration-after-statement');
         }
         else{
             $self->cc_append_to_ccflags('-W');
@@ -491,4 +514,4 @@ sub const_cccmd {
 1;
 __END__
 
-#line 641
+#line 670

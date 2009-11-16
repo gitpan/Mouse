@@ -168,7 +168,7 @@ package
 sub name          { $_[0]->{package} }
 
 sub _method_map   { $_[0]->{methods} }
-sub _attribute_map{ $_[0]->{attribute_map} }
+sub _attribute_map{ $_[0]->{attributes} }
 
 sub namespace{
     my $name = $_[0]->{package};
@@ -203,6 +203,9 @@ sub add_method {
 package
     Mouse::Meta::Class;
 
+sub constructor_class() { 'Mouse::Meta::Method::Constructor' }
+sub destructor_class()  { 'Mouse::Meta::Method::Destructor'  }
+
 sub is_anon_class{
     return exists $_[0]->{anon_serial_id};
 }
@@ -210,6 +213,67 @@ sub is_anon_class{
 sub roles { $_[0]->{roles} }
 
 sub linearized_isa { @{ get_linear_isa($_[0]->{package}) } }
+
+sub get_all_attributes {
+    my($self) = @_;
+    my %attrs = map { %{ $self->initialize($_)->{attributes} } } reverse $self->linearized_isa;
+    return values %attrs;
+}
+
+sub _initialize_object{
+    my($self, $object, $args, $ignore_triggers) = @_;
+
+    my @triggers_queue;
+
+    foreach my $attribute ($self->get_all_attributes) {
+        my $init_arg = $attribute->init_arg;
+        my $slot     = $attribute->name;
+
+        if (defined($init_arg) && exists($args->{$init_arg})) {
+            $object->{$slot} = $attribute->_coerce_and_verify($args->{$init_arg}, $object);
+
+            weaken($object->{$slot})
+                if ref($object->{$slot}) && $attribute->is_weak_ref;
+
+            if ($attribute->has_trigger) {
+                push @triggers_queue, [ $attribute->trigger, $object->{$slot} ];
+            }
+        }
+        else { # no init arg
+            if ($attribute->has_default || $attribute->has_builder) {
+                if (!$attribute->is_lazy) {
+                    my $default = $attribute->default;
+                    my $builder = $attribute->builder;
+                    my $value =   $builder                ? $object->$builder()
+                                : ref($default) eq 'CODE' ? $object->$default()
+                                :                           $default;
+
+                    $object->{$slot} = $attribute->_coerce_and_verify($value, $object);
+
+                    weaken($object->{$slot})
+                        if ref($object->{$slot}) && $attribute->is_weak_ref;
+                }
+            }
+            elsif($attribute->is_required) {
+                $self->throw_error("Attribute (".$attribute->name.") is required");
+            }
+        }
+    }
+
+    if(!$ignore_triggers){
+        foreach my $trigger_and_value(@triggers_queue){
+            my($trigger, $value) = @{$trigger_and_value};
+            $trigger->($object, $value);
+        }
+    }
+
+    if($self->is_anon_class){
+        $object->{__METACLASS__} = $self;
+    }
+
+    return;
+}
+
 
 package
     Mouse::Meta::Role;
@@ -331,7 +395,78 @@ sub compile_type_constraint{
     return;
 }
 
+package
+    Mouse::Object;
 
+
+sub BUILDARGS {
+    my $class = shift;
+
+    if (scalar @_ == 1) {
+        (ref($_[0]) eq 'HASH')
+            || $class->meta->throw_error("Single parameters to new() must be a HASH ref");
+
+        return {%{$_[0]}};
+    }
+    else {
+        return {@_};
+    }
+}
+
+sub new {
+    my $class = shift;
+
+    $class->meta->throw_error('Cannot call new() on an instance') if ref $class;
+
+    my $args = $class->BUILDARGS(@_);
+
+    my $meta = Mouse::Meta::Class->initialize($class);
+    my $self = $meta->new_object($args);
+
+    # BUILDALL
+    if( $self->can('BUILD') ) {
+        for my $class (reverse $meta->linearized_isa) {
+            my $build = Mouse::Util::get_code_ref($class, 'BUILD')
+                || next;
+
+            $self->$build($args);
+        }
+    }
+
+    return $self;
+}
+
+sub DESTROY {
+    my $self = shift;
+
+    return unless $self->can('DEMOLISH'); # short circuit
+
+    local $?;
+
+    my $e = do{
+        local $@;
+        eval{
+
+            # DEMOLISHALL
+
+            # We cannot count on being able to retrieve a previously made
+            # metaclass, _or_ being able to make a new one during global
+            # destruction. However, we should still be able to use mro at
+            # that time (at least tests suggest so ;)
+
+            foreach my $class (@{ Mouse::Util::get_linear_isa(ref $self) }) {
+                my $demolish = Mouse::Util::get_code_ref($class, 'DEMOLISH')
+                    || next;
+
+                $self->$demolish();
+            }
+        };
+        $@;
+    };
+
+    no warnings 'misc';
+    die $e if $e; # rethrow
+}
 
 1;
 __END__
@@ -342,7 +477,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SEE ALSO
 

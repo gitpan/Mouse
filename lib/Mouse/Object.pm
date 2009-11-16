@@ -1,48 +1,8 @@
 package Mouse::Object;
 use Mouse::Util qw(does dump); # enables strict and warnings
 
-sub new {
-    my $class = shift;
+sub new;
 
-    $class->meta->throw_error('Cannot call new() on an instance') if ref $class;
-
-    my $args = $class->BUILDARGS(@_);
-
-    my $instance = Mouse::Meta::Class->initialize($class)->new_object($args);
-    $instance->BUILDALL($args);
-    return $instance;
-}
-
-sub BUILDARGS {
-    my $class = shift;
-
-    if (scalar @_ == 1) {
-        (ref($_[0]) eq 'HASH')
-            || $class->meta->throw_error("Single parameters to new() must be a HASH ref");
-
-        return {%{$_[0]}};
-    }
-    else {
-        return {@_};
-    }
-}
-
-sub DESTROY {
-    my $self = shift;
-
-    local $?;
-
-    my $e = do{
-        local $@;
-        eval{
-            $self->DEMOLISHALL();
-        };
-        $@;
-    };
-
-    no warnings 'misc';
-    die $e if $e; # rethrow
-}
 
 sub BUILDALL {
     my $self = shift;
@@ -89,7 +49,7 @@ Mouse::Object - The base object for Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 METHODS
 

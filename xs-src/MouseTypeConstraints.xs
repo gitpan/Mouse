@@ -149,21 +149,11 @@ mouse_tc_RoleName(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
     assert(sv);
     if(is_class_loaded(sv)){
         int ok;
-        SV* meta;
-        dSP;
 
         ENTER;
         SAVETMPS;
 
-        PUSHMARK(SP);
-        XPUSHs(sv);
-        PUTBACK;
-        call_pv("Mouse::Util::get_metaclass_by_name", G_SCALAR);
-        SPAGAIN;
-        meta = POPs;
-        PUTBACK;
-
-        ok =  is_an_instance_of("Mouse::Meta::Role", meta);
+        ok =  is_an_instance_of("Mouse::Meta::Role", get_metaclass(sv));
 
         FREETMPS;
         LEAVE;
@@ -188,19 +178,19 @@ mouse_tc_ScalarRef(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
 int
 mouse_tc_ArrayRef(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
     assert(sv);
-    return SvROK(sv) && !SvOBJECT(SvRV(sv)) && SvTYPE(SvRV(sv)) == SVt_PVAV;
+    return IsArrayRef(sv);
 }
 
 int
 mouse_tc_HashRef(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
     assert(sv);
-    return SvROK(sv) && !SvOBJECT(SvRV(sv)) && SvTYPE(SvRV(sv)) == SVt_PVHV;
+    return IsHashRef(sv);
 }
 
 int
 mouse_tc_CodeRef(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
     assert(sv);
-    return SvROK(sv)  && !SvOBJECT(SvRV(sv))&& SvTYPE(SvRV(sv)) == SVt_PVCV;
+    return IsCodeRef(sv);
 }
 
 int
@@ -244,7 +234,7 @@ mouse_tc_Object(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
 
 static int
 mouse_parameterized_ArrayRef(pTHX_ SV* const param, SV* const sv) {
-    if(mouse_tc_ArrayRef(aTHX_ NULL, sv)){
+    if(IsArrayRef(sv)){
         AV* const av  = (AV*)SvRV(sv);
         I32 const len = av_len(av) + 1;
         I32 i;
@@ -546,7 +536,7 @@ CODE:
 {
     check_fptr_t fptr;
     SV* const tc_code = mcall0s(param, "_compiled_type_constraint");
-    if(!(SvROK(tc_code) && SvTYPE(SvRV(tc_code)) == SVt_PVCV)){
+    if(!IsCodeRef(tc_code)){
         croak("_compiled_type_constraint didn't return a CODE reference");
     }
 
@@ -567,16 +557,24 @@ OUTPUT:
 
 MODULE = Mouse::Util::TypeConstraints    PACKAGE = Mouse::Meta::TypeConstraint
 
+BOOT:
+    INSTALL_SIMPLE_READER(TypeConstraint, name);
+    INSTALL_SIMPLE_READER(TypeConstraint, parent);
+    INSTALL_SIMPLE_READER(TypeConstraint, message);
+
+    INSTALL_SIMPLE_READER_WITH_KEY(TypeConstraint, _compiled_type_constraint, compiled_type_constraint);
+    INSTALL_SIMPLE_READER(TypeConstraint, _compiled_type_coercion); /* Mouse specific */
+
+    INSTALL_SIMPLE_PREDICATE_WITH_KEY(TypeConstraint, has_coercion, _compiled_type_coercion);
+
 void
 compile_type_constraint(SV* self)
 CODE:
 {
-    AV* const checks = newAV();
+    AV* const checks = newAV_mortal();
     SV* check; /* check function */
     SV* parent;
     SV* types_ref;
-
-    sv_2mortal((SV*)checks);
 
     for(parent = get_slots(self, "parent"); parent; parent = get_slots(parent, "parent")){
         check = get_slots(parent, "hand_optimized_type_constraint");
@@ -615,14 +613,13 @@ CODE:
         I32 len;
         I32 i;
 
-        if(!mouse_tc_ArrayRef(aTHX_ NULL, types_ref)){
+        if(!IsArrayRef(types_ref)){
             croak("Not an ARRAY reference");
         }
         types = (AV*)SvRV(types_ref);
         len = av_len(types) + 1;
 
-        union_checks = newAV();
-        sv_2mortal((SV*)union_checks);
+        union_checks = newAV_mortal();
 
         for(i = 0; i < len; i++){
             SV* const tc = *av_fetch(types, i, TRUE);

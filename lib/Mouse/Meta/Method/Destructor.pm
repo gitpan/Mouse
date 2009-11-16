@@ -1,5 +1,5 @@
 package Mouse::Meta::Method::Destructor;
-use Mouse::Util qw(get_code_ref); # enables strict and warnings
+use Mouse::Util; # enables strict and warnings
 
 sub _empty_DESTROY{ }
 
@@ -12,7 +12,7 @@ sub _generate_destructor{
 
     my $demolishall = '';
     for my $class ($metaclass->linearized_isa) {
-        if (get_code_ref($class, 'DEMOLISH')) {
+        if (Mouse::Util::get_code_ref($class, 'DEMOLISH')) {
             $demolishall .= "${class}::DEMOLISH(\$self);\n";
         }
     }
@@ -53,7 +53,7 @@ Mouse::Meta::Method::Destructor - A Mouse method generator for destructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SEE ALSO
 

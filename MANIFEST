@@ -13,13 +13,13 @@ benchmarks/load_class.pl
 benchmarks/modifiers.pl
 benchmarks/subtype.pl
 benchmarks/type_constraints.pl
+benchmarks/vs_caf.pl
 Changes
+example/point.pl
 inc/Carp/Always.pm
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm
-inc/Module/Install/Can.pm
-inc/Module/Install/External.pm
 inc/Module/Install/Include.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
@@ -58,6 +58,7 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
 mouse.h
+README
 t/000-load.t
 t/000_recipes/002_schwartz_tutorial.t
 t/000_recipes/basics-recipe10.t
@@ -235,12 +236,10 @@ t/100_bugs/010_immutable_n_default_x2.t
 t/100_bugs/011_DEMOLISH_eats_exceptions.t
 t/100_bugs/012_DEMOLISH_eats_mini.t
 t/100_bugs/013_lazybuild_required_undef.t
-t/100_bugs/014_DEMOLISHALL.t
 t/100_bugs/016_inheriting_from_roles.t
 t/100_bugs/017_type_constraint_messages.t
 t/100_bugs/019_moose_octal_defaults.t
 t/100_bugs/020_super_recursion.t
-t/100_bugs/021_DEMOLISHALL_shortcutted.t
 t/100_bugs/022_role_caller.t
 t/100_bugs/025_universal_methods_wrappable.t
 t/100_bugs/026_create_anon_recursion.t
@@ -285,6 +284,7 @@ t/lib/Test/Mouse.pm
 t/lib/Unsweetened.pm
 xs-src/Mouse.xs
 xs-src/MouseAccessor.xs
+xs-src/MouseAttribute.xs
 xs-src/MouseTypeConstraints.xs
 xs-src/MouseUtil.xs
 xt/01_pod.t

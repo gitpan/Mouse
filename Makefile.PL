@@ -2,19 +2,18 @@ use strict;
 use warnings;
 use inc::Module::Install;
 
+# for co-developpers
+use Module::Install::XSUtil 0.17;
+
 system($^X, 'author/generate-mouse-tiny.pl', 'lib/Mouse/Tiny.pm') == 0
     or warn "Cannot generate Mouse::Tiny: $!";
 
 name     'Mouse';
 all_from 'lib/Mouse.pm';
 
-tests 't/*.t t/*/*.t';
-
 # Scalar::Util < 1.14 has a bug.
 # > Fixed looks_like_number(undef) to return false for perl >= 5.009002
 requires 'Scalar::Util' => 1.14;
-
-configure_requires 'ExtUtils::CBuilder';
 
 test_requires 'Test::More'      => 0.88;
 test_requires 'Test::Exception' => 0.27;
@@ -43,19 +42,12 @@ if($] < 5.008_001){
 }
 
 if(!defined $use_xs){
-    $use_xs = eval {
-        require ExtUtils::CBuilder;
-        ExtUtils::CBuilder->new(quiet => 1)->have_compiler();
-    };
+    $use_xs = cc_available();
 }
 
 if($use_xs){
     print "Mouse configured with XS.\n",
           "NOTE: You can try --pp option to configure Mouse with Pure Perl.\n";
-    ;
-
-    require Module::Install::XSUtil;
-    Module::Install::XSUtil->VERSION(0.16); # for co-developpers
 
     use_ppport(3.19);
     cc_warnings();
@@ -68,8 +60,8 @@ else{
 if (author_context()) {
     my $require_version = Mouse::Spec->MooseVersion;
 
-    if (eval{ require Moose; Moose->VERSION($require_version) }) {
-        if (eval 'use Module::Install::AuthorTests; 1') {
+    if (eval { require Moose; Moose->VERSION($require_version) }) {
+        if (eval { require Module::Install::AuthorTests }) {
             do 'author/create-moose-compatibility-tests.pl';
             recursive_author_tests('xt');
         } else {
@@ -91,6 +83,8 @@ if (author_context()) {
                 . qq{\t} . $test_via_harness;
     }
 }
+
+tests 't/*.t t/*/*.t';
 
 clean_files 'lib/Mouse/Tiny.pm $(O_FILES)';
 

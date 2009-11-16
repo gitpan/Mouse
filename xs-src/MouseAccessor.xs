@@ -6,46 +6,8 @@
         }                                                             \
     } STMT_END
 
-/* Moose XS Attribute object */
-enum mouse_xa_ix_t{
-    MOUSE_XA_ATTRIBUTE,
-    MOUSE_XA_TC,
-    MOUSE_XA_TC_CODE,
-
-    MOUSE_XA_last
-};
-
-#define MOUSE_xa_attribute(m) MOUSE_av_at(m, MOUSE_XA_ATTRIBUTE)
-#define MOUSE_xa_tc(m)        MOUSE_av_at(m, MOUSE_XA_TC)
-#define MOUSE_xa_tc_code(m)   MOUSE_av_at(m, MOUSE_XA_TC_CODE)
 
 #define MOUSE_mg_attribute(mg) MOUSE_xa_attribute(MOUSE_mg_xa(mg))
-
-enum mouse_xa_flags_t{
-    MOUSEf_ATTR_HAS_TC          = 0x0001,
-    MOUSEf_ATTR_HAS_DEFAULT     = 0x0002,
-    MOUSEf_ATTR_HAS_BUILDER     = 0x0004,
-    MOUSEf_ATTR_HAS_INITIALIZER = 0x0008, /* not used in Mouse */
-    MOUSEf_ATTR_HAS_TRIGGER     = 0x0010,
-
-    MOUSEf_ATTR_IS_LAZY         = 0x0020,
-    MOUSEf_ATTR_IS_WEAK_REF     = 0x0040,
-    MOUSEf_ATTR_IS_REQUIRED     = 0x0080,
-
-    MOUSEf_ATTR_SHOULD_COERCE   = 0x0100,
-
-    MOUSEf_ATTR_SHOULD_AUTO_DEREF
-                                = 0x0200,
-    MOUSEf_TC_IS_ARRAYREF       = 0x0400,
-    MOUSEf_TC_IS_HASHREF        = 0x0800,
-
-    MOUSEf_OTHER1               = 0x1000,
-    MOUSEf_OTHER2               = 0x2000,
-    MOUSEf_OTHER3               = 0x4000,
-    MOUSEf_OTHER4               = 0x8000,
-
-    MOUSEf_MOUSE_MASK           = 0xFFFF /* not used */
-};
 
 static MGVTBL mouse_accessor_vtbl; /* MAGIC identity */
 
@@ -66,122 +28,25 @@ mouse_accessor_get_self(pTHX_ I32 const ax, I32 const items, CV* const cv) {
 
 CV*
 mouse_instantiate_xs_accessor(pTHX_ SV* const attr, XSUBADDR_t const accessor_impl){
-    SV* const slot = mcall0(attr,  mouse_name);
-    AV* const xa = newAV();
+    AV* const xa = mouse_get_xa(aTHX_ attr);
     CV* xsub;
     MAGIC* mg;
-    U16 flags = 0;
-
-    sv_2mortal((SV*)xa);
 
     xsub = newXS(NULL, accessor_impl, __FILE__);
     sv_2mortal((SV*)xsub);
 
-    mg = sv_magicext((SV*)xsub, slot, PERL_MAGIC_ext, &mouse_accessor_vtbl, (char*)xa, HEf_SVKEY);
+    mg = sv_magicext((SV*)xsub, MOUSE_xa_slot(xa), PERL_MAGIC_ext, &mouse_accessor_vtbl, (char*)xa, HEf_SVKEY);
+
+    MOUSE_mg_flags(mg) = (U16)MOUSE_xa_flags(xa);
 
     /* NOTE:
      * although we use MAGIC for gc, we also store mg to CvXSUBANY for efficiency (gfx)
      */
     CvXSUBANY(xsub).any_ptr = (void*)mg;
 
-    av_extend(xa, MOUSE_XA_last - 1);
-
-    av_store(xa, MOUSE_XA_ATTRIBUTE, newSVsv(attr));
-
-    /* prepare attribute status */
-    /* XXX: making it lazy is a good way? */
-
-    if(SvTRUEx(mcall0s(attr, "has_type_constraint"))){
-        SV* tc;
-        flags |= MOUSEf_ATTR_HAS_TC;
-
-        ENTER;
-        SAVETMPS;
-
-        tc = mcall0s(attr, "type_constraint");
-        av_store(xa, MOUSE_XA_TC, newSVsv(tc));
-
-        if(SvTRUEx(mcall0s(attr, "should_auto_deref"))){
-            flags |= MOUSEf_ATTR_SHOULD_AUTO_DEREF;
-            if( SvTRUEx(mcall1s(tc, "is_a_type_of", newSVpvs_flags("ArrayRef", SVs_TEMP))) ){
-                flags |= MOUSEf_TC_IS_ARRAYREF;
-            }
-            else if( SvTRUEx(mcall1s(tc, "is_a_type_of", newSVpvs_flags("HashRef", SVs_TEMP))) ){
-                flags |= MOUSEf_TC_IS_HASHREF;
-            }
-            else{
-                mouse_throw_error(attr, tc,
-                    "Can not auto de-reference the type constraint '%"SVf"'",
-                        mcall0(tc, mouse_name));
-            }
-        }
-
-        if(SvTRUEx(mcall0s(attr, "should_coerce"))){
-            flags |= MOUSEf_ATTR_SHOULD_COERCE;
-        }
-
-        FREETMPS;
-        LEAVE;
-    }
-
-    if(SvTRUEx(mcall0s(attr, "has_trigger"))){
-        flags |= MOUSEf_ATTR_HAS_TRIGGER;
-    }
-
-    if(SvTRUEx(mcall0s(attr, "is_lazy"))){
-        flags |= MOUSEf_ATTR_IS_LAZY;
-
-        if(SvTRUEx(mcall0s(attr, "has_builder"))){
-            flags |= MOUSEf_ATTR_HAS_BUILDER;
-        }
-        else if(SvTRUEx(mcall0s(attr, "has_default"))){
-            flags |= MOUSEf_ATTR_HAS_DEFAULT;
-        }
-    }
-
-    if(SvTRUEx(mcall0s(attr, "is_weak_ref"))){
-        flags |= MOUSEf_ATTR_IS_WEAK_REF;
-    }
-
-    if(SvTRUEx(mcall0s(attr, "is_required"))){
-        flags |= MOUSEf_ATTR_IS_REQUIRED;
-    }
-
-    MOUSE_mg_flags(mg) = flags;
-
     return xsub;
 }
 
-static SV*
-mouse_apply_type_constraint(pTHX_ AV* const xa, SV* value, U16 const flags){
-    SV* const tc = MOUSE_xa_tc(xa);
-    SV* tc_code;
-
-    if(flags & MOUSEf_ATTR_SHOULD_COERCE){
-          value = mcall1s(tc, "coerce", value);
-    }
-
-    if(!SvOK(MOUSE_xa_tc_code(xa))){
-        tc_code = mcall0s(tc, "_compiled_type_constraint");
-        av_store(xa, MOUSE_XA_TC_CODE, newSVsv(tc_code));
-
-        if(!(SvROK(tc_code) && SvTYPE(SvRV(tc_code)) == SVt_PVCV)){
-            mouse_throw_error(MOUSE_xa_attribute(xa), tc, "Not a CODE reference");
-        }
-    }
-    else{
-        tc_code = MOUSE_xa_tc_code(xa);
-    }
-
-    if(!mouse_tc_check(aTHX_ tc_code, value)){
-        mouse_throw_error(MOUSE_xa_attribute(xa), value,
-            "Attribute (%"SVf") does not pass the type constraint because: %"SVf,
-                mcall0(MOUSE_xa_attribute(xa), mouse_name),
-                mcall1s(tc, "get_message", value));
-    }
-
-    return value;
-}
 
 #define PUSH_VALUE(value, flags) STMT_START { \
         if((flags) & MOUSEf_ATTR_SHOULD_AUTO_DEREF && GIMME_V == G_ARRAY){ \
@@ -206,14 +71,15 @@ mouse_push_values(pTHX_ SV* const value, U16 const flags){
     }
 
     if(flags & MOUSEf_TC_IS_ARRAYREF){
-        AV* const av = (AV*)SvRV(value);
+        AV* av;
         I32 len;
         I32 i;
 
-        if(SvTYPE(av) != SVt_PVAV){
+        if(!IsArrayRef(value)){
             croak("Mouse-panic: Not an ARRAY reference");
         }
 
+        av  = (AV*)SvRV(value);
         len = av_len(av) + 1;
         EXTEND(SP, len);
         for(i = 0; i < len; i++){
@@ -222,13 +88,14 @@ mouse_push_values(pTHX_ SV* const value, U16 const flags){
         }
     }
     else if(flags & MOUSEf_TC_IS_HASHREF){
-        HV* const hv = (HV*)SvRV(value);
+        HV* hv;
         HE* he;
 
-        if(SvTYPE(hv) != SVt_PVHV){
+        if(!IsHashRef(value)){
             croak("Mouse-panic: Not a HASH reference");
         }
 
+        hv = (HV*)SvRV(value);
         hv_iterinit(hv);
         while((he = hv_iternext(hv))){
             EXTEND(SP, 2);
@@ -243,36 +110,13 @@ mouse_push_values(pTHX_ SV* const value, U16 const flags){
 static void
 mouse_attr_get(pTHX_ SV* const self, MAGIC* const mg){
     U16 const flags = MOUSE_mg_flags(mg);
-    SV* const slot  = MOUSE_mg_slot(mg);
     SV* value;
 
-    value = get_slot(self, slot);
+    value = get_slot(self, MOUSE_mg_slot(mg));
 
     /* check_lazy */
     if( !value && flags & MOUSEf_ATTR_IS_LAZY ){
-        AV* const xa   = MOUSE_mg_xa(mg);
-        SV* const attr = MOUSE_xa_attribute(xa);
-
-        /* get default value by $attr->builder or $attr->default */
-        if(flags & MOUSEf_ATTR_HAS_BUILDER){
-            SV* const builder = mcall0s(attr, "builder");
-            value = mcall0(self, builder);
-        }
-        else {
-            value = mcall0s(attr, "default");
-
-            if(SvROK(value) && SvTYPE(SvRV(value)) == SVt_PVCV){
-                value = mcall0(self, value);
-            }
-        }
-
-        /* apply coerce and type constraint */
-        if(flags & MOUSEf_ATTR_HAS_TC){
-            value = mouse_apply_type_constraint(aTHX_ xa, value, flags);
-        }
-
-        /* store value to slot */
-        value = set_slot(self, slot, value);
+        value = mouse_xa_set_default(aTHX_ MOUSE_mg_xa(mg), self);
     }
 
     PUSH_VALUE(value, flags);
@@ -284,7 +128,7 @@ mouse_attr_set(pTHX_ SV* const self, MAGIC* const mg, SV* value){
     SV* const slot  = MOUSE_mg_slot(mg);
 
     if(flags & MOUSEf_ATTR_HAS_TC){
-        value = mouse_apply_type_constraint(aTHX_ MOUSE_mg_xa(mg), value, flags);
+        value = mouse_xa_apply_type_constraint(aTHX_ MOUSE_mg_xa(mg), value, flags);
     }
 
     set_slot(self, slot, value);
@@ -310,7 +154,7 @@ mouse_attr_set(pTHX_ SV* const self, MAGIC* const mg, SV* value){
     PUSH_VALUE(value, flags);
 }
 
-XS(mouse_xs_accessor)
+XS(XS_Mouse_accessor)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -332,7 +176,7 @@ XS(mouse_xs_accessor)
 }
 
 
-XS(mouse_xs_reader)
+XS(XS_Mouse_reader)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -349,7 +193,7 @@ XS(mouse_xs_reader)
     mouse_attr_get(aTHX_ self, mg);
 }
 
-XS(mouse_xs_writer)
+XS(XS_Mouse_writer)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -397,7 +241,7 @@ mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const
     return xsub;
 }
 
-XS(mouse_xs_simple_reader)
+XS(XS_Mouse_simple_reader)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -414,7 +258,7 @@ XS(mouse_xs_simple_reader)
 }
 
 
-XS(mouse_xs_simple_writer)
+XS(XS_Mouse_simple_writer)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -428,7 +272,7 @@ XS(mouse_xs_simple_writer)
     XSRETURN(1);
 }
 
-XS(mouse_xs_simple_clearer)
+XS(XS_Mouse_simple_clearer)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -444,7 +288,7 @@ XS(mouse_xs_simple_clearer)
     XSRETURN(1);
 }
 
-XS(mouse_xs_simple_predicate)
+XS(XS_Mouse_simple_predicate)
 {
     dVAR; dXSARGS;
     dMOUSE_self;
@@ -463,6 +307,7 @@ XS(mouse_xs_simple_predicate)
 SV*
 mouse_instance_create(pTHX_ HV* const stash) {
     assert(stash);
+    assert(SvTYPE(stash) == SVt_PVHV);
     return sv_bless( newRV_noinc((SV*)newHV()), stash );
 }
 
@@ -537,7 +382,7 @@ CV*
 _generate_accessor(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, mouse_xs_accessor);
+    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_accessor);
 }
 OUTPUT:
     RETVAL
@@ -546,7 +391,7 @@ CV*
 _generate_reader(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, mouse_xs_reader);
+    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_reader);
 }
 OUTPUT:
     RETVAL
@@ -555,7 +400,7 @@ CV*
 _generate_writer(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, mouse_xs_writer);
+    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_writer);
 }
 OUTPUT:
     RETVAL
@@ -567,7 +412,7 @@ CODE:
     SV* const slot = mcall0s(attr, "name");
     STRLEN len;
     const char* const pv = SvPV_const(slot, len);
-    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, mouse_xs_simple_clearer);
+    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, XS_Mouse_simple_clearer);
 }
 OUTPUT:
     RETVAL
@@ -579,7 +424,7 @@ CODE:
     SV* const slot = mcall0s(attr, "name");
     STRLEN len;
     const char* const pv = SvPV_const(slot, len);
-    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, mouse_xs_simple_predicate);
+    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, XS_Mouse_simple_predicate);
 }
 OUTPUT:
     RETVAL

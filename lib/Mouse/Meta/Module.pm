@@ -6,6 +6,14 @@ use Scalar::Util ();
 
 my %METAS;
 
+if(Mouse::Util::_MOUSE_XS){
+    # register meta storage for performance
+    Mouse::Util::__register_metaclass_storage(\%METAS, 0);
+
+    # ensure thread safety
+    *CLONE = sub { Mouse::Util::__register_metaclass_storage(\%METAS, 1) };
+}
+
 sub _metaclass_cache { # DEPRECATED
     my($class, $name) = @_;
     return $METAS{$name};
@@ -64,8 +72,10 @@ sub get_attribute_map { # DEPRECATED
 
 sub has_attribute     { exists $_[0]->{attributes}->{$_[1]} }
 sub get_attribute     {        $_[0]->{attributes}->{$_[1]} }
-sub get_attribute_list{ keys %{$_[0]->{attributes}}         }
 sub remove_attribute  { delete $_[0]->{attributes}->{$_[1]} }
+
+sub get_attribute_list{ keys   %{$_[0]->{attributes}} }
+
 
 # XXX: for backward compatibility
 my %foreign = map{ $_ => undef } qw(
@@ -288,7 +298,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SEE ALSO
 

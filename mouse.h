@@ -6,12 +6,15 @@
 #include <perl.h>
 #include <XSUB.h>
 
-#define  NEED_newSVpvn_flags
 #include "ppport.h"
 
 /* for portability */
 #ifndef newSVpvs_share
 #define newSVpvs_share(s) Perl_newSVpvn_share(aTHX_ s, sizeof(s)-1, 0U)
+#endif
+
+#ifndef get_cvs
+#define get_cvs(name, flags) get_cv(name, flags)
 #endif
 
 #ifndef GvNAME_get
@@ -34,6 +37,9 @@ AV* mouse_mro_get_linear_isa(pTHX_ HV* const stash);
 #define mro_get_pkg_gen(stash) (HvAUX(stash)->xhv_mro_meta ? HvAUX(stash)->xhv_mro_meta->pkg_gen : (U32)0)
 #endif /* !no_mro_get_linear_isa */
 #endif /* mro_get_package_gen */
+
+#define newAV_mortal() (AV*)sv_2mortal((SV*)newAV())
+#define newHV_mortal() (HV*)sv_2mortal((SV*)newHV())
 
 #define MOUSE_CALL_BOOT(name) STMT_START {      \
         EXTERN_C XS(CAT2(boot_, name));         \
@@ -59,15 +65,32 @@ bool mouse_is_class_loaded(pTHX_ SV*);
 
 #define is_an_instance_of(klass, sv) mouse_is_an_instance_of(aTHX_ gv_stashpvs(klass, GV_ADD), (sv))
 
-#define IsObject(sv) (SvROK(sv) && SvOBJECT(SvRV(sv)))
+#define IsObject(sv)   (SvROK(sv) && SvOBJECT(SvRV(sv)))
+#define IsArrayRef(sv) (SvROK(sv) && !SvOBJECT(SvRV(sv)) && SvTYPE(SvRV(sv)) == SVt_PVAV)
+#define IsHashRef(sv)  (SvROK(sv) && !SvOBJECT(SvRV(sv)) && SvTYPE(SvRV(sv)) == SVt_PVHV)
+#define IsCodeRef(sv)  (SvROK(sv) && !SvOBJECT(SvRV(sv)) && SvTYPE(SvRV(sv)) == SVt_PVCV)
 
-#define mcall0(invocant, m)        mouse_call0(aTHX_ (invocant), (m))
-#define mcall1(invocant, m, arg1)  mouse_call1(aTHX_ (invocant), (m), (arg1))
-#define mcall0s(invocant, m)       mcall0((invocant), sv_2mortal(newSVpvs_share(m)))
-#define mcall1s(invocant, m, arg1) mcall1((invocant), sv_2mortal(newSVpvs_share(m)), (arg1))
+#define mcall0(invocant, m)          mouse_call0(aTHX_ (invocant), (m))
+#define mcall1(invocant, m, arg1)    mouse_call1(aTHX_ (invocant), (m), (arg1))
+#define predicate_call(invocant, m)  mouse_predicate_call(aTHX_ (invocant), (m))
+
+#define mcall0s(invocant, m)          mcall0((invocant), sv_2mortal(newSVpvs_share(m)))
+#define mcall1s(invocant, m, arg1)    mcall1((invocant), sv_2mortal(newSVpvs_share(m)), (arg1))
+#define predicate_calls(invocant, m)  predicate_call((invocant), sv_2mortal(newSVpvs_share(m)))
+
+
+#define get_metaclass(name) mouse_get_metaclass(aTHX_ name)
 
 SV* mouse_call0(pTHX_ SV *const self, SV *const method);
 SV* mouse_call1(pTHX_ SV *const self, SV *const method, SV* const arg1);
+int mouse_predicate_call(pTHX_ SV* const self, SV* const method);
+
+SV* mouse_get_metaclass(pTHX_ SV* metaclass_name);
+
+GV* mouse_stash_fetch(pTHX_ HV* const stash, const char* const name, I32 const namelen, I32 const create);
+#define stash_fetch(s, n, l, c) mouse_stash_fetch(aTHX_ (s), (n), (l), (c))
+#define stash_fetchs(s, n, c)   mouse_stash_fetch(aTHX_ (s), STR_WITH_LEN(n), (c))
+
 
 #define MOUSEf_DIE_ON_FAIL 0x01
 MAGIC* mouse_mg_find(pTHX_ SV* const sv, const MGVTBL* const vtbl, I32 const flags);
@@ -113,26 +136,26 @@ void mouse_instance_weaken_slot(pTHX_ SV* const instance, SV* const slot);
 
 /* mouse_simle_accessor.xs */
 #define INSTALL_SIMPLE_READER(klass, name)                  INSTALL_SIMPLE_READER_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_READER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, mouse_xs_simple_reader)
+#define INSTALL_SIMPLE_READER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_reader)
 
 #define INSTALL_SIMPLE_WRITER(klass, name)                  INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, mouse_xs_simple_writer)
+#define INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_writer)
 
 #define INSTALL_SIMPLE_PREDICATE(klass, name)                INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, key) (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, mouse_xs_simple_predicate)
+#define INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, key) (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_predicate)
 
 CV* mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl);
 
-XS(mouse_xs_simple_reader);
-XS(mouse_xs_simple_writer);
-XS(mouse_xs_simple_clearer);
-XS(mouse_xs_simple_predicate);
+XS(XS_Mouse_simple_reader);
+XS(XS_Mouse_simple_writer);
+XS(XS_Mouse_simple_clearer);
+XS(XS_Mouse_simple_predicate);
 
 CV* mouse_instantiate_xs_accessor(pTHX_ SV* const attr, XSUBADDR_t const accessor_impl);
 
-XS(mouse_xs_accessor);
-XS(mouse_xs_reader);
-XS(mouse_xs_writer);
+XS(XS_Mouse_accessor);
+XS(XS_Mouse_reader);
+XS(XS_Mouse_writer);
 
 /* type constraints */
 
@@ -163,6 +186,57 @@ CV* mouse_generate_isa_predicate_for(pTHX_ SV* const klass, const char* const pr
 int mouse_is_an_instance_of(pTHX_ HV* const stash, SV* const instance);
 
 XS(XS_Mouse_constraint_check);
+
+/* Mouse XS Attribute object */
+
+AV* mouse_get_xa(pTHX_ SV* const attr);
+SV* mouse_xa_apply_type_constraint(pTHX_ AV* const xa, SV* value, U16 const flags);
+SV* mouse_xa_set_default(pTHX_ AV* const xa, SV* const object);
+
+enum mouse_xa_ix_t{
+    MOUSE_XA_SLOT,      /* for constructors, sync to mg_obj */
+    MOUSE_XA_FLAGS,     /* for constructors, sync to mg_private */
+    MOUSE_XA_ATTRIBUTE,
+    MOUSE_XA_INIT_ARG,
+    MOUSE_XA_TC,
+    MOUSE_XA_TC_CODE,
+
+    MOUSE_XA_last
+};
+
+#define MOUSE_xa_slot(m)      MOUSE_av_at(m, MOUSE_XA_SLOT)
+#define MOUSE_xa_flags(m)     SvUVX( MOUSE_av_at(m, MOUSE_XA_FLAGS) )
+#define MOUSE_xa_attribute(m) MOUSE_av_at(m, MOUSE_XA_ATTRIBUTE)
+#define MOUSE_xa_init_arg(m)  MOUSE_av_at(m, MOUSE_XA_INIT_ARG)
+#define MOUSE_xa_tc(m)        MOUSE_av_at(m, MOUSE_XA_TC)
+#define MOUSE_xa_tc_code(m)   MOUSE_av_at(m, MOUSE_XA_TC_CODE)
+
+enum mouse_xa_flags_t{
+    MOUSEf_ATTR_HAS_TC          = 0x0001,
+    MOUSEf_ATTR_HAS_DEFAULT     = 0x0002,
+    MOUSEf_ATTR_HAS_BUILDER     = 0x0004,
+    MOUSEf_ATTR_HAS_INITIALIZER = 0x0008, /* not used */
+    MOUSEf_ATTR_HAS_TRIGGER     = 0x0010,
+
+    MOUSEf_ATTR_IS_LAZY         = 0x0020,
+    MOUSEf_ATTR_IS_WEAK_REF     = 0x0040,
+    MOUSEf_ATTR_IS_REQUIRED     = 0x0080,
+
+    MOUSEf_ATTR_SHOULD_COERCE   = 0x0100,
+
+    MOUSEf_ATTR_SHOULD_AUTO_DEREF
+                                = 0x0200,
+    MOUSEf_TC_IS_ARRAYREF       = 0x0400,
+    MOUSEf_TC_IS_HASHREF        = 0x0800,
+
+    MOUSEf_OTHER1               = 0x1000,
+    MOUSEf_OTHER2               = 0x2000,
+    MOUSEf_OTHER3               = 0x4000,
+    MOUSEf_OTHER4               = 0x8000,
+
+    MOUSEf_MOUSE_MASK           = 0xFFFF /* not used */
+};
+
 
 #endif /* !MOUSE_H */
 

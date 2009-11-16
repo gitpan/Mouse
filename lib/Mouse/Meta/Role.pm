@@ -11,10 +11,10 @@ sub _construct_meta {
 
     my %args  = @_;
 
-    $args{methods}          ||= {};
-    $args{attributes}       ||= {};
-    $args{required_methods} ||= [];
-    $args{roles}            ||= [];
+    $args{methods}          = {};
+    $args{attributes}       = {};
+    $args{required_methods} = [];
+    $args{roles}            = [];
 
     my $self = bless \%args, ref($class) || $class;
     if($class ne __PACKAGE__){
@@ -330,7 +330,7 @@ Mouse::Meta::Role - The Mouse Role metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SEE ALSO
 

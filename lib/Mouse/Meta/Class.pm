@@ -3,23 +3,21 @@ use Mouse::Util qw/:meta get_linear_isa not_supported/; # enables strict and war
 
 use Scalar::Util qw/blessed weaken/;
 
-use Mouse::Meta::Method::Constructor;
-use Mouse::Meta::Method::Destructor;
 use Mouse::Meta::Module;
 our @ISA = qw(Mouse::Meta::Module);
 
 sub method_metaclass()    { 'Mouse::Meta::Method'    }
 sub attribute_metaclass() { 'Mouse::Meta::Attribute' }
 
-sub constructor_class()   { 'Mouse::Meta::Method::Constructor' }
-sub destructor_class()    { 'Mouse::Meta::Method::Destructor'  }
+sub constructor_class();
+sub destructor_class();
 
 sub _construct_meta {
     my($class, %args) = @_;
 
-    $args{attributes} ||= {};
-    $args{methods}    ||= {};
-    $args{roles}      ||= [];
+    $args{attributes} = {};
+    $args{methods}    = {};
+    $args{roles}      = [];
 
     $args{superclasses} = do {
         no strict 'refs';
@@ -154,23 +152,6 @@ sub compute_all_applicable_attributes {
     return shift->get_all_attributes(@_)
 }
 
-sub get_all_attributes {
-    my $self = shift;
-    my (@attr, %seen);
-
-    for my $class ($self->linearized_isa) {
-        my $meta = Mouse::Util::get_metaclass_by_name($class)
-            or next;
-
-        for my $name ($meta->get_attribute_list) {
-            next if $seen{$name}++;
-            push @attr, $meta->get_attribute($name);
-        }
-    }
-
-    return @attr;
-}
-
 sub linearized_isa;
 
 sub new_object {
@@ -180,60 +161,6 @@ sub new_object {
     my $object = bless {}, $self->name;
 
     $self->_initialize_object($object, \%args);
-    return $object;
-}
-
-sub _initialize_object{
-    my($self, $object, $args) = @_;
-
-    my @triggers_queue;
-
-    foreach my $attribute ($self->get_all_attributes) {
-        my $from = $attribute->init_arg;
-        my $key  = $attribute->name;
-
-        if (defined($from) && exists($args->{$from})) {
-            $object->{$key} = $attribute->_coerce_and_verify($args->{$from}, $object);
-
-            weaken($object->{$key})
-                if ref($object->{$key}) && $attribute->is_weak_ref;
-
-            if ($attribute->has_trigger) {
-                push @triggers_queue, [ $attribute->trigger, $object->{$key} ];
-            }
-        }
-        else {
-            if ($attribute->has_default || $attribute->has_builder) {
-                unless ($attribute->is_lazy) {
-                    my $default = $attribute->default;
-                    my $builder = $attribute->builder;
-                    my $value =   $builder                ? $object->$builder()
-                                : ref($default) eq 'CODE' ? $object->$default()
-                                :                           $default;
-
-                    $object->{$key} = $attribute->_coerce_and_verify($value, $object);
-
-                    weaken($object->{$key})
-                        if ref($object->{$key}) && $attribute->is_weak_ref;
-                }
-            }
-            else {
-                if ($attribute->is_required) {
-                    $self->throw_error("Attribute (".$attribute->name.") is required");
-                }
-            }
-        }
-    }
-
-    foreach my $trigger_and_value(@triggers_queue){
-        my($trigger, $value) = @{$trigger_and_value};
-        $trigger->($object, $value);
-    }
-
-    if($self->is_anon_class){
-        $object->{__METACLASS__} = $self;
-    }
-
     return $object;
 }
 
@@ -271,13 +198,17 @@ sub make_immutable {
     $self->{is_immutable}++;
 
     if ($args{inline_constructor}) {
+        my $c = $self->constructor_class;
+        Mouse::Util::load_class($c);
         $self->add_method($args{constructor_name} =>
-            $self->constructor_class->_generate_constructor($self, \%args));
+            $c->_generate_constructor($self, \%args));
     }
 
     if ($args{inline_destructor}) {
+        my $c = $self->destructor_class;
+        Mouse::Util::load_class($c);
         $self->add_method(DESTROY =>
-            $self->destructor_class->_generate_destructor($self, \%args));
+            $c->_generate_destructor($self, \%args));
     }
 
     # Moose's make_immutable returns true allowing calling code to skip setting an explicit true value
@@ -479,7 +410,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 METHODS
 

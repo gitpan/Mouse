@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.40_05';
+our $VERSION = '0.40_06';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -160,7 +160,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_05
+This document describes Mouse version 0.40_06
 
 =head1 SYNOPSIS
 
@@ -408,9 +408,9 @@ L<Class::MOP>
 
 =head1 AUTHORS
 
-Shawn M Moore, E<lt>sartak at gmail.comE<gt>
+Shawn M Moore E<lt>sartak at gmail.comE<gt>
 
-Yuval Kogman, E<lt>nothingmuch at woobling.orgE<gt>
+Yuval Kogman E<lt>nothingmuch at woobling.orgE<gt>
 
 tokuhirom
 

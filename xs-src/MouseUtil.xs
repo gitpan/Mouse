@@ -1,5 +1,11 @@
 #include "mouse.h"
 
+#define MY_CXT_KEY "Mouse::Util::_guts" XS_VERSION
+typedef struct {
+    HV* metas;
+} my_cxt_t;
+START_MY_CXT
+
 #define ISA_CACHE "::LINEALIZED_ISA_CACHE::"
 
 #ifdef no_mro_get_linear_isa
@@ -21,8 +27,8 @@ mouse_mro_get_linear_isa(pTHX_ HV* const stash){
         return isa; /* returns the cache if available */
     }
     else{
-        SvREADONLY_off(isa);
-        av_clear(isa);
+        SvREFCNT_dec(isa);
+        GvAV(cachegv) = isa = newAV();
     }
 
     get_linear_isa = get_cv("Mouse::Util::get_linear_isa", TRUE);
@@ -44,7 +50,7 @@ mouse_mro_get_linear_isa(pTHX_ HV* const stash){
         avref = POPs;
         PUTBACK;
 
-        if(SvROK(avref) && SvTYPE(SvRV(avref)) == SVt_PVAV){
+        if(IsArrayRef(avref)){
             AV* const av  = (AV*)SvRV(avref);
             I32 const len = AvFILLp(av) + 1;
             I32 i;
@@ -65,7 +71,7 @@ mouse_mro_get_linear_isa(pTHX_ HV* const stash){
     }
 
     sv_setiv(gen, (IV)mro_get_pkg_gen(stash));
-    return GvAV(cachegv);
+    return isa;
 }
 #endif /* !no_mor_get_linear_isa */
 
@@ -156,9 +162,8 @@ mouse_is_class_loaded(pTHX_ SV * const klass){
 }
 
 
-SV *
-mouse_call0 (pTHX_ SV *const self, SV *const method)
-{
+SV*
+mouse_call0 (pTHX_ SV* const self, SV* const method) {
     dSP;
     SV *ret;
 
@@ -175,9 +180,8 @@ mouse_call0 (pTHX_ SV *const self, SV *const method)
     return ret;
 }
 
-SV *
-mouse_call1 (pTHX_ SV *const self, SV *const method, SV* const arg1)
-{
+SV*
+mouse_call1 (pTHX_ SV* const self, SV* const method, SV* const arg1) {
     dSP;
     SV *ret;
 
@@ -194,6 +198,32 @@ mouse_call1 (pTHX_ SV *const self, SV *const method, SV* const arg1)
     PUTBACK;
 
     return ret;
+}
+
+int
+mouse_predicate_call(pTHX_ SV* const self, SV* const method) {
+    SV* const value = mcall0(self, method);
+    return SvTRUE(value);
+}
+
+SV*
+mouse_get_metaclass(pTHX_ SV* metaclass_name){
+    dMY_CXT;
+    HE* he;
+
+    assert(metaclass_name);
+    assert(MY_CXT.metas);
+
+    if(IsObject(metaclass_name)){
+        HV* const stash = SvSTASH(SvRV(metaclass_name));
+
+        metaclass_name = newSVpvn_share(HvNAME_get(stash), HvNAMELEN_get(stash), 0U);
+        sv_2mortal(metaclass_name);
+    }
+
+    he = hv_fetch_ent(MY_CXT.metas, metaclass_name, FALSE, 0U);
+
+    return he ? HeVAL(he) : &PL_sv_undef;
 }
 
 MAGIC*
@@ -213,10 +243,47 @@ mouse_mg_find(pTHX_ SV* const sv, const MGVTBL* const vtbl, I32 const flags){
     return NULL;
 }
 
+GV*
+mouse_stash_fetch(pTHX_ HV* const stash, const char* const name, I32 const namelen, I32 const create) {
+    GV** const gvp = (GV**)hv_fetch(stash, name, namelen, create);
+
+    if(gvp){
+        if(!isGV(*gvp)){
+            gv_init(*gvp, stash, name, namelen, GV_ADDMULTI);
+        }
+        return *gvp;
+    }
+    else{
+        return NULL;
+    }
+}
+
 MODULE = Mouse::Util  PACKAGE = Mouse::Util
 
 PROTOTYPES:   DISABLE
 VERSIONCHECK: DISABLE
+
+BOOT:
+{
+    MY_CXT_INIT;
+    MY_CXT.metas = NULL;
+}
+
+void
+__register_metaclass_storage(HV* metas, bool cloning)
+CODE:
+{
+    if(cloning){
+        MY_CXT_CLONE;
+        MY_CXT.metas = NULL;
+    }
+    {
+        dMY_CXT;
+        if(MY_CXT.metas) croak("Cannot set metaclass storage more than once");
+        MY_CXT.metas = metas;
+        SvREFCNT_inc_simple_void_NN(metas);
+    }
+}
 
 bool
 is_class_loaded(SV* sv)
@@ -252,7 +319,9 @@ get_code_ref(SV* package, SV* name)
 CODE:
 {
     HV* stash;
-    HE* he;
+    STRLEN name_len;
+    const char* name_pv;
+    GV* gv;
 
     if(!SvOK(package)){
         croak("You must define a package name");
@@ -265,19 +334,10 @@ CODE:
     if(!stash){
         XSRETURN_UNDEF;
     }
-    he = hv_fetch_ent(stash, name, FALSE, 0U);
-    if(he){
-        GV* const gv = (GV*)hv_iterval(stash, he);
-        if(!isGV(gv)){ /* special constant or stub */
-            STRLEN len;
-            const char* const pv = SvPV_const(name, len);
-            gv_init(gv, stash, pv, len, GV_ADDMULTI);
-        }
-        RETVAL = GvCVu(gv);
-    }
-    else{
-        RETVAL = NULL;
-    }
+
+    name_pv = SvPV_const(name, name_len);
+    gv = stash_fetch(stash, name_pv, name_len, FALSE);
+    RETVAL = gv ? GvCVu(gv) : NULL;
 
     if(!RETVAL){
         XSRETURN_UNDEF;
