@@ -1,10 +1,4 @@
 .shipit
-author/create-moose-compatibility-tests.pl
-author/force-pp.pl
-author/generate-mouse-tiny.pl
-author/he-profile.pl
-author/test-externals.pl
-author/use-he.pl
 benchmarks/accessors.pl
 benchmarks/basic.pl
 benchmarks/class_type.pl
@@ -48,6 +42,7 @@ lib/Mouse/Role.pm
 lib/Mouse/Spec.pm
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
+lib/Mouse/Util/MetaRole.pm
 lib/Mouse/Util/TypeConstraints.pm
 lib/Mouse/XS.pod
 lib/ouse.pm
@@ -130,6 +125,8 @@ t/001_mouse/055-exporter.t
 t/001_mouse/056-role-combine.t
 t/001_mouse/057_subtype_without_where.t
 t/001_mouse/058-accessor-leaks.t
+t/001_mouse/059-weak-with-default.t
+t/001_mouse/060-threads.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -225,6 +222,9 @@ t/040_type_constraints/025_type_coersion_on_lazy_attributes.t
 t/050_metaclasses/001_custom_attr_meta_with_roles.t
 t/050_metaclasses/002_custom_attr_meta_as_role.t
 t/050_metaclasses/011_init_meta.t
+t/050_metaclasses/017_use_base_of_moose.t
+t/050_metaclasses/020_metaclass_parameterized_traits.t
+t/050_metaclasses/041_moose_nonmoose_moose_chain_init_meta.t
 t/100_bugs/001_subtype_quote_bug.t
 t/100_bugs/002_subtype_conflict_bug.t
 t/100_bugs/003_Moose_Object_error.t
@@ -273,6 +273,7 @@ t/lib/Bar.pm
 t/lib/BaseClass.pm
 t/lib/ClassType_Foo.pm
 t/lib/Foo.pm
+t/lib/MyMetaclassRole.pm
 t/lib/MyMouseA.pm
 t/lib/MyMouseB.pm
 t/lib/MyMouseObject.pm
@@ -282,6 +283,9 @@ t/lib/Role/Parent.pm
 t/lib/SyntaxError.pm
 t/lib/Test/Mouse.pm
 t/lib/Unsweetened.pm
+tool/create-moose-compatibility-tests.pl
+tool/force-pp.pl
+tool/generate-mouse-tiny.pl
 xs-src/Mouse.xs
 xs-src/MouseAccessor.xs
 xs-src/MouseAttribute.xs

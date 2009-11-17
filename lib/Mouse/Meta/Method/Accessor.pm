@@ -25,7 +25,7 @@ sub _generate_accessor{
 
     $type ||= 'accessor';
 
-    my $accessor = sprintf(qq{#line 1 "%s for %s (%s)"\n}, $type, $name, __FILE__)
+    my $accessor = sprintf(qq{package %s;\n#line 1 "%s for %s (%s)"\n}, $class->name, $type, $name, __FILE__)
                  . "sub {\n";
 
     if ($type eq 'accessor' || $type eq 'writer') {
@@ -104,6 +104,9 @@ sub _generate_accessor{
         else{
             $accessor .= "$slot = $value;\n";
         }
+        if ($is_weak) {
+            $accessor .= "Scalar::Util::weaken($slot) if ref $slot;\n";
+        }
         $accessor .= "}\n";
     }
 
@@ -121,7 +124,7 @@ sub _generate_accessor{
 
     $accessor .= "return $slot;\n}\n";
 
-    #print "# class ", $class->name, "\n", $accessor, "\n";
+    #print $accessor, "\n";
     my $code;
     my $e = do{
         local $@;
@@ -172,7 +175,7 @@ Mouse::Meta::Method::Accessor - A Mouse method generator for accessors
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_06
+This document describes Mouse version 0.40_07
 
 =head1 SEE ALSO
 

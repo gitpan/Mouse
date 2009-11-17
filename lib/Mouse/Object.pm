@@ -1,5 +1,5 @@
 package Mouse::Object;
-use Mouse::Util qw(does dump); # enables strict and warnings
+use Mouse::Util qw(does dump meta); # enables strict and warnings
 
 sub new;
 
@@ -49,7 +49,7 @@ Mouse::Object - The base object for Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_06
+This document describes Mouse version 0.40_07
 
 =head1 METHODS
 

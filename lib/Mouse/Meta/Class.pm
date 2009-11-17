@@ -6,11 +6,11 @@ use Scalar::Util qw/blessed weaken/;
 use Mouse::Meta::Module;
 our @ISA = qw(Mouse::Meta::Module);
 
-sub method_metaclass()    { 'Mouse::Meta::Method'    }
-sub attribute_metaclass() { 'Mouse::Meta::Attribute' }
+sub method_metaclass;
+sub attribute_metaclass;
 
-sub constructor_class();
-sub destructor_class();
+sub constructor_class;
+sub destructor_class;
 
 sub _construct_meta {
     my($class, %args) = @_;
@@ -140,7 +140,7 @@ sub add_attribute {
     $self->{attributes}{$attr->name} = $attr;
     $attr->install_accessors();
 
-    if(_MOUSE_VERBOSE && !$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
+    if(Mouse::Util::_MOUSE_VERBOSE && !$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
         Carp::cluck(qq{Attribute (}.$attr->name.qq{) of class }.$self->name.qq{ has no associated methods (did you mean to provide an "is" argument?)});
     }
     return $attr;
@@ -148,21 +148,13 @@ sub add_attribute {
 
 sub compute_all_applicable_attributes {
     Carp::cluck('compute_all_applicable_attributes() has been deprecated')
-        if _MOUSE_VERBOSE;
+        if Mouse::Util::_MOUSE_VERBOSE;
     return shift->get_all_attributes(@_)
 }
 
 sub linearized_isa;
 
-sub new_object {
-    my $self = shift;
-    my %args = (@_ == 1 ? %{$_[0]} : @_);
-
-    my $object = bless {}, $self->name;
-
-    $self->_initialize_object($object, \%args);
-    return $object;
-}
+sub new_object;
 
 sub clone_object {
     my $class  = shift;
@@ -182,7 +174,7 @@ sub clone_instance {
     my ($class, $instance, %params) = @_;
 
     Carp::cluck('clone_instance has been deprecated. Use clone_object instead')
-        if _MOUSE_VERBOSE;
+        if Mouse::Util::_MOUSE_VERBOSE;
     return $class->clone_object($instance, %params);
 }
 
@@ -410,7 +402,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_06
+This document describes Mouse version 0.40_07
 
 =head1 METHODS
 

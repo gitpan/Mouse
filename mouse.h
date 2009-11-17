@@ -8,7 +8,8 @@
 
 #include "ppport.h"
 
-/* for portability */
+/* Portability stuff */
+
 #ifndef newSVpvs_share
 #define newSVpvs_share(s) Perl_newSVpvn_share(aTHX_ s, sizeof(s)-1, 0U)
 #endif
@@ -37,6 +38,14 @@ AV* mouse_mro_get_linear_isa(pTHX_ HV* const stash);
 #define mro_get_pkg_gen(stash) (HvAUX(stash)->xhv_mro_meta ? HvAUX(stash)->xhv_mro_meta->pkg_gen : (U32)0)
 #endif /* !no_mro_get_linear_isa */
 #endif /* mro_get_package_gen */
+
+#if !defined(__GNUC__)
+#  if (!defined(__cplusplus__) || !defined(__STDC_VERSION__) ||  (__STDC_VERSION__ < 199901L)) && !defined(inline)
+#    define inline /* nothing */
+#  endif
+#endif
+
+/* Mouse stuff */
 
 #define newAV_mortal() (AV*)sv_2mortal((SV*)newAV())
 #define newHV_mortal() (HV*)sv_2mortal((SV*)newHV())
@@ -103,11 +112,9 @@ SV** mouse_av_at_safe(pTHX_ AV* const mi, I32 const ix);
 #define MOUSE_av_at(av, ix)  AvARRAY(av)[ix]
 #endif
 
-#define dMOUSE_self  SV* const self = mouse_accessor_get_self(aTHX_ ax, items, cv)
-SV* mouse_accessor_get_self(pTHX_ I32 const ax, I32 const items, CV* const cv);
-
 #define MOUSE_mg_obj(mg)     ((mg)->mg_obj)
 #define MOUSE_mg_ptr(mg)     ((mg)->mg_ptr)
+#define MOUSE_mg_len(mg)     ((mg)->mg_len)
 #define MOUSE_mg_flags(mg)   ((mg)->mg_private)
 #define MOUSE_mg_virtual(mg) ((mg)->mg_virtual)
 
@@ -135,17 +142,29 @@ void mouse_instance_weaken_slot(pTHX_ SV* const instance, SV* const slot);
 #define set_slots(self, key, value) set_slot(self, sv_2mortal(newSVpvs_share(key)), value)
 
 /* mouse_simle_accessor.xs */
-#define INSTALL_SIMPLE_READER(klass, name)                  INSTALL_SIMPLE_READER_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_READER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_reader)
+#define INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTSV(klass, name, dsv) \
+    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #name, sizeof(#name)-1, XS_Mouse_simple_accessor, (dsv), HEf_SVKEY)
+#define INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(klass, name, ds) \
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTSV(klass, name, newSVpvs(ds))
 
-#define INSTALL_SIMPLE_WRITER(klass, name)                  INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, key)    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_writer)
+#define INSTALL_SIMPLE_READER(klass, name) \
+    INSTALL_SIMPLE_READER_WITH_KEY(klass, name, name)
+#define INSTALL_SIMPLE_READER_WITH_KEY(klass, name, key) \
+    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_reader, NULL, 0)
 
-#define INSTALL_SIMPLE_PREDICATE(klass, name)                INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, name)
-#define INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, key) (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_predicate)
+#define INSTALL_SIMPLE_WRITER(klass, name) \
+    NSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, name)
+#define INSTALL_SIMPLE_WRITER_WITH_KEY(klass, name, key) \
+    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_writer, NULL, 0)
 
-CV* mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl);
+#define INSTALL_SIMPLE_PREDICATE(klass, name) \
+    INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, name)
+#define INSTALL_SIMPLE_PREDICATE_WITH_KEY(klass, name, key) \
+    (void)mouse_install_simple_accessor(aTHX_ "Mouse::Meta::" #klass "::" #name, #key, sizeof(#key)-1, XS_Mouse_simple_predicate, NULL, 0)
 
+CV* mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl, void* const dptr, I32 const dlen);
+
+XS(XS_Mouse_simple_accessor);
 XS(XS_Mouse_simple_reader);
 XS(XS_Mouse_simple_writer);
 XS(XS_Mouse_simple_clearer);

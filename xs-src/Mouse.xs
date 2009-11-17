@@ -150,7 +150,7 @@ mouse_class_update_xc(pTHX_ SV* const metaclass PERL_UNUSED_DECL, HV* const stas
     sv_setuv(MOUSE_xc_gen(xc), mro_get_pkg_gen(stash));
 }
 
-AV*
+static AV*
 mouse_get_xc(pTHX_ SV* const metaclass) {
     AV* xc;
     SV* gen;
@@ -202,7 +202,7 @@ mouse_get_xc(pTHX_ SV* const metaclass) {
     return xc;
 }
 
-HV*
+static HV*
 mouse_buildargs(pTHX_ SV* metaclass, SV* const klass, I32 ax, I32 items) {
     HV* args;
 
@@ -237,7 +237,7 @@ mouse_buildargs(pTHX_ SV* metaclass, SV* const klass, I32 ax, I32 items) {
     return args;
 }
 
-void
+static void
 mouse_class_initialize_object(pTHX_ SV* const meta, SV* const object, HV* const args, bool const ignore_triggers) {
     AV* const xc    = mouse_get_xc(aTHX_ meta);
     AV* const attrs = MOUSE_xc_attrall(xc);
@@ -436,11 +436,11 @@ MODULE = Mouse  PACKAGE = Mouse::Meta::Class
 BOOT:
     INSTALL_SIMPLE_READER(Class, roles);
     INSTALL_SIMPLE_PREDICATE_WITH_KEY(Class, is_anon_class, anon_serial_id);
-    newCONSTSUB(gv_stashpvs("Mouse::Meta::Class", TRUE), "constructor_class",
-        newSVpvs("Mouse::Meta::Method::Constructor::XS"));
-    newCONSTSUB(gv_stashpvs("Mouse::Meta::Class", TRUE), "destructor_class",
-        newSVpvs("Mouse::Meta::Method::Destructor::XS"));
 
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(Class, method_metaclass,     "Mouse::Meta::Method");
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(Class, attribute_metaclass,  "Mouse::Meta::Attribute");
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(Class, constructor_class,    "Mouse::Meta::Method::Constructor::XS");
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(Class, destructor_class,     "Mouse::Meta::Method::Destructor::XS");
 
     newCONSTSUB(gv_stashpvs("Mouse::Meta::Method::Constructor::XS", TRUE), "_generate_constructor",
         newRV_inc((SV*)get_cvs("Mouse::Object::new", TRUE)));
@@ -483,7 +483,7 @@ PPCODE:
 }
 
 SV*
-new_object_(SV* meta, ...)
+new_object(SV* meta, ...)
 CODE:
 {
     AV* const xc   = mouse_get_xc(aTHX_ meta);
@@ -492,7 +492,8 @@ CODE:
     RETVAL = mouse_instance_create(aTHX_ MOUSE_xc_stash(xc));
     mouse_class_initialize_object(aTHX_ meta, RETVAL, args, FALSE);
 }
-
+OUTPUT:
+    RETVAL
 
 void
 _initialize_object(SV* meta, SV* object, HV* args, bool ignore_triggers = FALSE)
@@ -501,21 +502,13 @@ CODE:
     mouse_class_initialize_object(aTHX_ meta, object, args, ignore_triggers);
 }
 
-void
-__xc(SV* meta)
-PPCODE:
-{
-    AV* const xc = mouse_get_xc(aTHX_ meta);
-    mXPUSHu(MOUSE_xc_flags(xc));
-    mXPUSHs(newRV_inc((SV*)MOUSE_xc_buildall(xc)));
-    mXPUSHs(newRV_inc((SV*)MOUSE_xc_demolishall(xc)));
-}
-
 MODULE = Mouse  PACKAGE = Mouse::Meta::Role
 
 BOOT:
     INSTALL_SIMPLE_READER_WITH_KEY(Role, get_roles, roles);
     INSTALL_SIMPLE_PREDICATE_WITH_KEY(Role, is_anon_role, anon_serial_id);
+
+    INSTALL_SIMPLE_ACCESSOR_WITH_DEFAULTS(Role, method_metaclass,  "Mouse::Meta::Role::Method");
 
 MODULE = Mouse  PACKAGE = Mouse::Object
 

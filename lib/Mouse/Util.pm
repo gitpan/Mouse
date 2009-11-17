@@ -1,11 +1,44 @@
 package Mouse::Util;
 use Mouse::Exporter; # enables strict and warnings
 
+sub get_linear_isa($;$); # must be here
+
 BEGIN{
+    # This is used in Mouse::PurePerl
+    Mouse::Exporter->setup_import_methods(
+        as_is => [qw(
+            find_meta
+            does_role
+            resolve_metaclass_alias
+            apply_all_roles
+            english_list
+
+            load_class
+            is_class_loaded
+
+            get_linear_isa
+            get_code_info
+
+            get_code_package
+            get_code_ref
+
+            not_supported
+
+            does meta dump
+        )],
+        groups => {
+            default => [], # export no functions by default
+
+            # The ':meta' group is 'use metaclass' for Mouse
+            meta    => [qw(does meta dump)],
+        },
+    );
+
+
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_06';
+    our $VERSION = '0.40_07';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -36,45 +69,15 @@ use Scalar::Util ();
 
 use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
 
-Mouse::Exporter->setup_import_methods(
-    as_is => [qw(
-        find_meta
-        does_role
-        resolve_metaclass_alias
-        apply_all_roles
-        english_list
-
-        load_class
-        is_class_loaded
-
-        get_linear_isa
-        get_code_info
-
-        get_code_package
-        get_code_ref
-
-        not_supported
-
-        does meta dump
-        _MOUSE_VERBOSE
-    )],
-    groups => {
-        default => [], # export no functions by default
-
-        # The ':meta' group is 'use metaclass' for Mouse
-        meta    => [qw(does meta dump _MOUSE_VERBOSE)],
-    },
-);
-
 # aliases as public APIs
 # it must be 'require', not 'use', because Mouse::Meta::Module depends on Mouse::Util
 require Mouse::Meta::Module; # for the entities of metaclass cache utilities
 
 BEGIN {
-    *class_of                    = \&Mouse::Meta::Module::class_of;
-    *get_metaclass_by_name       = \&Mouse::Meta::Module::get_metaclass_by_name;
-    *get_all_metaclass_instances = \&Mouse::Meta::Module::get_all_metaclass_instances;
-    *get_all_metaclass_names     = \&Mouse::Meta::Module::get_all_metaclass_names;
+    *class_of                    = \&Mouse::Meta::Module::_class_of;
+    *get_metaclass_by_name       = \&Mouse::Meta::Module::_get_metaclass_by_name;
+    *get_all_metaclass_instances = \&Mouse::Meta::Module::_get_all_metaclass_instances;
+    *get_all_metaclass_names     = \&Mouse::Meta::Module::_get_all_metaclass_names;
 
     # is-a predicates
     generate_isa_predicate_for('Mouse::Meta::TypeConstraint' => 'is_a_type_constraint');
@@ -116,7 +119,7 @@ BEGIN {
         } else {
 #       VVVVV   CODE TAKEN FROM MRO::COMPAT   VVVVV
             my $_get_linear_isa_dfs; # this recurses so it isn't pretty
-            $_get_linear_isa_dfs = sub {
+            $_get_linear_isa_dfs = sub ($;$){
                 no strict 'refs';
 
                 my $classname = shift;
@@ -138,8 +141,6 @@ BEGIN {
         }
     }
 
-
-    no warnings 'once';
     *get_linear_isa = $get_linear_isa;
 }
 
@@ -183,7 +184,7 @@ sub is_valid_class_name {
     return 0 if ref($class);
     return 0 unless defined($class);
 
-    return 1 if $class =~ /^\w+(?:::\w+)*$/;
+    return 1 if $class =~ /\A \w+ (?: :: \w+ )* \z/xms;
 
     return 0;
 }
@@ -336,7 +337,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_06
+This document describes Mouse version 0.40_07
 
 =head1 IMPLEMENTATIONS FOR
 
