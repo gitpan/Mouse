@@ -38,7 +38,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_07';
+    our $VERSION = '0.40_08';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -52,6 +52,9 @@ BEGIN{
         $xs = eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
+
+            *Mouse::Meta::Method::Constructor::XS::meta = \&meta;
+            *Mouse::Meta::Method::Destructor::XS::meta  = \&meta;
         };
         #warn $@ if $@;
     }
@@ -60,7 +63,7 @@ BEGIN{
         require 'Mouse/PurePerl.pm'; # we don't want to create its namespace
     }
 
-    *_MOUSE_XS = sub(){ $xs };
+    *MOUSE_XS = sub(){ $xs };
 }
 
 
@@ -337,7 +340,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_07
+This document describes Mouse version 0.40_08
 
 =head1 IMPLEMENTATIONS FOR
 

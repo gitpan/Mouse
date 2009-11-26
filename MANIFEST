@@ -127,6 +127,7 @@ t/001_mouse/057_subtype_without_where.t
 t/001_mouse/058-accessor-leaks.t
 t/001_mouse/059-weak-with-default.t
 t/001_mouse/060-threads.t
+t/001_mouse/061-metaclass-compatibility.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -222,6 +223,7 @@ t/040_type_constraints/025_type_coersion_on_lazy_attributes.t
 t/050_metaclasses/001_custom_attr_meta_with_roles.t
 t/050_metaclasses/002_custom_attr_meta_as_role.t
 t/050_metaclasses/011_init_meta.t
+t/050_metaclasses/013_metaclass_traits.t
 t/050_metaclasses/017_use_base_of_moose.t
 t/050_metaclasses/020_metaclass_parameterized_traits.t
 t/050_metaclasses/041_moose_nonmoose_moose_chain_init_meta.t
@@ -293,3 +295,4 @@ xs-src/MouseTypeConstraints.xs
 xs-src/MouseUtil.xs
 xt/01_pod.t
 xt/02_pod_spell.t
+xt/03_pod_coverage.t

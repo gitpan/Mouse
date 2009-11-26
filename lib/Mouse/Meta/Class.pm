@@ -6,11 +6,18 @@ use Scalar::Util qw/blessed weaken/;
 use Mouse::Meta::Module;
 our @ISA = qw(Mouse::Meta::Module);
 
-sub method_metaclass;
 sub attribute_metaclass;
+sub method_metaclass;
 
 sub constructor_class;
 sub destructor_class;
+
+my @MetaClassTypes = qw(
+    attribute_metaclass
+    method_metaclass
+    constructor_class
+    destructor_class
+);
 
 sub _construct_meta {
     my($class, %args) = @_;
@@ -54,14 +61,55 @@ sub superclasses {
         foreach my $super(@_){
             Mouse::Util::load_class($super);
             my $meta = Mouse::Util::get_metaclass_by_name($super);
+
+            next if not defined $meta;
+
             if(Mouse::Util::is_a_metarole($meta)){
                 $self->throw_error("You cannot inherit from a Mouse Role ($super)");
             }
+
+            next if $self->isa(ref $meta); # _superclass_meta_is_compatible
+
+            $self->_reconcile_with_superclass_meta($meta);
         }
         @{ $self->{superclasses} } = @_;
     }
 
     return @{ $self->{superclasses} };
+}
+
+sub _reconcile_with_superclass_meta {
+    my($self, $super_meta) = @_;
+
+    my @incompatibles;
+
+    foreach my $metaclass_type(@MetaClassTypes){
+        my $super_c = $super_meta->$metaclass_type();
+        my $self_c  = $self->$metaclass_type();
+
+        if(!$super_c->isa($self_c)){
+            push @incompatibles, ($metaclass_type => $super_c);
+        }
+    }
+
+    my @roles;
+
+    foreach my $role($self->meta->calculate_all_roles){
+        if(!$super_meta->meta->does_role($role->name)){
+            push @roles, $role->name;
+        }
+    }
+
+    #print "reconcile($self vs. $super_meta; @roles; @incompatibles)\n";
+
+    require Mouse::Util::MetaRole;
+    Mouse::Util::MetaRole::apply_metaclass_roles(
+        for_class       => $self,
+        metaclass       => ref $super_meta,
+        metaclass_roles => \@roles,
+        @incompatibles,
+    );
+    return;
 }
 
 sub find_method_by_name{
@@ -402,7 +450,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_07
+This document describes Mouse version 0.40_08
 
 =head1 METHODS
 
@@ -486,6 +534,8 @@ metaclass.
 Throws an error with the given message.
 
 =head1 SEE ALSO
+
+L<Mouse::Meta::Module>
 
 L<Moose::Meta::Class>
 

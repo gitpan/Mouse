@@ -28,7 +28,7 @@ mouse_accessor_get_self(pTHX_ I32 const ax, I32 const items, CV* const cv) {
 
 
 CV*
-mouse_instantiate_xs_accessor(pTHX_ SV* const attr, XSUBADDR_t const accessor_impl){
+mouse_accessor_generate(pTHX_ SV* const attr, XSUBADDR_t const accessor_impl){
     AV* const xa = mouse_get_xa(aTHX_ attr);
     CV* xsub;
     MAGIC* mg;
@@ -221,7 +221,7 @@ mouse_accessor_get_mg(pTHX_ CV* const xsub){
 */
 
 CV*
-mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl, void* const dptr, I32 const dlen){
+mouse_simple_accessor_generate(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl, void* const dptr, I32 const dlen){
     CV* const xsub = newXS((char*)fq_name, accessor_impl, __FILE__);
     SV* const slot = newSVpvn_share(key, keylen, 0U);
     MAGIC* mg;
@@ -245,37 +245,6 @@ mouse_install_simple_accessor(pTHX_ const char* const fq_name, const char* const
     return xsub;
 }
 
-XS(XS_Mouse_simple_accessor)
-{
-    dVAR; dXSARGS;
-    dMOUSE_self;
-    MAGIC* const mg = (MAGIC*)XSANY.any_ptr;
-    SV* value;
-
-    if(items == 1){ /* reader */
-        value = get_slot(self, MOUSE_mg_slot(mg));
-        if(!value) {
-            if(MOUSE_mg_ptr(mg)){
-                /* the default value must be a SV */
-                assert(MOUSE_mg_len(mg) == HEf_SVKEY);
-                value = (SV*)MOUSE_mg_ptr(mg);
-            }
-            else{
-                value = &PL_sv_undef;
-            }
-        }
-    }
-    else if(items == 2){ /* writer */
-         value = set_slot(self, MOUSE_mg_slot(mg), ST(1));
-    }
-    else {
-        croak("Expected exactly one or two argument for an accessor for '%"SVf"'", MOUSE_mg_slot(mg));
-    }
-
-    ST(0) = value;
-    XSRETURN(1);
-}
-
 XS(XS_Mouse_simple_reader)
 {
     dVAR; dXSARGS;
@@ -288,7 +257,18 @@ XS(XS_Mouse_simple_reader)
     }
 
     value = get_slot(self, MOUSE_mg_slot(mg));
-    ST(0) = value ? value : &PL_sv_undef;
+    if(!value) {
+        if(MOUSE_mg_ptr(mg)){
+            /* the default value must be a SV */
+            assert(MOUSE_mg_len(mg) == HEf_SVKEY);
+            value = (SV*)MOUSE_mg_ptr(mg);
+        }
+        else{
+            value = &PL_sv_undef;
+        }
+    }
+
+    ST(0) = value;
     XSRETURN(1);
 }
 
@@ -384,7 +364,8 @@ mouse_instance_set_slot(pTHX_ SV* const instance, SV* const slot, SV* const valu
     CHECK_INSTANCE(instance);
     he = hv_fetch_ent((HV*)SvRV(instance), slot, TRUE, 0U);
     sv = HeVAL(he);
-    sv_setsv_mg(sv, value);
+    sv_setsv(sv, value);
+    SvSETMAGIC(sv);
     return sv;
 }
 
@@ -417,7 +398,7 @@ CV*
 _generate_accessor(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_accessor);
+    RETVAL = mouse_accessor_generate(aTHX_ attr, XS_Mouse_accessor);
 }
 OUTPUT:
     RETVAL
@@ -426,7 +407,7 @@ CV*
 _generate_reader(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_reader);
+    RETVAL = mouse_accessor_generate(aTHX_ attr, XS_Mouse_reader);
 }
 OUTPUT:
     RETVAL
@@ -435,7 +416,7 @@ CV*
 _generate_writer(klass, SV* attr, metaclass)
 CODE:
 {
-    RETVAL = mouse_instantiate_xs_accessor(aTHX_ attr, XS_Mouse_writer);
+    RETVAL = mouse_accessor_generate(aTHX_ attr, XS_Mouse_writer);
 }
 OUTPUT:
     RETVAL
@@ -447,7 +428,7 @@ CODE:
     SV* const slot = mcall0s(attr, "name");
     STRLEN len;
     const char* const pv = SvPV_const(slot, len);
-    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, XS_Mouse_simple_clearer, NULL, 0);
+    RETVAL = mouse_simple_accessor_generate(aTHX_ NULL, pv, len, XS_Mouse_simple_clearer, NULL, 0);
 }
 OUTPUT:
     RETVAL
@@ -459,7 +440,7 @@ CODE:
     SV* const slot = mcall0s(attr, "name");
     STRLEN len;
     const char* const pv = SvPV_const(slot, len);
-    RETVAL = mouse_install_simple_accessor(aTHX_ NULL, pv, len, XS_Mouse_simple_predicate, NULL, 0);
+    RETVAL = mouse_simple_accessor_generate(aTHX_ NULL, pv, len, XS_Mouse_simple_predicate, NULL, 0);
 }
 OUTPUT:
     RETVAL
