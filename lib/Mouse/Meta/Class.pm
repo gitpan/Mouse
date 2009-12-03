@@ -226,14 +226,22 @@ sub clone_instance {
     return $class->clone_object($instance, %params);
 }
 
-sub make_immutable {
-    my $self = shift;
-    my %args = (
+
+sub immutable_options {
+    my ( $self, @args ) = @_;
+
+    return (
         inline_constructor => 1,
         inline_destructor  => 1,
         constructor_name   => 'new',
-        @_,
+        @args,
     );
+}
+
+
+sub make_immutable {
+    my $self = shift;
+    my %args = $self->immutable_options(@_);
 
     $self->{is_immutable}++;
 
@@ -450,7 +458,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 METHODS
 

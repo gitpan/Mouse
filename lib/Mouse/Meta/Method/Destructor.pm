@@ -1,5 +1,5 @@
 package Mouse::Meta::Method::Destructor;
-use Mouse::Util; # enables strict and warnings
+use Mouse::Util qw(:meta); # enables strict and warnings
 
 sub _empty_DESTROY{ }
 
@@ -53,7 +53,7 @@ Mouse::Meta::Method::Destructor - A Mouse method generator for destructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 SEE ALSO
 

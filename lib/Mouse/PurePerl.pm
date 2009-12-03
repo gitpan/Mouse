@@ -18,14 +18,19 @@ sub is_class_loaded {
     return 0 if ref($class) || !defined($class) || !length($class);
 
     # walk the symbol table tree to avoid autovififying
-    # \*{${main::}{"Foo::"}} == \*main::Foo::
+    # \*{${main::}{"Foo::"}{"Bar::"}} == \*main::Foo::Bar::
 
     my $pack = \%::;
     foreach my $part (split('::', $class)) {
-        my $entry = \$pack->{$part . '::'};
+        $part .= '::';
+        return 0 if !exists $pack->{$part};
+
+        my $entry = \$pack->{$part};
         return 0 if ref($entry) ne 'GLOB';
-        $pack = *{$entry}{HASH} or return 0;
+        $pack = *{$entry}{HASH};
     }
+
+    return 0 if !%{$pack};
 
     # check for $VERSION or @ISA
     return 1 if exists $pack->{VERSION}
@@ -197,6 +202,77 @@ sub add_method {
     no warnings 'redefine', 'once';
     *{ $pkg . '::' . $name } = $code;
     return;
+}
+
+my %SIGIL_MAP = (
+    '$' => 'SCALAR',
+    '@' => 'ARRAY',
+    '%' => 'HASH',
+    '&' => 'CODE',
+    '*' => 'GLOB',
+);
+
+sub _deconstruct_variable_name {
+    my($self, $variable) = @_;
+
+    (defined $variable)
+        || $self->throw_error("You must pass a variable name");
+
+    my $sigil = substr($variable, 0, 1, '');
+
+    (defined $sigil)
+        || $self->throw_error("The variable name must include a sigil");
+
+    (exists $SIGIL_MAP{$sigil})
+        || $self->throw_error("I do not recognize that sigil '$sigil'");
+
+    return ($variable, $SIGIL_MAP{$sigil});
+}
+
+sub has_package_symbol {
+    my($self, $variable) = @_;
+
+    my($name, $type) = $self->_deconstruct_variable_name($variable);
+
+    my $namespace = $self->namespace;
+
+    return 0 unless exists $namespace->{$name};
+
+    my $entry_ref = \$namespace->{$name};
+    if ( ref($entry_ref) eq 'GLOB' ) {
+        return defined( *{$entry_ref}{$type} );
+    }
+    else {
+        # a symbol table entry can be -1 (stub), string (stub with prototype),
+        # or reference (constant)
+        return $type eq 'CODE';
+    }
+}
+
+sub get_package_symbol {
+    my ($self, $variable) = @_;
+
+    my($name, $type) = $self->_deconstruct_variable_name($variable);
+
+    my $namespace = $self->namespace;
+
+    return undef
+        unless exists $namespace->{$name};
+
+    my $entry_ref = \$namespace->{$name};
+
+    if ( ref($entry_ref) eq 'GLOB' ) {
+        return *{$entry_ref}{$type};
+    }
+    else {
+        if ( $type eq 'CODE' ) {
+            no strict 'refs';
+            return \&{ $self->name . '::' . $name };
+        }
+        else {
+            return undef;
+        }
+    }
 }
 
 
@@ -492,7 +568,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 SEE ALSO
 

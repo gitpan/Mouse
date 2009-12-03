@@ -13,11 +13,13 @@ sub wrap{
 }
 
 sub _new{
-    my $class = shift;
-    return $class->meta->new_object(@_)
-        if $class ne __PACKAGE__;
+    my($class, %args) = @_;
+    my $self = bless \%args, $class;
 
-    return bless {@_}, $class;
+    if($class ne __PACKAGE__){
+        $self->meta->_initialize_object($self, \%args);
+    }
+    return $self;
 }
 
 sub body                 { $_[0]->{body}    }
@@ -39,7 +41,7 @@ Mouse::Meta::Method - A Mouse Method metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 SEE ALSO
 

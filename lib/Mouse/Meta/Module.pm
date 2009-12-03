@@ -265,6 +265,8 @@ sub get_method_list {
     sub DESTROY{
         my($self) = @_;
 
+        return if $Mouse::Util::in_global_destruction;
+
         my $serial_id = $self->{anon_serial_id};
 
         return if !$serial_id;
@@ -311,7 +313,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 SEE ALSO
 

@@ -128,6 +128,9 @@ t/001_mouse/058-accessor-leaks.t
 t/001_mouse/059-weak-with-default.t
 t/001_mouse/060-threads.t
 t/001_mouse/061-metaclass-compatibility.t
+t/001_mouse/062-package-symbol.t
+t/001_mouse/063-meta-of-metaclasses.t
+t/001_mouse/064-class-c3.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t

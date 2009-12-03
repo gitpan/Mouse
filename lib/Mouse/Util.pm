@@ -38,13 +38,11 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_08';
+    our $VERSION = '0.40_09';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
     if($xs){
-        local $@;
-
         # XXX: XSLoader tries to get the object path from caller's file name
         #      $hack_mouse_file fools its mechanism
 
@@ -52,9 +50,10 @@ BEGIN{
         $xs = eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
-
-            *Mouse::Meta::Method::Constructor::XS::meta = \&meta;
-            *Mouse::Meta::Method::Destructor::XS::meta  = \&meta;
+            Mouse::Util->import({ into => 'Mouse::Meta::Method::Constructor::XS' }, ':meta');
+            Mouse::Util->import({ into => 'Mouse::Meta::Method::Destructor::XS'  }, ':meta');
+            Mouse::Util->import({ into => 'Mouse::Meta::Method::Accessor::XS'    }, ':meta');
+            return 1;
         };
         #warn $@ if $@;
     }
@@ -88,6 +87,8 @@ BEGIN {
     generate_isa_predicate_for('Mouse::Meta::Role'           => 'is_a_metarole');
 }
 
+our $in_global_destruction = 0;
+END{ $in_global_destruction = 1 }
 
 # Moose::Util compatible utilities
 
@@ -112,36 +113,43 @@ BEGIN {
         require mro;
         $get_linear_isa = \&mro::get_linear_isa;
     } else {
-        my $e = do {
-            local $@;
-            eval { require MRO::Compat };
-            $@;
-        };
-        if (!$e) {
-            $get_linear_isa = \&mro::get_linear_isa;
-        } else {
 #       VVVVV   CODE TAKEN FROM MRO::COMPAT   VVVVV
-            my $_get_linear_isa_dfs; # this recurses so it isn't pretty
-            $_get_linear_isa_dfs = sub ($;$){
-                no strict 'refs';
+        my $_get_linear_isa_dfs; # this recurses so it isn't pretty
+        $_get_linear_isa_dfs = sub {
+            my($classname) = @_;
 
-                my $classname = shift;
+            my @lin = ($classname);
+            my %stored;
 
-                my @lin = ($classname);
-                my %stored;
-                foreach my $parent (@{"$classname\::ISA"}) {
-                    my $plin = $_get_linear_isa_dfs->($parent);
-                    foreach  my $p(@$plin) {
-                        next if exists $stored{$p};
-                        push(@lin, $p);
-                        $stored{$p} = 1;
-                    }
+            no strict 'refs';
+            foreach my $parent (@{"$classname\::ISA"}) {
+                my $plin = $_get_linear_isa_dfs->($parent);
+                foreach  my $p(@$plin) {
+                    next if exists $stored{$p};
+                    push(@lin, $p);
+                    $stored{$p} = 1;
                 }
-                return \@lin;
-            };
+            }
+            return \@lin;
+        };
 #       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
-            $get_linear_isa = $_get_linear_isa_dfs;
-        }
+
+        eval{ require Class::C3 };
+
+        # MRO::Compat::__get_linear_isa has no prototype, so
+        # we define a prototyped version for compatibility with core's
+        # See also MRO::Compat::__get_linear_isa.
+        $get_linear_isa = sub ($;$){
+            my($classname, $type) = @_;
+            if(!defined $type){
+                package Class::C3;
+                our %MRO;
+                $type = exists $MRO{$classname} ? 'c3' : 'dfs';
+            }
+            return $type eq 'c3'
+                ? [Class::C3::calculateMRO($classname)]
+                : $_get_linear_isa_dfs->($classname);
+        };
     }
 
     *get_linear_isa = $get_linear_isa;
@@ -272,7 +280,7 @@ sub apply_all_roles {
         load_class($role_name);
 
         is_a_metarole( get_metaclass_by_name($role_name) )
-            || $applicant->meta->throw_error("You can only consume roles, $role_name(".$role_name->meta.") is not a Mouse role");
+            || $applicant->meta->throw_error("You can only consume roles, $role_name is not a Mouse role");
     }
 
     if ( scalar @roles == 1 ) {
@@ -340,7 +348,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_08
+This document describes Mouse version 0.40_09
 
 =head1 IMPLEMENTATIONS FOR
 
