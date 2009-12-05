@@ -38,7 +38,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.41';
+    our $VERSION = '0.42';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -140,13 +140,14 @@ BEGIN {
         # See also MRO::Compat::__get_linear_isa.
         $get_linear_isa = sub ($;$){
             my($classname, $type) = @_;
+            package # hide from PAUSE
+                Class::C3;
             if(!defined $type){
-                package Class::C3;
                 our %MRO;
                 $type = exists $MRO{$classname} ? 'c3' : 'dfs';
             }
             return $type eq 'c3'
-                ? [Class::C3::calculateMRO($classname)]
+                ? [calculateMRO($classname)]
                 : $_get_linear_isa_dfs->($classname);
         };
     }
@@ -344,7 +345,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.41
+This document describes Mouse version 0.42
 
 =head1 IMPLEMENTATIONS FOR
 
