@@ -89,7 +89,6 @@ sub remove_attribute  { delete $_[0]->{attributes}->{$_[1]} }
 
 sub get_attribute_list{ keys   %{$_[0]->{attributes}} }
 
-
 # XXX: for backward compatibility
 my %foreign = map{ $_ => undef } qw(
     Mouse Mouse::Role Mouse::Util Mouse::Util::TypeConstraints
@@ -304,7 +303,6 @@ sub throw_error{
 }
 
 1;
-
 __END__
 
 =head1 NAME
@@ -313,7 +311,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_09
+This document describes Mouse version 0.41
 
 =head1 SEE ALSO
 

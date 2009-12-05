@@ -10,7 +10,6 @@ benchmarks/type_constraints.pl
 benchmarks/vs_caf.pl
 Changes
 example/point.pl
-inc/Carp/Always.pm
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm

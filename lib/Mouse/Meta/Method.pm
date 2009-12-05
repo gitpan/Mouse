@@ -28,7 +28,7 @@ sub package_name         { $_[0]->{package} }
 sub associated_metaclass { $_[0]->{associated_metaclass} }
 
 sub fully_qualified_name {
-    my $self = shift;
+    my($self) = @_;
     return $self->package_name . '::' . $self->name;
 }
 
@@ -41,7 +41,7 @@ Mouse::Meta::Method - A Mouse Method metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_09
+This document describes Mouse version 0.41
 
 =head1 SEE ALSO
 

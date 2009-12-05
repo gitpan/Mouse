@@ -342,7 +342,6 @@ sub find_or_create_isa_type_constraint {
 }
 
 1;
-
 __END__
 
 =head1 NAME
@@ -351,7 +350,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_09
+This document describes Mouse version 0.41
 
 =head2 SYNOPSIS
 

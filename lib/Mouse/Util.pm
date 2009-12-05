@@ -38,7 +38,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.40_09';
+    our $VERSION = '0.41';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -64,7 +64,6 @@ BEGIN{
 
     *MOUSE_XS = sub(){ $xs };
 }
-
 
 use Carp         ();
 use Scalar::Util ();
@@ -260,7 +259,6 @@ sub load_class {
 
 sub is_class_loaded;
 
-
 sub apply_all_roles {
     my $applicant = Scalar::Util::blessed($_[0])
         ?                                shift   # instance
@@ -306,7 +304,6 @@ sub english_list {
     return join q{, }, @items, "and $tail";
 }
 
-
 # common utilities
 
 sub not_supported{
@@ -339,7 +336,6 @@ sub does :method;
 *does = \&does_role; # alias
 
 1;
-
 __END__
 
 =head1 NAME
@@ -348,7 +344,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.40_09
+This document describes Mouse version 0.41
 
 =head1 IMPLEMENTATIONS FOR
 
@@ -394,9 +390,13 @@ C<eval "use $module"> or using C<require>.
 
 =head3 C<get_code_info>
 
-=head1 UTILITIES FOR MOUSE
+=head1 Mouse specific utilities
 
 =head3 C<not_supported>
+
+=head3 C<get_code_package>
+
+=head3 C<get_code_ref>
 
 =head1 SEE ALSO
 
