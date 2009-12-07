@@ -47,7 +47,7 @@ Mouse::Object - The base object for Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.42
+This document describes Mouse version 0.43
 
 =head1 METHODS
 
@@ -86,7 +86,7 @@ need to redispatch or return any specific value.
 This will check if the invocant's class B<does> a given C<$role_name>.
 This is similar to "isa" for object, but it checks the roles instead.
 
-=head2 C<<dump ($maxdepth) -> Str >>
+=head2 C<< dump ($maxdepth) -> Str >>
 
 From the Moose POD:
 

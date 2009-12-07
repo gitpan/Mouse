@@ -11,7 +11,6 @@ use Mouse::Meta::Method::Delegation;
 sub _process_options{
     my($class, $name, $args) = @_;
 
-
     # XXX: for backward compatibility (with method modifiers)
     if($class->can('canonicalize_args') != \&canonicalize_args){
         %{$args} = $class->canonicalize_args($name, %{$args});
@@ -431,7 +430,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.42
+This document describes Mouse version 0.43
 
 =head1 METHODS
 

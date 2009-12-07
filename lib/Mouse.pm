@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -166,7 +166,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.42
+This document describes Mouse version 0.43
 
 =head1 SYNOPSIS
 
@@ -256,9 +256,11 @@ Installs a "before" method modifier. See L<Moose/before>.
 =head2 C<< after (method|methods) => CodeRef >>
 
 Installs an "after" method modifier. See L<Moose/after>.
+
 =head2 C<< around (method|methods) => CodeRef >>
 
 Installs an "around" method modifier. See L<Moose/around>.
+
 =head2 C<< has (name|names) => parameters >>
 
 Adds an attribute (or if passed an arrayref of names, multiple attributes) to
@@ -268,10 +270,16 @@ this class. Options:
 
 =item C<< is => ro|rw|bare >>
 
-If specified, inlines a read-only/read-write accessor with the same name as
+The I<is> option accepts either I<rw> (for read/write), I<ro> (for read
+only) or I<bare> (for nothing). These will create either a read/write accessor
+or a read-only accessor respectively, using the same name as the C<$name> of
 the attribute.
 
-=item C<< isa => TypeConstraint >>
+If you need more control over how your accessors are named, you can
+use the C<reader>, C<writer> and C<accessor> options, however if you
+use those, you won't need the I<is> option.
+
+=item C<< isa => TypeName | ClassName >>
 
 Provides type checking in the constructor and accessor. The following types are
 supported. Any unknown type is taken to be a class check
@@ -283,6 +291,17 @@ supported. Any unknown type is taken to be a class check
 
 For more documentation on type constraints, see L<Mouse::Util::TypeConstraints>.
 
+=item C<< does => RoleName >>
+
+This will accept the name of a role which the value stored in this attribute
+is expected to have consumed.
+
+=item C<< coerce => Bool >>
+
+This will attempt to use coercion with the supplied type constraint to change
+the value passed into any accessors or constructors. You B<must> have supplied
+a type constraint in order for this to work. See L<Moose::Cookbook::Basics::Recipe5>
+for an example.
 
 =item C<< required => Bool >>
 
@@ -319,12 +338,12 @@ Lets you specify a method name for installing a clearer method, which clears
 the attribute's value from the instance. On the next read, lazy or builder will
 be invoked.
 
-=item C<< handles => HashRef|ArrayRef >>
+=item C<< handles => HashRef|ArrayRef|Regexp >>
 
 Lets you specify methods to delegate to the attribute. ArrayRef forwards the
 given method names to method calls on the attribute. HashRef maps local method
 names to remote method names called on the attribute. Other forms of
-L</handles>, such as regular expression and coderef, are not yet supported.
+L</handles>, such as RoleName and CodeRef, are not yet supported.
 
 =item C<< weak_ref => Bool >>
 

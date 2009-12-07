@@ -8,6 +8,7 @@ benchmarks/modifiers.pl
 benchmarks/subtype.pl
 benchmarks/type_constraints.pl
 benchmarks/vs_caf.pl
+benchmarks/vs_caf_w_destructors.pl
 Changes
 example/point.pl
 inc/Module/Install.pm
@@ -39,6 +40,7 @@ lib/Mouse/Object.pm
 lib/Mouse/PurePerl.pm
 lib/Mouse/Role.pm
 lib/Mouse/Spec.pm
+lib/Mouse/Tiny.pod
 lib/Mouse/TypeRegistry.pm
 lib/Mouse/Util.pm
 lib/Mouse/Util/MetaRole.pm
@@ -127,7 +129,6 @@ t/001_mouse/058-accessor-leaks.t
 t/001_mouse/059-weak-with-default.t
 t/001_mouse/060-threads.t
 t/001_mouse/061-metaclass-compatibility.t
-t/001_mouse/062-package-symbol.t
 t/001_mouse/063-meta-of-metaclasses.t
 t/001_mouse/064-class-c3.t
 t/001_mouse/100-meta-class.t
