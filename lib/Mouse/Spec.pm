@@ -2,7 +2,7 @@ package Mouse::Spec;
 use strict;
 use warnings;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 our $MouseVersion = $VERSION;
 our $MooseVersion = '0.93';
@@ -19,7 +19,7 @@ Mouse::Spec - To what extent Mouse is compatible with Moose
 
 =head1 VERSION
 
-This document describes Mouse version 0.43
+This document describes Mouse version 0.44
 
 =head1 SYNOPSIS
 
@@ -43,8 +43,8 @@ The sugary API is highly compatible with Moose.
 
 Any MOP in Mouse has no attributes.
 
-And C<< $metaclass->meta->make_immutable() >> does not yet work as you expect.
-B<Don not make metaclasses immutalbe>.
+For this reason, C<< $metaclass->meta->make_immutable() >> does not yet work as you expect.
+B<Don not make metaclasses immutable>.
 
 =head3 Mouse::Meta::Instance
 

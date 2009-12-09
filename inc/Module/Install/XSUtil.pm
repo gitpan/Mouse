@@ -3,7 +3,7 @@ package Module::Install::XSUtil;
 
 use 5.005_03;
 
-$VERSION = '0.18';
+$VERSION = '0.19';
 
 use Module::Install::Base;
 @ISA     = qw(Module::Install::Base);
@@ -18,7 +18,7 @@ use File::Find;
 use constant _VERBOSE => $ENV{MI_VERBOSE} ? 1 : 0;
 
 my %ConfigureRequires = (
-    'ExtUtils::CBuilder' => 0.25, # for have_compiler()
+    'ExtUtils::CBuilder' => 0.21, # for have_compiler()
 );
 
 my %BuildRequires = (
@@ -55,6 +55,7 @@ sub _xs_initialize{
         $self->requires(%Requires);
 
         $self->makemaker_args(OBJECT => '$(O_FILES)');
+        $self->clean_files('$(O_FILES)');
 
         if($self->_xs_debugging()){
             # override $Config{optimize}
@@ -85,6 +86,16 @@ sub _is_msvc{
 
     sub cc_available {
         return $cc_available if defined $cc_available;
+
+        foreach my $arg(@ARGV){
+            if($arg eq '--pp'){
+                return $cc_available = 0;
+            }
+            elsif($arg eq '--xs'){
+                return $cc_available = 1;
+            }
+        }
+
         local $@;
         return $cc_available = eval{
             require ExtUtils::CBuilder;
@@ -519,4 +530,4 @@ sub const_cccmd {
 1;
 __END__
 
-#line 675
+#line 689

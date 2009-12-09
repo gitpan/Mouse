@@ -5,12 +5,12 @@ Mouse::XS - A Mouse guts in XS
 
 =head1 VERSION
 
-This document describes Mouse version 0.43
+This document describes Mouse version 0.44
 
 =head1 DESCRIPTION
 
 Mouse has an optional XS implementation, which is automatically built
-and used if available. Accoding to benchmarks, this is about 2 times
+and used if available. According to benchmarks, this is about 2 times
 faster than Mouse::PurePerl.
 
 =head2 INSTALL

@@ -11,7 +11,11 @@ Mouse::Exporter->setup_import_methods(
     as_is => [qw(
         as where message optimize_as
         from via
-        type subtype coerce class_type role_type enum
+
+        type subtype class_type role_type duck_type
+        enum
+        coerce
+
         find_type_constraint
     )],
 );
@@ -172,6 +176,22 @@ sub role_type {
     );
 }
 
+sub duck_type {
+    my($name, @methods);
+
+    if(!(@_ == 1 && ref($_[0]) eq 'ARRAY')){
+        $name = shift;
+    }
+
+    @methods = (@_ == 1 && ref($_[0]) eq 'ARRAY') ? @{$_[0]} : @_;
+
+    return _create_type 'type', $name => (
+        optimized_as => Mouse::Util::generate_can_predicate_for(\@methods),
+
+        type => 'DuckType',
+    );
+}
+
 sub typecast_constraints { # DEPRECATED
     my($class, $pkg, $type, $value) = @_;
     Carp::croak("wrong arguments count") unless @_ == 4;
@@ -184,16 +204,12 @@ sub typecast_constraints { # DEPRECATED
 sub enum {
     my($name, %valid);
 
-    # enum ['small', 'medium', 'large']
-    if (ref($_[0]) eq 'ARRAY') {
-        %valid = map{ $_ => undef } @{ $_[0] };
-        $name  = sprintf '(%s)', join '|', sort @{$_[0]};
+    if(!(@_ == 1 && ref($_[0]) eq 'ARRAY')){
+        $name = shift;
     }
-    # enum size => 'small', 'medium', 'large'
-    else{
-        $name  = shift;
-        %valid = map{ $_ => undef } @_;
-    }
+
+    %valid = map{ $_ => undef } (@_ == 1 && ref($_[0]) eq 'ARRAY' ? @{$_[0]} : @_);
+
     return _create_type 'type', $name => (
         optimized_as  => sub{ defined($_[0]) && !ref($_[0]) && exists $valid{$_[0]} },
 
@@ -350,7 +366,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.43
+This document describes Mouse version 0.44
 
 =head2 SYNOPSIS
 
@@ -523,15 +539,25 @@ Returns the names of all the type constraints.
 
 =over 4
 
-=item C<< subtype 'Name' => as 'Parent' => where { } ... -> Mouse::Meta::TypeConstraint >>
+=item C<< type $name => where { } ... -> Mouse::Meta::TypeConstraint >>
 
-=item C<< subtype as 'Parent' => where { } ...  -> Mouse::Meta::TypeConstraint >>
+=item C<< subtype $name => as $parent => where { } ... -> Mouse::Meta::TypeConstraint >>
+
+=item C<< subtype as $parent => where { } ...  -> Mouse::Meta::TypeConstraint >>
 
 =item C<< class_type ($class, ?$options) -> Mouse::Meta::TypeConstraint >>
 
 =item C<< role_type ($role, ?$options) -> Mouse::Meta::TypeConstraint >>
 
+=item C<< duck_type($name, @methods | \@methods) -> Mouse::Meta::TypeConstraint >>
+
+=item C<< duck_type(\@methods) -> Mouse::Meta::TypeConstraint >>
+
+=item C<< enum($name, @values | \@values) -> Mouse::Meta::TypeConstraint >>
+
 =item C<< enum (\@values) -> Mouse::Meta::TypeConstraint >>
+
+=item C<< coerce $type => from $another_type, via { }, ... >>
 
 =back
 
