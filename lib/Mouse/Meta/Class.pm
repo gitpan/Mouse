@@ -264,10 +264,14 @@ sub make_immutable {
     return 1;
 }
 
-sub make_mutable { not_supported }
+sub make_mutable {
+    my($self) = @_;
+    $self->{is_immutable} = 0;
+    return;
+}
 
-sub is_immutable {  $_[0]->{is_immutable} }
-sub is_mutable   { !$_[0]->{is_immutable} }
+sub is_immutable;
+sub is_mutable   { !$_[0]->is_immutable }
 
 sub _install_modifier_pp{
     my( $self, $type, $name, $code ) = @_;
@@ -458,7 +462,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 METHODS
 

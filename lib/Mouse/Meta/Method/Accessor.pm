@@ -23,7 +23,7 @@ sub _generate_accessor_any{
     my $self  = '$_[0]';
     my $slot  = $method_class->_inline_slot($self, $name);;
 
-    my $accessor = sprintf(qq{package %s;\n#line 1 "%s for %s (%s)"\n}, $class->name, $type, $name, __FILE__)
+    my $accessor = sprintf(qq{package %s;\n#line 1 "%s-accessor for %s (%s)"\n}, $class->name, $type, $name, __FILE__)
                  . "sub {\n";
 
     if ($type eq 'rw' || $type eq 'wo') {
@@ -49,7 +49,7 @@ sub _generate_accessor_any{
             $accessor .= 
                 "\n".
                 '$compiled_type_constraint->('.$value.') or
-                    $attribute->verify_type_constraint_error($name, '.$value.', $constraint);' . "\n";
+                    $attribute->_throw_type_constraint_error('.$value.', $constraint);' . "\n";
         }
 
         # if there's nothing left to do for the attribute we can return during
@@ -96,7 +96,7 @@ sub _generate_accessor_any{
             $accessor .= "my \$tmp = $value;\n";
 
             $accessor .= "\$compiled_type_constraint->(\$tmp)";
-            $accessor .= " || \$attribute->verify_type_constraint_error(\$name, \$tmp, \$constraint);\n";
+            $accessor .= " || \$attribute->_throw_type_constraint_error(\$tmp, \$constraint);\n";
             $accessor .= "$slot = \$tmp;\n";
         }
         else{
@@ -176,7 +176,7 @@ Mouse::Meta::Method::Accessor - A Mouse method generator for accessors
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 SEE ALSO
 

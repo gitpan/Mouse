@@ -317,6 +317,7 @@ sub _initialize_object{
     return;
 }
 
+sub is_immutable {  $_[0]->{is_immutable} }
 
 package
     Mouse::Meta::Role;
@@ -513,6 +514,24 @@ sub DESTROY {
     die $e if $e; # rethrow
 }
 
+sub BUILDALL {
+    my $self = shift;
+
+    # short circuit
+    return unless $self->can('BUILD');
+
+    for my $class (reverse $self->meta->linearized_isa) {
+        my $build = Mouse::Util::get_code_ref($class, 'BUILD')
+            || next;
+
+        $self->$build(@_);
+    }
+    return;
+}
+
+sub DEMOLISHALL;
+*DEMOLISHALL = \&DESTROY;
+
 1;
 __END__
 
@@ -522,7 +541,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 SEE ALSO
 

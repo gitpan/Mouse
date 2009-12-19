@@ -5,9 +5,6 @@ use Carp ();
 
 use Mouse::Meta::TypeConstraint;
 
-#use Mouse::Meta::Method::Accessor;
-use Mouse::Meta::Method::Delegation;
-
 sub _process_options{
     my($class, $name, $args) = @_;
 
@@ -202,8 +199,7 @@ sub canonicalize_args{ # DEPRECATED
     my ($self, $name, %args) = @_;
 
     Carp::cluck("$self->canonicalize_args has been deprecated."
-        . "Use \$self->_process_options instead.")
-            if Mouse::Util::_MOUSE_VERBOSE;
+        . "Use \$self->_process_options instead.");
 
     return %args;
 }
@@ -212,8 +208,7 @@ sub create { # DEPRECATED
     my ($self, $class, $name, %args) = @_;
 
     Carp::cluck("$self->create has been deprecated."
-        . "Use \$meta->add_attribute and \$attr->install_accessors instead.")
-            if Mouse::Util::_MOUSE_VERBOSE;
+        . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
 
     # noop
     return $self;
@@ -241,13 +236,17 @@ sub verify_against_type_constraint {
     return 1 if !$type_constraint;
     return 1 if $type_constraint->check($value);
 
-    $self->verify_type_constraint_error($self->name, $value, $type_constraint);
+    $self->_throw_type_constraint_error($value, $type_constraint);
 }
 
-sub verify_type_constraint_error {
-    my($self, $name, $value, $type) = @_;
-    $self->throw_error("Attribute ($name) does not pass the type constraint because: "
-        . $type->get_message($value));
+sub _throw_type_constraint_error {
+    my($self, $value, $type) = @_;
+
+    $self->throw_error(
+        sprintf q{Attribute (%s) does not pass the type constraint because: %s},
+            $self->name,
+            $type->get_message($value),
+    );
 }
 
 sub coerce_constraint { # DEPRECATED
@@ -281,8 +280,7 @@ sub clone_parent { # DEPRECATED
     my %args  = ($self->get_parent_args($class, $name), @_);
 
     Carp::cluck("$self->clone_parent has been deprecated."
-        . "Use \$meta->add_attribute and \$attr->install_accessors instead.")
-        if Mouse::Util::_MOUSE_VERBOSE;
+        . "Use \$meta->add_attribute and \$attr->install_accessors instead.");
 
     $self->clone_and_inherited_args($class, $name, %args);
 }
@@ -303,45 +301,107 @@ sub get_parent_args { # DEPRECATED
 
 
 sub get_read_method {
-    $_[0]->reader || $_[0]->accessor
+    return $_[0]->reader || $_[0]->accessor
 }
 sub get_write_method {
-    $_[0]->writer || $_[0]->accessor
+    return $_[0]->writer || $_[0]->accessor
+}
+
+sub _get_accessor_method_ref {
+    my($self, $type, $generator) = @_;
+
+    my $metaclass = $self->associated_class
+        || $self->throw_error('No asocciated class for ' . $self->name);
+
+    my $accessor = $self->$type();
+    if($accessor){
+        return $metaclass->get_method_body($accessor);
+    }
+    else{
+        return $self->accessor_metaclass->$generator($self, $metaclass);
+    }
 }
 
 sub get_read_method_ref{
     my($self) = @_;
-
-    $self->{_read_method_ref} ||= do{
-        my $metaclass = $self->associated_class
-            or $self->throw_error('No asocciated class for ' . $self->name);
-
-        my $reader = $self->{reader} || $self->{accessor};
-        if($reader){
-            $metaclass->name->can($reader);
-        }
-        else{
-            $self->accessor_metaclass->_generate_reader($self, $metaclass);
-        }
-    };
+    return $self->{_read_method_ref} ||= $self->_get_accessor_method_ref('get_read_method', '_generate_reader');
 }
 
 sub get_write_method_ref{
     my($self) = @_;
-
-    $self->{_write_method_ref} ||= do{
-        my $metaclass = $self->associated_class
-            or $self->throw_error('No asocciated class for ' . $self->name);
-
-        my $reader = $self->{writer} || $self->{accessor};
-        if($reader){
-            $metaclass->name->can($reader);
-        }
-        else{
-            $self->accessor_metaclass->_generate_writer($self, $metaclass);
-        }
-    };
+    return $self->{_write_method_ref} ||= $self->_get_accessor_method_ref('get_write_method', '_generate_writer');
 }
+
+sub set_value {
+    my($self, $object, $value) = @_;
+    return $self->get_write_method_ref()->($object, $value);
+}
+
+sub get_value {
+    my($self, $object) = @_;
+    return $self->get_read_method_ref()->($object);
+}
+
+sub has_value {
+    my($self, $object) = @_;
+    my $accessor_ref = $self->{_predicate_ref}
+        ||= $self->_get_accessor_method_ref('predicate', '_generate_predicate');
+
+    return $accessor_ref->($object);
+}
+
+sub clear_value {
+    my($self, $object) = @_;
+    my $accessor_ref = $self->{_crealer_ref}
+        ||= $self->_get_accessor_method_ref('clearer', '_generate_clearer');
+
+    return $accessor_ref->($object);
+}
+
+
+sub associate_method{
+    my ($attribute, $method_name) = @_;
+    $attribute->{associated_methods}++;
+    return;
+}
+
+sub install_accessors{
+    my($attribute) = @_;
+
+    my $metaclass      = $attribute->associated_class;
+    my $accessor_class = $attribute->accessor_metaclass;
+
+    foreach my $type(qw(accessor reader writer predicate clearer)){
+        if(exists $attribute->{$type}){
+            my $generator = '_generate_' . $type;
+            my $code      = $accessor_class->$generator($attribute, $metaclass);
+            $metaclass->add_method($attribute->{$type} => $code);
+            $attribute->associate_method($attribute->{$type});
+        }
+    }
+
+    # install delegation
+    if(exists $attribute->{handles}){
+        my %handles = $attribute->_canonicalize_handles($attribute->{handles});
+
+        while(my($handle, $method_to_call) = each %handles){
+            $metaclass->add_method($handle =>
+                $attribute->_make_delegation_method(
+                    $handle, $method_to_call));
+
+            $attribute->associate_method($handle);
+        }
+    }
+
+    if($attribute->can('create') != \&create){
+        # backword compatibility
+        $attribute->create($metaclass, $attribute->name, %{$attribute});
+    }
+
+    return;
+}
+
+sub delegation_metaclass() { 'Mouse::Meta::Method::Delegation' }
 
 sub _canonicalize_handles {
     my($self, $handles) = @_;
@@ -368,50 +428,12 @@ sub _canonicalize_handles {
     }
 }
 
-sub associate_method{
-    my ($attribute, $method_name) = @_;
-    $attribute->{associated_methods}++;
-    return;
-}
+sub _make_delegation_method {
+    my($self, $handle, $method_to_call) = @_;
+    my $delegator = $self->delegation_metaclass;
+    Mouse::Util::load_class($delegator);
 
-sub delegation_metaclass() { 'Mouse::Meta::Method::Delegation' }
-
-sub install_accessors{
-    my($attribute) = @_;
-
-    my $metaclass      = $attribute->associated_class;
-    my $accessor_class = $attribute->accessor_metaclass;
-
-    foreach my $type(qw(accessor reader writer predicate clearer)){
-        if(exists $attribute->{$type}){
-            my $generator = '_generate_' . $type;
-            my $code      = $accessor_class->$generator($attribute, $metaclass);
-            $metaclass->add_method($attribute->{$type} => $code);
-            $attribute->associate_method($attribute->{$type});
-        }
-    }
-
-    # install delegation
-    if(exists $attribute->{handles}){
-        my $delegation_class = $attribute->delegation_metaclass;
-        my %handles = $attribute->_canonicalize_handles($attribute->{handles});
-        my $reader  = $attribute->get_read_method_ref;
-
-        while(my($handle_name, $method_to_call) = each %handles){
-            my $code = $delegation_class->_generate_delegation($attribute, $metaclass,
-                $reader, $handle_name, $method_to_call);
-
-            $metaclass->add_method($handle_name => $code);
-            $attribute->associate_method($handle_name);
-        }
-    }
-
-    if($attribute->can('create') != \&create){
-        # backword compatibility
-        $attribute->create($metaclass, $attribute->name, %{$attribute});
-    }
-
-    return;
+    return $delegator->_generate_delegation($self, $handle, $method_to_call);
 }
 
 sub throw_error{
@@ -430,7 +452,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 METHODS
 

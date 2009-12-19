@@ -38,7 +38,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.44';
+    our $VERSION = '0.45';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -54,7 +54,7 @@ BEGIN{
             Mouse::Util->import({ into => 'Mouse::Meta::Method::Destructor::XS'  }, ':meta');
             Mouse::Util->import({ into => 'Mouse::Meta::Method::Accessor::XS'    }, ':meta');
             return 1;
-        };
+        } || 0;
         #warn $@ if $@;
     }
 
@@ -81,9 +81,14 @@ BEGIN {
     *get_all_metaclass_names     = \&Mouse::Meta::Module::_get_all_metaclass_names;
 
     # is-a predicates
-    generate_isa_predicate_for('Mouse::Meta::TypeConstraint' => 'is_a_type_constraint');
-    generate_isa_predicate_for('Mouse::Meta::Class'          => 'is_a_metaclass');
-    generate_isa_predicate_for('Mouse::Meta::Role'           => 'is_a_metarole');
+    #generate_isa_predicate_for('Mouse::Meta::TypeConstraint' => 'is_a_type_constraint');
+    #generate_isa_predicate_for('Mouse::Meta::Class'          => 'is_a_metaclass');
+    #generate_isa_predicate_for('Mouse::Meta::Role'           => 'is_a_metarole');
+
+    # duck type predicates
+    generate_can_predicate_for(['_compiled_type_constraint']  => 'is_a_type_constraint');
+    generate_can_predicate_for(['create_anon_class']          => 'is_a_metaclass');
+    generate_can_predicate_for(['create_anon_role']           => 'is_a_metarole');
 }
 
 our $in_global_destruction = 0;
@@ -345,7 +350,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 IMPLEMENTATIONS FOR
 

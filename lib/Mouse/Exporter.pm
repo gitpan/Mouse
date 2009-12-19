@@ -225,6 +225,7 @@ sub do_unimport {
     };
 
     for my $keyword (@{ $spec->{REMOVABLES} }) {
+        next if !exists $stash->{$keyword};
         my $gv = \$stash->{$keyword};
         if(ref($gv) eq 'GLOB' && *{$gv}{CODE} == $spec->{EXPORTS}{$keyword}){ # make sure it is from us
             delete $stash->{$keyword};
@@ -233,20 +234,18 @@ sub do_unimport {
     return;
 }
 
-# 1 extra level because it's called by import so there's a layer
-# of indirection
-sub _LEVEL(){ 1 }
-
 sub _get_caller_package {
     my($arg) = @_;
 
+    # We need one extra level because it's called by import so there's a layer
+    # of indirection
     if(ref $arg){
         return defined($arg->{into})       ? $arg->{into}
-             : defined($arg->{into_level}) ? scalar caller(_LEVEL + $arg->{into_level})
-             :                               scalar caller(_LEVEL);
+             : defined($arg->{into_level}) ? scalar caller(1 + $arg->{into_level})
+             :                               scalar caller(1);
     }
     else{
-        return scalar caller(_LEVEL);
+        return scalar caller(1);
     }
 }
 
@@ -261,7 +260,7 @@ Mouse::Exporter - make an import() and unimport() just like Mouse.pm
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 SYNOPSIS
 

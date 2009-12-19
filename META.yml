@@ -25,10 +25,11 @@ no_index:
     - t
     - xt
 requires:
+  MouseX::AttributeHelpers: 0.06
   Scalar::Util: 1.14
   XSLoader: 0.1
   perl: 5.6.2
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Mouse.git
-version: 0.44
+version: 0.45

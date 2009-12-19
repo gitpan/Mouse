@@ -133,6 +133,7 @@ t/001_mouse/061-metaclass-compatibility.t
 t/001_mouse/062-duck_type.t
 t/001_mouse/063-meta-of-metaclasses.t
 t/001_mouse/064-class-c3.t
+t/001_mouse/065-attr-mop.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -231,7 +232,7 @@ t/050_metaclasses/011_init_meta.t
 t/050_metaclasses/013_metaclass_traits.t
 t/050_metaclasses/017_use_base_of_moose.t
 t/050_metaclasses/020_metaclass_parameterized_traits.t
-t/050_metaclasses/041_moose_nonmoose_moose_chain_init_meta.t
+t/050_metaclasses/041_moose_nonmoose_chain_init_meta.t
 t/100_bugs/001_subtype_quote_bug.t
 t/100_bugs/002_subtype_conflict_bug.t
 t/100_bugs/003_Moose_Object_error.t
@@ -301,3 +302,4 @@ xs-src/MouseUtil.xs
 xt/01_pod.t
 xt/02_pod_spell.t
 xt/03_pod_coverage.t
+xt/04_fs_portability.t

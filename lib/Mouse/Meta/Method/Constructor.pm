@@ -77,7 +77,7 @@ sub _generate_processattrs {
         my $post_process = '';
         if(defined $type_constraint){
             $post_process .= "\$checks[$index]->($instance_slot)";
-            $post_process .= "  or $attr_var->verify_type_constraint_error(q{$key}, $instance_slot, $constraint_var);\n";
+            $post_process .= "  or $attr_var->_throw_type_constraint_error($instance_slot, $constraint_var);\n";
         }
         if($is_weak_ref){
             $post_process .= "Scalar::Util::weaken($instance_slot) if ref $instance_slot;\n";
@@ -197,7 +197,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.44
+This document describes Mouse version 0.45
 
 =head1 SEE ALSO
 
