@@ -1,5 +1,7 @@
 package Mouse::Meta::Method::Accessor;
 use Mouse::Util qw(:meta); # enables strict and warnings
+use warnings FATAL => 'recursion';
+
 
 sub _inline_slot{
     my(undef, $self_var, $attr_name) = @_;
@@ -176,7 +178,7 @@ Mouse::Meta::Method::Accessor - A Mouse method generator for accessors
 
 =head1 VERSION
 
-This document describes Mouse version 0.45
+This document describes Mouse version 0.4501
 
 =head1 SEE ALSO
 
