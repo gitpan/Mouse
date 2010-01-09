@@ -194,9 +194,9 @@ sub add_attribute {
     return $attr;
 }
 
-sub compute_all_applicable_attributes {
-    Carp::cluck('compute_all_applicable_attributes() has been deprecated')
-        if Mouse::Util::_MOUSE_VERBOSE;
+sub compute_all_applicable_attributes { # DEPRECATED
+    Carp::cluck('compute_all_applicable_attributes() has been deprecated. Use get_all_attributes() instead');
+
     return shift->get_all_attributes(@_)
 }
 
@@ -218,11 +218,11 @@ sub clone_object {
     return $cloned;
 }
 
-sub clone_instance {
+sub clone_instance { # DEPRECATED
     my ($class, $instance, %params) = @_;
 
-    Carp::cluck('clone_instance has been deprecated. Use clone_object instead')
-        if Mouse::Util::_MOUSE_VERBOSE;
+    Carp::cluck('clone_instance() has been deprecated. Use clone_object() instead');
+
     return $class->clone_object($instance, %params);
 }
 
@@ -462,7 +462,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.4501
+This document describes Mouse version 0.46
 
 =head1 METHODS
 

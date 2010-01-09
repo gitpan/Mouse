@@ -249,15 +249,6 @@ sub _throw_type_constraint_error {
     );
 }
 
-sub coerce_constraint { # DEPRECATED
-    my $type = $_[0]->{type_constraint}
-        or return $_[1];
-
-    Carp::cluck("coerce_constraint() has been deprecated, which was an internal utility anyway");
-
-    return Mouse::Util::TypeConstraints->typecast_constraints($_[0]->associated_class->name, $type, $_[1]);
-}
-
 sub clone_and_inherit_options{
     my($self, %args) = @_;
 
@@ -412,6 +403,11 @@ sub _canonicalize_handles {
     elsif (ref($handles) eq 'ARRAY') {
         return map { $_ => $_ } @$handles;
     }
+    elsif ( ref($handles) eq 'CODE' ) {
+        my $class_or_role = ( $self->{isa} || $self->{does} )
+            || $self->throw_error( "Cannot find delegate metaclass for attribute " . $self->name );
+        return $handles->( $self, Mouse::Meta::Class->initialize("$class_or_role"));
+    }
     elsif (ref($handles) eq 'Regexp') {
         my $class_or_role = ($self->{isa} || $self->{does})
             || $self->throw_error("Cannot delegate methods based on a Regexp without a type constraint (isa)");
@@ -452,7 +448,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.4501
+This document describes Mouse version 0.46
 
 =head1 METHODS
 

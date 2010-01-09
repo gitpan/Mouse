@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.4501';
+our $VERSION = '0.46';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -166,7 +166,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.4501
+This document describes Mouse version 0.46
 
 =head1 SYNOPSIS
 
@@ -448,7 +448,7 @@ interface at L<http://rt.cpan.org/Public/Dist/Display.html?Name=Mouse>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2008-2009 Infinity Interactive, Inc.
+Copyright (c) 2008-2010 Infinity Interactive, Inc.
 
 http://www.iinteractive.com/
 
