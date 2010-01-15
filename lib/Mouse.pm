@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -166,7 +166,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.46
+This document describes Mouse version 0.47
 
 =head1 SYNOPSIS
 
@@ -401,6 +401,22 @@ You may use L</extends> to replace the superclass list.
 
 Please unimport Mouse (C<no Mouse>) so that if someone calls one of the
 keywords (such as L</extends>) it will break loudly instead breaking subtly.
+
+=head1 CAVEATS
+
+If you use Mouse::XS you might see a fatal error on callbacks
+which include C<eval 'BEGIN{ die }'>, which typically occurs in such code
+as C<eval 'use NotInstalledModule'>. This is not
+a bug in Mouse. In fact, it is a bug in Perl (RT #69939).
+
+To work around this problem, surround C<eval STRING> with C<eval BLOCK>:
+
+    sub callback {
+        # eval 'use NotInstalledModule';       # NG
+        eval{ eval 'use NotInstalledModule' }; # OK
+    }
+
+It seems ridiculous, but it works as you expected.
 
 =head1 SOURCE CODE ACCESS
 

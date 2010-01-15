@@ -3,21 +3,8 @@ package Sub::Uplevel;
 
 use 5.006;
 use strict;
-our $VERSION = '0.2002';
+our $VERSION = '0.22';
 $VERSION = eval $VERSION;
-
-sub import {
-  no strict 'refs';
-  my ($class, @args) = @_;
-  for my $fcn ( @args ) {
-    if ( $fcn ne 'uplevel' ) {
-      die qq{"$fcn" is not exported by the $class module\n}
-    }
-  }
-  my $caller = caller(0);
-  *{"$caller\::uplevel"} = \&uplevel;
-  return;
-}
 
 # We must override *CORE::GLOBAL::caller if it hasn't already been 
 # overridden or else Perl won't see our local override later.
@@ -26,8 +13,38 @@ if ( not defined *CORE::GLOBAL::caller{CODE} ) {
     *CORE::GLOBAL::caller = \&_normal_caller;
 }
 
+# modules to force reload if ":aggressive" is specified
+my @reload_list = qw/Exporter Exporter::Heavy/;
 
-#line 96
+sub import {
+  no strict 'refs';
+  my ($class, @args) = @_;
+  for my $tag ( @args, 'uplevel' ) {
+    if ( $tag eq 'uplevel' ) {
+      my $caller = caller(0);
+      *{"$caller\::uplevel"} = \&uplevel;
+    }
+    elsif( $tag eq ':aggressive' ) {
+      _force_reload( @reload_list );
+    }
+    else {
+      die qq{"$tag" is not exported by the $class module\n}
+    }
+  }
+  return;
+}
+
+sub _force_reload {
+  no warnings 'redefine';
+  local $^W = 0;
+  for my $m ( @_ ) {
+    $m =~ s{::}{/}g;
+    $m .= ".pm";
+    require $m if delete $INC{$m};
+  }
+}
+  
+#line 113
 
 # @Up_Frames -- uplevel stack
 # $Caller_Proxy -- whatever caller() override was in effect before uplevel
@@ -98,7 +115,7 @@ sub _uplevel_caller (;$) { ## no critic Prototypes
     # to skip this function's caller
     return $Caller_Proxy->( $height + 1 ) if ! @Up_Frames;
 
-#line 215
+#line 232
 
     my $saw_uplevel = 0;
     my $adjust = 0;
@@ -143,6 +160,6 @@ sub _uplevel_caller (;$) { ## no critic Prototypes
     }
 }
 
-#line 327
+#line 358
 
 1;

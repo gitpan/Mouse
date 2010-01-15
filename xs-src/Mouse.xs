@@ -253,9 +253,6 @@ mouse_class_initialize_object(pTHX_ SV* const meta, SV* const object, HV* const 
         croak("You cannot use tied HASH reference as initializing arguments");
     }
 
-    ENTER;
-    SAVETMPS;
-
     if(!ignore_triggers){
         triggers_queue = newAV_mortal();
     }
@@ -313,8 +310,6 @@ mouse_class_initialize_object(pTHX_ SV* const meta, SV* const object, HV* const 
         set_slot(object, newSVpvs_flags("__METACLASS__", SVs_TEMP), meta);
     }
 
-    FREETMPS;
-    LEAVE;
 }
 
 static SV*
@@ -353,7 +348,12 @@ mouse_buildall(pTHX_ AV* const xc, SV* const object, SV* const args) {
         PUSHs(args);
         PUTBACK;
 
-        call_sv(AvARRAY(buildall)[i], G_VOID | G_DISCARD);
+        call_sv(AvARRAY(buildall)[i], G_VOID);
+
+        /* discard a scalar which G_VOID returns */
+        SPAGAIN;
+        (void)POPs;
+        PUTBACK;
     }
 }
 
@@ -590,10 +590,9 @@ CODE:
     AV* demolishall;
     I32 len, i;
 
-    PERL_UNUSED_VAR(ix);
-
     if(!IsObject(object)){
-        croak("You must not call DESTROY as a class method");
+        croak("You must not call %s as a class method",
+            ix == 0 ? "DESTROY" : "DEMOLISHALL");
     }
 
     if(SvOK(meta)){
@@ -632,8 +631,14 @@ CODE:
             XPUSHs(object);
             PUTBACK;
 
-            call_sv(AvARRAY(demolishall)[i], G_VOID | G_DISCARD | G_EVAL);
-            if(SvTRUE(ERRSV)){
+            call_sv(AvARRAY(demolishall)[i], G_VOID | G_EVAL);
+
+            /* discard a scalar which G_VOID returns */
+            SPAGAIN;
+            (void)POPs;
+            PUTBACK;
+
+            if(sv_true(ERRSV)){
                 SV* const e = newSVsv(ERRSV);
 
                 FREETMPS;

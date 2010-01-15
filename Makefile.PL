@@ -3,7 +3,7 @@ use warnings;
 use inc::Module::Install;
 
 # for co-developpers
-use Module::Install::XSUtil 0.19;
+use Module::Install::XSUtil 0.21;
 
 system($^X, 'tool/generate-mouse-tiny.pl', 'lib/Mouse/Tiny.pm') == 0
     or warn "Cannot generate Mouse::Tiny: $!";
@@ -23,6 +23,24 @@ include_deps 'Test::Exception'; # work around 0.27_0x (its use of diehook might 
 
 if($] < 5.010) {
     recommends 'Class::C3';
+}
+
+my %suggests = (
+    'Class::Method::Modifiers::Fast' => 0.041,
+    'MouseX::AttributeHelpers'       => 0.06,
+);
+
+while(my($mod, $least) = each %suggests){
+    if(can_use($mod)){
+        if(!eval { $mod->VERSION($least) }){
+            my $ver = $mod->VERSION;
+            warn("\n",
+                "WARNING: $mod is installed, but its version ($ver) is too old (< $least).\n",
+                "         Please update $mod after installation of Mouse.\n",
+                "\n"
+            );
+        }
+    }
 }
 
 require 'lib/Mouse/Spec.pm'; # for the version
