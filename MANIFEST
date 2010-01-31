@@ -131,6 +131,7 @@ t/001_mouse/062-duck_type.t
 t/001_mouse/063-meta-of-metaclasses.t
 t/001_mouse/064-class-c3.t
 t/001_mouse/065-attr-mop.t
+t/001_mouse/066-magic.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t

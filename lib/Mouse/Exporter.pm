@@ -171,7 +171,7 @@ sub do_import {
     if($spec->{INIT_META}){
         my $meta;
         foreach my $init_meta(@{$spec->{INIT_META}}){
-            $meta = $into->$init_meta(for_class => $into);
+            $meta = $package->$init_meta(for_class => $into);
         }
 
         if(@traits){
@@ -260,7 +260,7 @@ Mouse::Exporter - make an import() and unimport() just like Mouse.pm
 
 =head1 VERSION
 
-This document describes Mouse version 0.47
+This document describes Mouse version 0.48
 
 =head1 SYNOPSIS
 
