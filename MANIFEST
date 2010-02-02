@@ -272,6 +272,7 @@ t/810_with_moose/501_moose_coerce_mouse.t
 t/900_bug/001_immutable_types.t
 t/900_bug/002_does_role_should_search_parent.t
 t/900_bug/003_RT50421.t
+t/900_bug/004_RT54203.t
 t/990_deprecated/001-export_to_level.t
 t/990_deprecated/044-attribute-metaclass.t
 t/990_deprecated/047-attribute-metaclass-role.t

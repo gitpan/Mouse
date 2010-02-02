@@ -1,12 +1,14 @@
 #define  NEED_newSVpvn_flags_GLOBAL
 #include "mouse.h"
 
+/* keywords for methods/keys */
 SV* mouse_package;
 SV* mouse_namespace;
 SV* mouse_methods;
 SV* mouse_name;
 SV* mouse_get_attribute;
 SV* mouse_get_attribute_list;
+SV* mouse_coerce;
 
 #define MOUSE_xc_flags(a)       SvUVX(MOUSE_av_at((a), MOUSE_XC_FLAGS))
 #define MOUSE_xc_gen(a)         MOUSE_av_at((a), MOUSE_XC_GEN)
@@ -271,7 +273,7 @@ mouse_class_initialize_object(pTHX_ SV* const meta, SV* const object, HV* const 
             if(flags & MOUSEf_ATTR_HAS_TC){
                 value = mouse_xa_apply_type_constraint(aTHX_ xa, value, flags);
             }
-            set_slot(object, slot, value);
+            value = set_slot(object, slot, value);
             if(SvROK(value) && flags & MOUSEf_ATTR_IS_WEAK_REF){
                 weaken_slot(object, slot);
             }
@@ -307,7 +309,7 @@ mouse_class_initialize_object(pTHX_ SV* const meta, SV* const object, HV* const 
     }
 
     if(MOUSE_xc_flags(xc) & MOUSEf_XC_IS_ANON){
-        set_slot(object, newSVpvs_flags("__METACLASS__", SVs_TEMP), meta);
+        (void)set_slot(object, newSVpvs_flags("__METACLASS__", SVs_TEMP), meta);
     }
 
 }
@@ -366,6 +368,7 @@ BOOT:
     mouse_namespace = newSVpvs_share("namespace");
     mouse_methods   = newSVpvs_share("methods");
     mouse_name      = newSVpvs_share("name");
+    mouse_coerce    = newSVpvs_share("coerce");
 
     mouse_get_attribute      = newSVpvs_share("get_attribute");
     mouse_get_attribute_list = newSVpvs_share("get_attribute_list");
@@ -439,7 +442,7 @@ CODE:
     }
     sv_setsv_mg((SV*)gv, code_ref); /* *gv = $code_ref */
 
-    set_slot(methods, name, code); /* $self->{methods}{$name} = $code */
+    (void)set_slot(methods, name, code); /* $self->{methods}{$name} = $code */
 
     /* name the CODE ref if it's anonymous */
     {
