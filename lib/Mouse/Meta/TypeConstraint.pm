@@ -81,6 +81,15 @@ sub create_child_type{
    );
 }
 
+sub name;
+sub parent;
+sub message;
+sub has_coercion;
+sub _compiled_type_constraint;
+sub _compiled_type_coercion;
+
+sub compile_type_constraint;
+
 sub _add_type_coercions{
     my $self = shift;
 
@@ -129,10 +138,14 @@ sub check {
 sub coerce {
     my $self = shift;
 
+    my $coercion = $self->_compiled_type_coercion;
+    if(!$coercion){
+        Carp::confess("Cannot coerce without a type coercion");
+    }
+
     return $_[0] if $self->_compiled_type_constraint->(@_);
 
-    my $coercion = $self->_compiled_type_coercion;
-    return $coercion ? $coercion->(@_) : $_[0];
+    return  $coercion->(@_);
 }
 
 sub get_message {
@@ -203,7 +216,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.49
+This document describes Mouse version 0.50
 
 =head1 DESCRIPTION
 

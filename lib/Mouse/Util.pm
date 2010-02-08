@@ -38,7 +38,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.49';
+    our $VERSION = '0.50';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -266,7 +266,7 @@ sub load_class {
 sub is_class_loaded;
 
 sub apply_all_roles {
-    my $applicant = Scalar::Util::blessed($_[0])
+    my $consumer = Scalar::Util::blessed($_[0])
         ?                                shift   # instance
         : Mouse::Meta::Class->initialize(shift); # class or role name
 
@@ -284,15 +284,15 @@ sub apply_all_roles {
         load_class($role_name);
 
         is_a_metarole( get_metaclass_by_name($role_name) )
-            || $applicant->meta->throw_error("You can only consume roles, $role_name is not a Mouse role");
+            || $consumer->meta->throw_error("You can only consume roles, $role_name is not a Mouse role");
     }
 
     if ( scalar @roles == 1 ) {
         my ( $role_name, $params ) = @{ $roles[0] };
-        get_metaclass_by_name($role_name)->apply( $applicant, defined $params ? $params : () );
+        get_metaclass_by_name($role_name)->apply( $consumer, defined $params ? $params : () );
     }
     else {
-        Mouse::Meta::Role->combine(@roles)->apply($applicant);
+        Mouse::Meta::Role->combine(@roles)->apply($consumer);
     }
     return;
 }
@@ -308,6 +308,18 @@ sub english_list {
     my $tail = pop @items;
 
     return join q{, }, @items, "and $tail";
+}
+
+sub quoted_english_list {
+    return qq{'$_[0]'} if @_ == 1;
+
+    my @items = sort @_;
+
+    return qq{'$items[0]' and '$items[1]'} if @items == 2;
+
+    my $tail = pop @items;
+
+    return join q{, }, (map{ qq{'$_'} } @items), qq{and '$tail'};
 }
 
 # common utilities
@@ -332,14 +344,15 @@ sub dump :method {
 
     require 'Data/Dumper.pm'; # we don't want to create its namespace
     my $dd = Data::Dumper->new([$self]);
-    $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 2);
+    $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 3);
     $dd->Indent(1);
     return $dd->Dump();
 }
 
 # general does() method
-sub does :method;
-*does = \&does_role; # alias
+sub does :method {
+    goto &does_role;
+}
 
 1;
 __END__
@@ -350,7 +363,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.49
+This document describes Mouse version 0.50
 
 =head1 IMPLEMENTATIONS FOR
 

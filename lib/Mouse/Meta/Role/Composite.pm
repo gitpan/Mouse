@@ -1,5 +1,5 @@
 package Mouse::Meta::Role::Composite;
-use Mouse::Util qw(english_list); # enables strict and warnings
+use Mouse::Util; # enables strict and warnings
 use Mouse::Meta::Role;
 our @ISA = qw(Mouse::Meta::Role);
 
@@ -79,38 +79,39 @@ sub add_override_method_modifier{
 # components of apply()
 
 sub _apply_methods{
-    my($self, $applicant, $args) = @_;
+    my($self, $consumer, $args) = @_;
 
     if(exists $self->{conflicting_methods}){
-        my $applicant_class_name = $applicant->name;
+        my $consumer_class_name = $consumer->name;
 
-        my @conflicting = sort grep{ !$applicant_class_name->can($_) } keys %{ $self->{conflicting_methods} };
+        my @conflicting = grep{ !$consumer_class_name->can($_) } keys %{ $self->{conflicting_methods} };
 
         if(@conflicting == 1){
             my $method_name = $conflicting[0];
-            my @roles       = sort @{ $self->{composed_roles_by_method}{$method_name} };
+            my $roles       = Mouse::Util::quoted_english_list(map{ $_->name } @{ $self->{composed_roles_by_method}{$method_name} });
             $self->throw_error(
                sprintf q{Due to a method name conflict in roles %s, the method '%s' must be implemented or excluded by '%s'},
-                   english_list(map{ sprintf q{'%s'}, $_->name } @roles), $method_name, $applicant->name
+                   $roles, $method_name, $consumer_class_name
             );
         }
         elsif(@conflicting > 1){
-            my $methods = english_list(map{ sprintf q{'%s'}, $_ } @conflicting);
-
             my %seen;
-            my $roles   = english_list(
-                sort map{ my $name = $_->name; $seen{$name}++ ? () : sprintf q{'%s'}, $name }
-                map{ @{$_} } @{ $self->{composed_roles_by_method} }{@conflicting}
+            my $roles = Mouse::Util::quoted_english_list(
+                grep{ !$seen{$_}++ } # uniq
+                map { $_->name }
+                map { @{$_} } @{ $self->{composed_roles_by_method} }{@conflicting}
             );
 
             $self->throw_error(
                sprintf q{Due to method name conflicts in roles %s, the methods %s must be implemented or excluded by '%s'},
-                   $roles, $methods, $applicant->name
+                   $roles,
+                   Mouse::Util::quoted_english_list(@conflicting),
+                   $consumer_class_name
             );
         }
     }
 
-    $self->SUPER::_apply_methods($applicant, $args);
+    $self->SUPER::_apply_methods($consumer, $args);
     return;
 }
 1;
@@ -122,7 +123,7 @@ Mouse::Meta::Role::Composite - An object to represent the set of roles
 
 =head1 VERSION
 
-This document describes Mouse version 0.49
+This document describes Mouse version 0.50
 
 =head1 SEE ALSO
 

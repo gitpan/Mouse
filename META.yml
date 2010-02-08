@@ -5,13 +5,13 @@ author:
 build_requires:
   ExtUtils::MakeMaker: 6.42
   ExtUtils::ParseXS: 2.21
-  Test::Exception: 0.27
+  Test::Exception: 0.29
   Test::More: 0.88
 configure_requires:
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.91'
+generated_by: 'Module::Install version 0.93'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -30,4 +30,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Mouse.git
-version: 0.49
+version: 0.50
