@@ -627,7 +627,7 @@ sub DESTROY {
                 my $demolish = Mouse::Util::get_code_ref($class, 'DEMOLISH')
                     || next;
 
-                $self->$demolish();
+                $self->$demolish($Mouse::Util::in_global_destruction);
             }
         };
         $@;
@@ -664,7 +664,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.50
+This document describes Mouse version 0.50_01
 
 =head1 SEE ALSO
 

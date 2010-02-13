@@ -13,7 +13,8 @@ sub _generate_destructor{
     my $demolishall = '';
     for my $class ($metaclass->linearized_isa) {
         if (Mouse::Util::get_code_ref($class, 'DEMOLISH')) {
-            $demolishall .= "${class}::DEMOLISH(\$self);\n";
+            $demolishall .= sprintf "%s::DEMOLISH(\$self, \$Mouse::Util::in_global_destruction);\n",
+                $class,
         }
     }
 
@@ -53,7 +54,7 @@ Mouse::Meta::Method::Destructor - A Mouse method generator for destructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.50
+This document describes Mouse version 0.50_01
 
 =head1 SEE ALSO
 

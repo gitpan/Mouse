@@ -150,6 +150,37 @@ sub get_method_list {
     return grep { $self->has_method($_) } keys %{ $self->namespace };
 }
 
+sub _collect_methods { # Mouse specific
+    my($meta, @args) = @_;
+
+    my @methods;
+    foreach my $arg(@args){
+        if(my $type = ref $arg){
+            if($type eq 'Regexp'){
+                push @methods, grep { $_ =~ $arg } $meta->get_all_method_names;
+            }
+            elsif($type eq 'ARRAY'){
+                push @methods, @{$arg};
+            }
+            else{
+                my $subname = ( caller(1) )[3];
+                $meta->throw_error(
+                    sprintf(
+                        'Methods passed to %s must be provided as a list, ArrayRef or regular expression, not %s',
+                        $subname,
+                        $type,
+                    )
+                );
+            }
+         }
+         else{
+            push @methods, $arg;
+         }
+     }
+     return @methods;
+}
+
+
 {
     my $ANON_SERIAL = 0;
 
@@ -311,7 +342,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.50
+This document describes Mouse version 0.50_01
 
 =head1 SEE ALSO
 

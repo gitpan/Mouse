@@ -1,7 +1,7 @@
 package Mouse::Role;
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.50';
+our $VERSION = '0.50_01';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -56,30 +56,27 @@ sub has {
 
 sub before {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-
     my $code = pop;
-    for (@_) {
-        $meta->add_before_method_modifier($_ => $code);
+    for my $name($meta->_collect_methods(@_)) {
+        $meta->add_before_method_modifier($name => $code);
     }
     return;
 }
 
 sub after {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-
     my $code = pop;
-    for (@_) {
-        $meta->add_after_method_modifier($_ => $code);
+    for my $name($meta->_collect_methods(@_)) {
+        $meta->add_after_method_modifier($name => $code);
     }
     return;
 }
 
 sub around {
     my $meta = Mouse::Meta::Role->initialize(scalar caller);
-
     my $code = pop;
-    for (@_) {
-        $meta->add_around_method_modifier($_ => $code);
+    for my $name($meta->_collect_methods(@_)) {
+        $meta->add_around_method_modifier($name => $code);
     }
     return;
 }
@@ -148,7 +145,7 @@ Mouse::Role - The Mouse Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.50
+This document describes Mouse version 0.50_01
 
 =head1 SYNOPSIS
 
@@ -161,15 +158,15 @@ This document describes Mouse version 0.50
 
 Returns this role's metaclass instance.
 
-=head2 C<< before (method|methods) -> CodeRef >>
+=head2 C<< before (method|methods|regexp) -> CodeRef >>
 
 Sets up a B<before> method modifier. See L<Moose/before>.
 
-=head2 C<< after (method|methods) => CodeRef >>
+=head2 C<< after (method|methods|regexp) => CodeRef >>
 
 Sets up an B<after> method modifier. See L<Moose/after>.
 
-=head2 C<< around (method|methods) => CodeRef >>
+=head2 C<< around (method|methods|regexp) => CodeRef >>
 
 Sets up an B<around> method modifier. See L<Moose/around>.
 

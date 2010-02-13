@@ -129,6 +129,7 @@ t/001_mouse/063-meta-of-metaclasses.t
 t/001_mouse/064-class-c3.t
 t/001_mouse/065-attr-mop.t
 t/001_mouse/066-magic.t
+t/001_mouse/067-traits.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -163,6 +164,7 @@ t/010_basics/006_override_and_foreign_classes.t
 t/010_basics/007_always_strict_warnings.t
 t/010_basics/008_wrapped_method_cxt_propagation.t
 t/010_basics/009_import_unimport.t
+t/010_basics/010_method_modifier_with_regexp.t
 t/010_basics/011_moose_respects_type_constraints.t
 t/010_basics/013_create.t
 t/010_basics/014_create_anon.t
@@ -170,6 +172,8 @@ t/010_basics/015_buildargs.t
 t/010_basics/017_error_handling.t
 t/010_basics/018_methods.t
 t/010_basics/019-destruction.t
+t/010_basics/020-global-destruction-helper.pl
+t/010_basics/020-global-destruction.t
 t/020_attributes/002_attribute_writer_generation.t
 t/020_attributes/003_attribute_accessor_generation.t
 t/020_attributes/005_attribute_does.t
@@ -228,6 +232,7 @@ t/050_metaclasses/013_metaclass_traits.t
 t/050_metaclasses/017_use_base_of_moose.t
 t/050_metaclasses/020_metaclass_parameterized_traits.t
 t/050_metaclasses/041_moose_nonmoose_chain_init_meta.t
+t/050_metaclasses/051_metarole_on_anon.t
 t/100_bugs/001_subtype_quote_bug.t
 t/100_bugs/002_subtype_conflict_bug.t
 t/100_bugs/003_Moose_Object_error.t
@@ -299,3 +304,4 @@ xt/01_pod.t
 xt/02_pod_spell.t
 xt/03_pod_coverage.t
 xt/04_fs_portability.t
+xt/05_dbsub.t
