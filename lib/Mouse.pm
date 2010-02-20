@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.50_01';
+our $VERSION = '0.50_02';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -160,7 +160,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_01
+This document describes Mouse version 0.50_02
 
 =head1 SYNOPSIS
 
@@ -176,6 +176,9 @@ This document describes Mouse version 0.50_01
         $self->y(0);
     }
 
+
+    __PACKAGE__->meta->make_immutable();
+
     package Point3D;
     use Mouse;
 
@@ -187,6 +190,8 @@ This document describes Mouse version 0.50_01
         my $self = shift;
         $self->z(0);
     };
+
+    __PACKAGE__->meta->make_immutable();
 
 =head1 DESCRIPTION
 

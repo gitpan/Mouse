@@ -67,6 +67,10 @@ sub name;
 sub parent;
 sub message;
 sub has_coercion;
+
+sub type_parameter;
+sub __is_parameterized;
+
 sub _compiled_type_constraint;
 sub _compiled_type_coercion;
 
@@ -211,13 +215,22 @@ sub parameterize{
         || Carp::confess("The $name constraint cannot be used, because $param doesn't subtype from a parameterizable type");
 
     return Mouse::Meta::TypeConstraint->new(
-        name        => $name,
-        parent      => $self,
-        parameter   => $param,
-        constraint  => $generator->($param), # must be 'constraint', not 'optimized'
+        name           => $name,
+        parent         => $self,
+        type_parameter => $param,
+        constraint     => $generator->($param), # must be 'constraint', not 'optimized'
 
-        type        => 'Parameterized',
+        type           => 'Parameterized',
     );
+}
+
+sub assert_valid {
+    my ($self, $value) = @_;
+
+    if(!$self->_compiled_type_constraint->($value)){
+        Carp::confess($self->get_message($value));
+    }
+    return 1;
 }
 
 1;
@@ -229,7 +242,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_01
+This document describes Mouse version 0.50_02
 
 =head1 DESCRIPTION
 

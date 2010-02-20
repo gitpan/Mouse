@@ -325,6 +325,8 @@ sub _initialize_object{
 
 sub is_immutable {  $_[0]->{is_immutable} }
 
+sub __strict_constructor{ $_[0]->{strict_constructor} }
+
 package
     Mouse::Meta::Role;
 
@@ -511,6 +513,9 @@ sub name    { $_[0]->{name}    }
 sub parent  { $_[0]->{parent}  }
 sub message { $_[0]->{message} }
 
+sub type_parameter { $_[0]->{type_parameter} }
+sub __is_parameterized { exists $_[0]->{type_parameter} }
+
 sub _compiled_type_constraint{ $_[0]->{compiled_type_constraint} }
 
 sub _compiled_type_coercion  { $_[0]->{_compiled_type_coercion}  }
@@ -664,7 +669,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_01
+This document describes Mouse version 0.50_02
 
 =head1 SEE ALSO
 

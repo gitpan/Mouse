@@ -130,6 +130,7 @@ t/001_mouse/064-class-c3.t
 t/001_mouse/065-attr-mop.t
 t/001_mouse/066-magic.t
 t/001_mouse/067-traits.t
+t/001_mouse/068-strict-constructor.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
@@ -222,9 +223,13 @@ t/040_type_constraints/004_util_find_type_constraint.t
 t/040_type_constraints/005_util_type_coercion.t
 t/040_type_constraints/007_util_more_type_coercion.t
 t/040_type_constraints/009_union_types_and_coercions.t
+t/040_type_constraints/010_misc_type_tests.t
 t/040_type_constraints/015_enum.t
 t/040_type_constraints/017_subtyping_union_types.t
+t/040_type_constraints/022_custom_type_errors.t
+t/040_type_constraints/023_types_and_undef.t
 t/040_type_constraints/025_type_coersion_on_lazy_attributes.t
+t/040_type_constraints/029_define_type_twice_throws.t
 t/050_metaclasses/001_custom_attr_meta_with_roles.t
 t/050_metaclasses/002_custom_attr_meta_as_role.t
 t/050_metaclasses/011_init_meta.t

@@ -375,7 +375,10 @@ sub _make_delegation_method {
     my $delegator = $self->delegation_metaclass;
     Mouse::Util::load_class($delegator);
 
-    return $delegator->_generate_delegation($self, $handle, $method_to_call);
+    return $delegator->_generate_delegation($self, $handle,
+        ref($method_to_call) eq 'ARRAY'
+            ? @{$method_to_call}
+            :   $method_to_call);
 }
 
 sub throw_error{
@@ -394,7 +397,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_01
+This document describes Mouse version 0.50_02
 
 =head1 METHODS
 
