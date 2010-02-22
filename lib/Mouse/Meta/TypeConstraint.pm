@@ -35,8 +35,6 @@ sub new {
         Carp::confess("Constraint for $args{name} is not a CODE reference");
     }
 
-    $args{package_defined_in} ||= caller;
-
     my $self = bless \%args, $class;
     $self->compile_type_constraint() if !$self->{hand_optimized_type_constraint};
 
@@ -242,7 +240,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_02
+This document describes Mouse version 0.50_03
 
 =head1 DESCRIPTION
 

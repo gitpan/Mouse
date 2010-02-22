@@ -3,6 +3,7 @@ benchmarks/accessors.pl
 benchmarks/basic.pl
 benchmarks/class_type.pl
 benchmarks/coercion.pl
+benchmarks/constructor.pl
 benchmarks/load_class.pl
 benchmarks/modifiers.pl
 benchmarks/subtype.pl
