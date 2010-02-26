@@ -101,7 +101,6 @@ sub list_all_builtin_type_constraints { @builtins }
 
 sub list_all_type_constraints         { keys %TYPE }
 
-
 sub _create_type{
     my $mode = shift;
 
@@ -392,7 +391,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head2 SYNOPSIS
 

@@ -41,6 +41,12 @@ enum mouse_xc_ix_t{
     MOUSE_XC_last
 };
 
+enum mouse_modifier_t {
+    MOUSE_M_BEFORE,
+    MOUSE_M_AROUND,
+    MOUSE_M_AFTER,
+};
+
 static MGVTBL mouse_xc_vtbl; /* for identity */
 
 static void
@@ -411,6 +417,44 @@ mouse_buildall(pTHX_ AV* const xc, SV* const object, SV* const args) {
     }
 }
 
+static AV*
+mouse_get_modifier_storage(pTHX_
+        SV* const meta,
+        enum mouse_modifier_t const m, SV* const name) {
+    static const char* const keys[] = {
+        "before",
+        "around",
+        "after",
+    };
+    SV* const key = sv_2mortal(Perl_newSVpvf(aTHX_ "%s_method_modifiers", keys[m]));
+    SV* table;
+    SV* storage_ref;
+
+    must_defined(name, "a method name");
+
+    table = get_slot(meta, key);
+
+    if(!table){
+        /* $meta->{$key} = {} */
+        table = sv_2mortal(newRV_noinc((SV*)newHV()));
+        set_slot(meta, key, table);
+    }
+
+    storage_ref = get_slot(table, name);
+
+    if(!storage_ref){
+        storage_ref = sv_2mortal(newRV_noinc((SV*)newAV()));
+        set_slot(table, name, storage_ref);
+    }
+    else{
+        if(!IsArrayRef(storage_ref)){
+            croak("Modifier strorage for '%s' is not an ARRAY reference", keys[m]);
+        }
+    }
+
+    return (AV*)SvRV(storage_ref);
+}
+
 MODULE = Mouse  PACKAGE = Mouse
 
 PROTOTYPES: DISABLE
@@ -465,65 +509,22 @@ CODE:
         croak("No package name defined");
     }
 
-    SvGETMAGIC(name);
-    SvGETMAGIC(code);
-
-    if(!SvOK(name)){
-        mouse_throw_error(self, NULL, "You must define a method name");
-    }
-    if(!SvROK(code)){
-        mouse_throw_error(self, NULL, "You must define a CODE reference");
-    }
+    must_defined(name, "a method name");
+    must_ref    (code, "a CODE reference", SVt_NULL); /* any reftype is OK */
 
     code_ref = code;
     if(SvTYPE(SvRV(code_ref)) != SVt_PVCV){
         SV*  sv = code_ref;  /* used in tryAMAGICunDEREF */
         SV** sp = &sv;       /* used in tryAMAGICunDEREF */
         tryAMAGICunDEREF(to_cv); /* try \&{$code} */
-        if(!(SvROK(sv) && SvTYPE(SvRV(sv)) == SVt_PVCV)){
-            mouse_throw_error(self, NULL, "You must pass a CODE reference to add_method");
-        }
+        must_ref(code, "a CODE reference", SVt_PVCV);
         code_ref = sv;
     }
 
     /*  *{$package . '::' . $name} -> *gv */
     gv = gv_fetchpv(form("%"SVf"::%"SVf, package, name), GV_ADDMULTI, SVt_PVCV);
-    if(GvCVu(gv)){ /* delete *slot{gv} to work around "redefine" warning */
-        SvREFCNT_dec(GvCV(gv));
-        GvCV(gv) = NULL;
-    }
-    sv_setsv_mg((SV*)gv, code_ref); /* *gv = $code_ref */
-
+    mouse_install_sub(aTHX_ gv, code_ref);
     (void)set_slot(methods, name, code); /* $self->{methods}{$name} = $code */
-
-    /* name the CODE ref if it's anonymous */
-    {
-        CV* const code_entity = (CV*)SvRV(code_ref);
-        if(CvANON(code_entity)
-            && CvGV(code_entity) /* a cv under construction has no gv */ ){
-            HV* dbsub;
-
-            /* update %DB::sub to make NYTProf happy */
-            if((PL_perldb & (PERLDBf_SUBLINE|PERLDB_NAMEANON))
-                && PL_DBsub && (dbsub = GvHV(PL_DBsub))
-            ){
-                /* see Perl_newATTRSUB() in op.c */
-                SV* const subname = sv_newmortal();
-                HE* orig;
-
-                gv_efullname3(subname, CvGV(code_entity), NULL);
-                orig = hv_fetch_ent(dbsub, subname, FALSE, 0U);
-                if(orig){
-                    gv_efullname3(subname, gv, NULL);
-                    (void)hv_store_ent(dbsub, subname, HeVAL(orig), 0U);
-                    SvREFCNT_inc_simple_void_NN(HeVAL(orig));
-                }
-            }
-
-            CvGV(code_entity) = gv;
-            CvANON_off(code_entity);
-        }
-    }
 }
 
 MODULE = Mouse  PACKAGE = Mouse::Meta::Class
@@ -606,6 +607,39 @@ BOOT:
     INSTALL_SIMPLE_PREDICATE_WITH_KEY(Role, is_anon_role, anon_serial_id);
 
     INSTALL_CLASS_HOLDER(Role, method_metaclass,  "Mouse::Meta::Role::Method");
+
+void
+add_before_modifier(SV* self, SV* name, SV* modifier)
+CODE:
+{
+    av_push(mouse_get_modifier_storage(aTHX_ self, ix, name), newSVsv(modifier));
+}
+ALIAS:
+    add_before_method_modifier = MOUSE_M_BEFORE
+    add_around_method_modifier = MOUSE_M_AROUND
+    add_after_method_modifier  = MOUSE_M_AFTER
+
+void
+get_before_modifiers(SV* self, SV* name)
+ALIAS:
+    get_before_method_modifiers = MOUSE_M_BEFORE
+    get_around_method_modifiers = MOUSE_M_AROUND
+    get_after_method_modifiers  = MOUSE_M_AFTER
+PPCODE:
+{
+    AV* const storage = mouse_get_modifier_storage(aTHX_ self, ix, name);
+    I32 const len     = av_len(storage) + 1;
+    if(GIMME_V == G_ARRAY) {
+        I32 i;
+        EXTEND(SP, len);
+        for(i = 0; i < len; i++){
+            PUSHs(*av_fetch(storage, i, TRUE));
+        }
+    }
+    else{
+        mPUSHi(len);
+    }
+}
 
 MODULE = Mouse  PACKAGE = Mouse::Object
 
@@ -747,8 +781,6 @@ CODE:
     SV* const meta = get_metaclass(self);
     AV* const xc   = mouse_get_xc(aTHX_ meta);
 
-    if(!IsHashRef(args)){
-        croak("You must pass a HASH reference to BUILDALL");
-    }
+    must_ref(args, "a HASH reference to BUILDALL", SVt_PVHV);
     mouse_buildall(aTHX_ xc, self, args);
 }

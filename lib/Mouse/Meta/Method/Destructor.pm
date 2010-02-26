@@ -18,22 +18,23 @@ sub _generate_destructor{
         }
     }
 
-    my $source = sprintf("#line %d %s\n", __LINE__, __FILE__) . <<"...";
+    my $source = sprintf(<<'END_DESTROY', __LINE__, __FILE__, $demolishall);
+#line %d %s
     sub {
-        my \$self = shift;
-        local \$?;
-
-        my \$e = do{
-            local \$@;
+        my $self = shift;
+        my $e = do{
+            local $?;
+            local $@;
             eval{
-                $demolishall;
+                # demolishall
+                %s;
             };
-            \$@;
+            $@;
         };
         no warnings 'misc';
-        die \$e if \$e; # rethrow
+        die $e if $e; # rethrow
     }
-...
+END_DESTROY
 
     my $code;
     my $e = do{
@@ -54,7 +55,7 @@ Mouse::Meta::Method::Destructor - A Mouse method generator for destructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 SEE ALSO
 

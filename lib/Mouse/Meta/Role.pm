@@ -149,13 +149,13 @@ sub _apply_modifiers{
     }
 
     for my $modifier_type (qw/before around after/) {
-        my $modifiers = $role->{"${modifier_type}_method_modifiers"}
+        my $table = $role->{"${modifier_type}_method_modifiers"}
             or next;
 
         my $add_modifier = "add_${modifier_type}_method_modifier";
 
-        foreach my $method_name (keys %{$modifiers}){
-            foreach my $code(@{ $modifiers->{$method_name} }){
+        while(my($method_name, $modifiers) = each %{$table}){
+            foreach my $code(@{ $modifiers }){
                 next if $consumer->{"_applied_$modifier_type"}{$method_name, $code}++; # skip applied modifiers
                 $consumer->$add_modifier($method_name => $code);
             }
@@ -167,10 +167,10 @@ sub _apply_modifiers{
 sub _append_roles{
     my($role, $consumer, $args) = @_;
 
-    my $roles = ($args->{_to} eq 'role') ? $consumer->get_roles : $consumer->roles;
+    my $roles = $consumer->{roles};
 
     foreach my $r($role, @{$role->get_roles}){
-        if(!$consumer->does_role($r->name)){
+        if(!$consumer->does_role($r)){
             push @{$roles}, $r;
         }
     }
@@ -255,37 +255,13 @@ sub combine {
     return $composite;
 }
 
-sub add_before_method_modifier {
-    my ($self, $method_name, $method) = @_;
+sub add_before_method_modifier;
+sub add_around_method_modifier;
+sub add_after_method_modifier;
 
-    push @{ $self->{before_method_modifiers}{$method_name} ||= [] }, $method;
-    return;
-}
-sub add_around_method_modifier {
-    my ($self, $method_name, $method) = @_;
-
-    push @{ $self->{around_method_modifiers}{$method_name} ||= [] }, $method;
-    return;
-}
-sub add_after_method_modifier {
-    my ($self, $method_name, $method) = @_;
-
-    push @{ $self->{after_method_modifiers}{$method_name} ||= [] }, $method;
-    return;
-}
-
-sub get_before_method_modifiers {
-    my ($self, $method_name) = @_;
-    return @{ $self->{before_method_modifiers}{$method_name} ||= [] }
-}
-sub get_around_method_modifiers {
-    my ($self, $method_name) = @_;
-    return @{ $self->{around_method_modifiers}{$method_name} ||= [] }
-}
-sub get_after_method_modifiers {
-    my ($self, $method_name) = @_;
-    return @{ $self->{after_method_modifiers}{$method_name} ||= [] }
-}
+sub get_before_method_modifiers;
+sub get_around_method_modifiers;
+sub get_after_method_modifiers;
 
 sub add_override_method_modifier{
     my($self, $method_name, $method) = @_;
@@ -312,6 +288,8 @@ sub does_role {
     (defined $role_name)
         || $self->throw_error("You must supply a role name to look for");
 
+    $role_name = $role_name->name if ref $role_name;
+
     # if we are it,.. then return true
     return 1 if $role_name eq $self->name;
     # otherwise.. check our children
@@ -330,7 +308,7 @@ Mouse::Meta::Role - The Mouse Role metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 SEE ALSO
 

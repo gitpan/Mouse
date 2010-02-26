@@ -3,12 +3,12 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.50_03';
+our $VERSION = '0.50_04';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
 
-use Mouse::Util qw(load_class is_class_loaded get_code_package not_supported);
+use Mouse::Util ();
 
 use Mouse::Meta::Module;
 use Mouse::Meta::Class;
@@ -160,7 +160,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 SYNOPSIS
 

@@ -91,8 +91,6 @@ mouse_throw_error(SV* const metaobject, SV* const data /* not used */, const cha
     va_list args;
     SV* message;
 
-    PERL_UNUSED_ARG(data); /* for moose-compat */
-
     assert(metaobject);
     assert(fmt);
 
@@ -103,13 +101,17 @@ mouse_throw_error(SV* const metaobject, SV* const data /* not used */, const cha
     {
         dSP;
         PUSHMARK(SP);
-        EXTEND(SP, 4);
+        EXTEND(SP, 6);
 
         PUSHs(metaobject);
         mPUSHs(message);
 
-        mPUSHs(newSVpvs("depth"));
-        mPUSHi(-1);
+        if(data){ /* extra arg, might be useful for debugging */
+            mPUSHs(newSVpvs("data"));
+            PUSHs(data);
+            mPUSHs(newSVpvs("depth"));
+            mPUSHi(-1);
+        }
 
         PUTBACK;
 
@@ -117,6 +119,30 @@ mouse_throw_error(SV* const metaobject, SV* const data /* not used */, const cha
         croak("throw_error() did not throw the error (%"SVf")", message);
     }
 }
+
+void
+mouse_must_defined(pTHX_ SV* const value, const char* const name) {
+    assert(value);
+    assert(name);
+
+    SvGETMAGIC(value);
+    if(!SvOK(value)){
+        croak("You must define %s", name);
+    }
+}
+
+void
+mouse_must_ref(pTHX_ SV* const value, const char* const name, svtype const t) {
+    assert(value);
+    assert(name);
+
+    SvGETMAGIC(value);
+    if(!(SvROK(value) && (t == SVt_NULL || SvTYPE(SvRV(value)) == t))) {
+        croak("You must pass %s, not %s",
+            name, SvOK(value) ? SvPV_nolen(value) : "undef");
+    }
+}
+
 
 bool
 mouse_is_class_loaded(pTHX_ SV * const klass){
@@ -257,6 +283,50 @@ mouse_stash_fetch(pTHX_ HV* const stash, const char* const name, I32 const namel
     }
 }
 
+void
+mouse_install_sub(pTHX_ GV* const gv, SV* const code_ref) {
+    CV* cv;
+
+    assert(gv != NULL);
+    assert(code_ref != NULL);
+    assert(isGV(gv));
+    assert(IsCodeRef(code_ref));
+
+    if(GvCVu(gv)){ /* delete *slot{gv} to work around "redefine" warning */
+        SvREFCNT_dec(GvCV(gv));
+        GvCV(gv) = NULL;
+    }
+
+    sv_setsv_mg((SV*)gv, code_ref); /* *gv = $code_ref */
+
+    /* name the CODE ref if it's anonymous */
+    cv = (CV*)SvRV(code_ref);
+    if(CvANON(cv)
+        && CvGV(cv) /* a cv under construction has no gv */ ){
+        HV* dbsub;
+
+        /* update %DB::sub to make NYTProf happy */
+        if((PL_perldb & (PERLDBf_SUBLINE|PERLDB_NAMEANON))
+            && PL_DBsub && (dbsub = GvHV(PL_DBsub))
+        ){
+            /* see Perl_newATTRSUB() in op.c */
+            SV* const subname = sv_newmortal();
+            HE* orig;
+
+            gv_efullname3(subname, CvGV(cv), NULL);
+            orig = hv_fetch_ent(dbsub, subname, FALSE, 0U);
+            if(orig){
+                gv_efullname3(subname, gv, NULL);
+                (void)hv_store_ent(dbsub, subname, HeVAL(orig), 0U);
+                SvREFCNT_inc_simple_void_NN(HeVAL(orig));
+            }
+        }
+
+        CvGV(cv) = gv;
+        CvANON_off(cv);
+    }
+}
+
 MODULE = Mouse::Util  PACKAGE = Mouse::Util
 
 PROTOTYPES:   DISABLE
@@ -283,6 +353,29 @@ CODE:
         SvREFCNT_inc_simple_void_NN(metas);
     }
 }
+
+bool
+is_valid_class_name(SV* sv)
+CODE:
+{
+    SvGETMAGIC(sv);
+    if(SvPOKp(sv) && SvCUR(sv) > 0){
+        UV i;
+        RETVAL = TRUE;
+        for(i = 0; i < SvCUR(sv); i++){
+            char const c = SvPVX(sv)[i];
+            if(!(isALNUM(c) || c == ':')){
+                RETVAL = FALSE;
+                break;
+            }
+        }
+    }
+    else{
+        RETVAL = SvNIOKp(sv) ? TRUE : FALSE;
+    }
+}
+OUTPUT:
+    RETVAL
 
 bool
 is_class_loaded(SV* sv)
@@ -322,12 +415,8 @@ CODE:
     const char* name_pv;
     GV* gv;
 
-    if(!SvOK(package)){
-        croak("You must define a package name");
-    }
-    if(!SvOK(name)){
-        croak("You must define a subroutine name");
-    }
+    must_defined(package, "a package name");
+    must_defined(name,    "a subroutine name");
 
     stash = gv_stashsv(package, FALSE);
     if(!stash){
@@ -355,17 +444,10 @@ PPCODE:
     const char* name_pv = NULL;
     CV* xsub;
 
-    SvGETMAGIC(arg);
-
-    if(!SvOK(arg)){
-        croak("You must define %s", ix == 0 ? "a class name" : "method names");
-    }
+    must_defined(arg, ix == 0 ? "a class_name" : "method names");
 
     if(predicate_name){
-        SvGETMAGIC(predicate_name);
-        if(!SvOK(predicate_name)){
-            croak("You must define %s", "a predicate name");
-        }
+        must_defined(predicate_name, "a predicate name");
         name_pv = SvPV_nolen_const(predicate_name);
     }
 
@@ -378,5 +460,37 @@ PPCODE:
 
     if(predicate_name == NULL){ /* anonymous predicate */
         mXPUSHs( newRV_inc((SV*)xsub) );
+    }
+}
+
+# This xsub will redefine &Mouse::Util::install_subroutines()
+void
+install_subroutines(SV* into, ...)
+CODE:
+{
+    HV* stash;
+    I32 i;
+
+    must_defined(into, "a package name");
+    stash = gv_stashsv(into, TRUE);
+
+    if( ((items-1) % 2) != 0 ){
+        croak_xs_usage(cv, "into, name => coderef [, other_name, other_coderef ...]");
+    }
+
+    for(i = 1; i < items; i += 2) {
+        SV* const name = ST(i);
+        SV* const code = ST(i+1);
+        STRLEN len;
+        const char* pv;
+        GV* gv;
+
+        must_defined(name, "a subroutine name");
+        must_ref(code, "a CODE reference", SVt_PVCV);
+
+        pv = SvPV_const(name, len);
+        gv = stash_fetch(stash, pv, len, TRUE);
+
+        mouse_install_sub(aTHX_ gv, code);
     }
 }

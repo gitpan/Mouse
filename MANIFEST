@@ -13,6 +13,7 @@ benchmarks/vs_caf_w_destructors.pl
 caveats/RT69939.t
 Changes
 example/point.pl
+example/warns.pl
 inc/Module/Install.pm
 inc/Module/Install/AuthorTests.pm
 inc/Module/Install/Base.pm

@@ -6,6 +6,8 @@ use Scalar::Util qw/blessed weaken/;
 use Mouse::Meta::Module;
 our @ISA = qw(Mouse::Meta::Module);
 
+our @CARP_NOT = qw(Mouse); # trust Mouse
+
 sub attribute_metaclass;
 sub method_metaclass;
 
@@ -94,7 +96,7 @@ sub _reconcile_with_superclass_meta {
 
     my @roles;
     foreach my $role($super_meta->meta->calculate_all_roles){
-        if(!$self->meta->does_role($role->name)){
+        if(!$self->meta->does_role($role)){
             push @roles, $role->name;
         }
     }
@@ -187,8 +189,9 @@ sub add_attribute {
     $self->{attributes}{$attr->name} = $attr;
     $attr->install_accessors();
 
-    if(Mouse::Util::_MOUSE_VERBOSE && !$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
-        Carp::cluck(qq{Attribute (}.$attr->name.qq{) of class }.$self->name.qq{ has no associated methods (did you mean to provide an "is" argument?)});
+    if(!$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
+        Carp::carp(qq{Attribute ($name) of class }.$self->name
+            .qq{ has no associated methods (did you mean to provide an "is" argument?)});
     }
     return $attr;
 }
@@ -247,17 +250,15 @@ sub make_immutable {
     $self->{strict_constructor} = $args{strict_constructor};
 
     if ($args{inline_constructor}) {
-        my $c = $self->constructor_class;
-        Mouse::Util::load_class($c);
         $self->add_method($args{constructor_name} =>
-            $c->_generate_constructor($self, \%args));
+            Mouse::Util::load_class($self->constructor_class)
+                ->_generate_constructor($self, \%args));
     }
 
     if ($args{inline_destructor}) {
-        my $c = $self->destructor_class;
-        Mouse::Util::load_class($c);
         $self->add_method(DESTROY =>
-            $c->_generate_destructor($self, \%args));
+            Mouse::Util::load_class($self->destructor_class)
+                ->_generate_destructor($self, \%args));
     }
 
     # Moose's make_immutable returns true allowing calling code to skip setting an explicit true value
@@ -361,10 +362,7 @@ sub _install_modifier {
             my $into = $self->name;
             $install_modifier->($into, $type, $name, $code);
 
-            $self->add_method($name => do{
-                no strict 'refs';
-                \&{ $into . '::' . $name };
-            });
+            $self->add_method($name => Mouse::Util::get_code_ref($into, $name));
             return;
         };
     }
@@ -441,6 +439,8 @@ sub does_role {
     (defined $role_name)
         || $self->throw_error("You must supply a role name to look for");
 
+    $role_name = $role_name->name if ref $role_name;
+
     for my $class ($self->linearized_isa) {
         my $meta = Mouse::Util::get_metaclass_by_name($class)
             or next;
@@ -463,7 +463,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 METHODS
 

@@ -11,6 +11,19 @@ use warnings FATAL => 'redefine'; # to avoid to load Mouse::PurePerl
 
 use B ();
 
+
+# taken from Class/MOP.pm
+sub is_valid_class_name {
+    my $class = shift;
+
+    return 0 if ref($class);
+    return 0 unless defined($class);
+
+    return 1 if $class =~ /\A \w+ (?: :: \w+ )* \z/xms;
+
+    return 0;
+}
+
 sub is_class_loaded {
     my $class = shift;
 
@@ -88,8 +101,7 @@ sub generate_isa_predicate_for {
     my $predicate = sub{ Scalar::Util::blessed($_[0]) && $_[0]->isa($for_class) };
 
     if(defined $name){
-        no strict 'refs';
-        *{ caller() . '::' . $name } = $predicate;
+        Mouse::Util::install_subroutines(scalar caller, $name => $predicate);
         return;
     }
 
@@ -115,8 +127,7 @@ sub generate_can_predicate_for {
     };
 
     if(defined $name){
-        no strict 'refs';
-        *{ caller() . '::' . $name } = $predicate;
+        Mouse::Util::install_subroutines(scalar caller, $name => $predicate);
         return;
     }
 
@@ -193,9 +204,7 @@ sub _parameterize_Maybe_for {
     return sub{
         return !defined($_) || $check->($_);
     };
-};
-
-
+}
 
 package Mouse::Meta::Module;
 
@@ -226,10 +235,9 @@ sub add_method {
 
     $self->{methods}->{$name} = $code; # Moose stores meta object here.
 
-    my $pkg = $self->name;
-    no strict 'refs';
-    no warnings 'redefine', 'once';
-    *{ $pkg . '::' . $name } = $code;
+    Mouse::Util::install_subroutines($self->name,
+        $name => $code,
+    );
     return;
 }
 
@@ -332,6 +340,38 @@ sub is_anon_role{
 }
 
 sub get_roles { $_[0]->{roles} }
+
+sub add_before_method_modifier {
+    my ($self, $method_name, $method) = @_;
+
+    push @{ $self->{before_method_modifiers}{$method_name} ||= [] }, $method;
+    return;
+}
+sub add_around_method_modifier {
+    my ($self, $method_name, $method) = @_;
+
+    push @{ $self->{around_method_modifiers}{$method_name} ||= [] }, $method;
+    return;
+}
+sub add_after_method_modifier {
+    my ($self, $method_name, $method) = @_;
+
+    push @{ $self->{after_method_modifiers}{$method_name} ||= [] }, $method;
+    return;
+}
+
+sub get_before_method_modifiers {
+    my ($self, $method_name) = @_;
+    return @{ $self->{before_method_modifiers}{$method_name} ||= [] }
+}
+sub get_around_method_modifiers {
+    my ($self, $method_name) = @_;
+    return @{ $self->{around_method_modifiers}{$method_name} ||= [] }
+}
+sub get_after_method_modifiers {
+    my ($self, $method_name) = @_;
+    return @{ $self->{after_method_modifiers}{$method_name} ||= [] }
+}
 
 package Mouse::Meta::Attribute;
 
@@ -517,14 +557,12 @@ sub name    { $_[0]->{name}    }
 sub parent  { $_[0]->{parent}  }
 sub message { $_[0]->{message} }
 
-sub type_parameter { $_[0]->{type_parameter} }
-sub __is_parameterized { exists $_[0]->{type_parameter} }
-
+sub type_parameter           { $_[0]->{type_parameter} }
 sub _compiled_type_constraint{ $_[0]->{compiled_type_constraint} }
-
 sub _compiled_type_coercion  { $_[0]->{_compiled_type_coercion}  }
 
-sub has_coercion{ exists $_[0]->{_compiled_type_coercion} }
+sub __is_parameterized { exists $_[0]->{type_parameter} }
+sub has_coercion {       exists $_[0]->{_compiled_type_coercion} }
 
 
 sub compile_type_constraint{
@@ -575,7 +613,6 @@ sub compile_type_constraint{
 
 package Mouse::Object;
 
-
 sub BUILDARGS {
     my $class = shift;
 
@@ -623,7 +660,6 @@ sub DESTROY {
     my $e = do{
         local $@;
         eval{
-
             # DEMOLISHALL
 
             # We cannot count on being able to retrieve a previously made
@@ -672,7 +708,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 SEE ALSO
 

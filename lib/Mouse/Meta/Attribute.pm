@@ -44,6 +44,8 @@ my %valid_options = map { $_ => undef } (
   'curries',
 );
 
+our @CARP_NOT = qw(Mouse::Meta::Class);
+
 sub new {
     my $class = shift;
     my $name  = shift;
@@ -76,8 +78,9 @@ sub new {
 
     # (3) bad options found
     if(@bad){
-        @bad = sort @bad;
-        Carp::cluck("Found unknown argument(s) passed to '$name' attribute constructor in '$class': @bad");
+        Carp::carp(
+            "Found unknown argument(s) passed to '$name' attribute constructor in '$class': "
+            . Mouse::Util::english_list(@bad));
     }
 
     my $self = bless $args, $class;
@@ -335,12 +338,6 @@ sub install_accessors{
         $attribute->create($metaclass, $attribute->name, %{$attribute});
     }
 
-    if(!$attribute->{associated_methods} && ($attribute->{is} || '') ne 'bare'){
-        Carp::cluck(
-            'Attribute (' . $attribute->name . ') of class ' . $metaclass->name
-            . ' has no associated methods (did you mean to provide an "is" argument?)');
-    }
-
     return;
 }
 
@@ -378,10 +375,8 @@ sub _canonicalize_handles {
 
 sub _make_delegation_method {
     my($self, $handle, $method_to_call) = @_;
-    my $delegator = $self->delegation_metaclass;
-    Mouse::Util::load_class($delegator);
-
-    return $delegator->_generate_delegation($self, $handle, $method_to_call);
+    return Mouse::Util::load_class($self->delegation_metaclass)
+        ->_generate_delegation($self, $handle, $method_to_call);
 }
 
 sub throw_error{
@@ -400,7 +395,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 METHODS
 

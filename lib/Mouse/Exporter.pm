@@ -6,14 +6,15 @@ use Carp qw(confess);
 
 my %SPEC;
 
-use constant _strict_bits => strict::bits(qw(subs refs vars));
+my $strict_bits;
+BEGIN{ $strict_bits = strict::bits(qw(subs refs vars)); }
 
 # it must be "require", because Mouse::Util depends on Mouse::Exporter,
 # which depends on Mouse::Util::import()
 require Mouse::Util;
 
 sub import{
-    $^H              |= _strict_bits;         # strict->import;
+    $^H              |= $strict_bits;         # strict->import;
     ${^WARNING_BITS} |= $warnings::Bits{all}; # warnings->import;
     return;
 }
@@ -26,20 +27,24 @@ sub setup_import_methods{
 
     my($import, $unimport) = $class->build_import_methods(%args);
 
-    no strict 'refs';
+    Mouse::Util::install_subroutines($exporting_package,
+        import   => $import,
+        unimport => $unimport,
 
-    *{$exporting_package . '::import'}    = $import;
-    *{$exporting_package . '::unimport'}  = $unimport;
+        export_to_level => sub {
+            my($package, $level, undef, @args) = @_; # the third argument is redundant
 
-    # for backward compatibility
-    *{$exporting_package . '::export_to_level'} = sub{
-        my($package, $level, undef, @args) = @_; # the third argument is redundant
-        $package->import({ into_level => $level + 1 }, @args);
-    };
-    *{$exporting_package . '::export'} = sub{
-        my($package, $into, @args) = @_;
-        $package->import({ into => $into }, @args);
-    };
+            Carp::carp("$package->export_to_level has been deprecated."
+                ." Use $package->import({ into_level => LEVEL }) instead");
+            $package->import({ into_level => $level + 1 }, @args);
+        },
+        export => sub {
+            my($package, $into, @args) = @_;
+            Carp::carp("$package->export has been deprecated."
+                ." Use $package->import({ into => PACKAGE }) instead");
+            $package->import({ into => $into }, @args);
+        },
+    );
     return;
 }
 
@@ -67,66 +72,64 @@ sub build_import_methods{
         @export_from = ($exporting_package);
     }
 
-    {
-        my %exports;
-        my @removables;
-        my @all;
+    my %exports;
+    my @removables;
+    my @all;
 
-        my @init_meta_methods;
+    my @init_meta_methods;
 
-        foreach my $package(@export_from){
-            my $spec = $SPEC{$package} or next;
+    foreach my $package(@export_from){
+        my $spec = $SPEC{$package} or next;
 
-            if(my $as_is = $spec->{as_is}){
-                foreach my $thingy (@{$as_is}){
-                    my($code_package, $code_name, $code);
+        if(my $as_is = $spec->{as_is}){
+            foreach my $thingy (@{$as_is}){
+                my($code_package, $code_name, $code);
 
-                    if(ref($thingy)){
-                        $code = $thingy;
-                        ($code_package, $code_name) = Mouse::Util::get_code_info($code);
-                    }
-                    else{
-                        no strict 'refs';
-                        $code_package = $package;
-                        $code_name    = $thingy;
-                        $code         = \&{ $code_package . '::' . $code_name };
-                   }
-
-                    push @all, $code_name;
-                    $exports{$code_name} = $code;
-                    if($code_package eq $package){
-                        push @removables, $code_name;
-                    }
+                if(ref($thingy)){
+                    $code = $thingy;
+                    ($code_package, $code_name) = Mouse::Util::get_code_info($code);
                 }
-            }
+                else{
+                    $code_package = $package;
+                    $code_name    = $thingy;
+                    no strict 'refs';
+                    $code         = \&{ $code_package . '::' . $code_name };
+               }
 
-            if(my $init_meta = $package->can('init_meta')){
-                if(!grep{ $_ == $init_meta } @init_meta_methods){
-                    push @init_meta_methods, $init_meta;
+                push @all, $code_name;
+                $exports{$code_name} = $code;
+                if($code_package eq $package){
+                    push @removables, $code_name;
                 }
             }
         }
-        $args{EXPORTS}    = \%exports;
-        $args{REMOVABLES} = \@removables;
 
-        $args{groups}{all}     ||= \@all;
-
-        if(my $default_list = $args{groups}{default}){
-            my %default;
-            foreach my $keyword(@{$default_list}){
-                $default{$keyword} = $exports{$keyword}
-                    || confess(qq{The $exporting_package package does not export "$keyword"});
+        if(my $init_meta = $package->can('init_meta')){
+            if(!grep{ $_ == $init_meta } @init_meta_methods){
+                push @init_meta_methods, $init_meta;
             }
-            $args{DEFAULT} = \%default;
         }
-        else{
-            $args{groups}{default} ||= \@all;
-            $args{DEFAULT}           = $args{EXPORTS};
-        }
+    }
+    $args{EXPORTS}    = \%exports;
+    $args{REMOVABLES} = \@removables;
 
-        if(@init_meta_methods){
-            $args{INIT_META} = \@init_meta_methods;
+    $args{groups}{all}     ||= \@all;
+
+    if(my $default_list = $args{groups}{default}){
+        my %default;
+        foreach my $keyword(@{$default_list}){
+            $default{$keyword} = $exports{$keyword}
+                || confess(qq{The $exporting_package package does not export "$keyword"});
         }
+        $args{DEFAULT} = \%default;
+    }
+    else{
+        $args{groups}{default} ||= \@all;
+        $args{DEFAULT}           = $args{EXPORTS};
+    }
+
+    if(@init_meta_methods){
+        $args{INIT_META} = \@init_meta_methods;
     }
 
     return (\&do_import, \&do_unimport);
@@ -165,7 +168,7 @@ sub do_import {
         }
     }
 
-    $^H              |= _strict_bits;         # strict->import;
+    $^H              |= $strict_bits;         # strict->import;
     ${^WARNING_BITS} |= $warnings::Bits{all}; # warnings->import;
 
     if($spec->{INIT_META}){
@@ -196,18 +199,17 @@ sub do_import {
     }
 
     if(@exports){
+        my @export_table;
         foreach my $keyword(@exports){
-            no strict 'refs';
-            *{$into.'::'.$keyword} = $spec->{EXPORTS}{$keyword}
-                || confess(qq{The $package package does not export "$keyword"});
+            push @export_table,
+                $keyword => ($spec->{EXPORTS}{$keyword}
+                    || confess(qq{The $package package does not export "$keyword"})
+                );
         }
+        Mouse::Util::install_subroutines($into, @export_table);
     }
     else{
-        my $default = $spec->{DEFAULT};
-        while(my($keyword, $code) = each %{$default}){
-            no strict 'refs';
-            *{$into.'::'.$keyword} = $code;
-        }
+        Mouse::Util::install_subroutines($into, %{$spec->{DEFAULT}});
     }
     return;
 }
@@ -262,7 +264,7 @@ Mouse::Exporter - make an import() and unimport() just like Mouse.pm
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 SYNOPSIS
 

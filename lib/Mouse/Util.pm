@@ -3,6 +3,18 @@ use Mouse::Exporter; # enables strict and warnings
 
 sub get_linear_isa($;$); # must be here
 
+sub install_subroutines { # must be here
+    my $into = shift;
+
+    while(my($name, $code) = splice @_, 0, 2){
+        no strict 'refs';
+        no warnings 'once', 'redefine';
+        use warnings FATAL => 'uninitialized';
+        *{$into . '::' . $name} = \&{$code};
+    }
+    return;
+}
+
 BEGIN{
     # This is used in Mouse::PurePerl
     Mouse::Exporter->setup_import_methods(
@@ -38,7 +50,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.50_03';
+    our $VERSION = '0.50_04';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -48,6 +60,7 @@ BEGIN{
 
         (my $hack_mouse_file = __FILE__) =~ s/.Util//; # .../Mouse/Util.pm -> .../Mouse.pm
         $xs = eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
+            local $^W = 0; # work around 'redefine' warning to &install_subroutines
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
             Mouse::Util->import({ into => 'Mouse::Meta::Method::Constructor::XS' }, ':meta');
@@ -68,17 +81,19 @@ BEGIN{
 use Carp         ();
 use Scalar::Util ();
 
-use constant _MOUSE_VERBOSE => !!$ENV{MOUSE_VERBOSE};
-
 # aliases as public APIs
 # it must be 'require', not 'use', because Mouse::Meta::Module depends on Mouse::Util
 require Mouse::Meta::Module; # for the entities of metaclass cache utilities
 
-BEGIN {
+# aliases
+{
     *class_of                    = \&Mouse::Meta::Module::_class_of;
     *get_metaclass_by_name       = \&Mouse::Meta::Module::_get_metaclass_by_name;
     *get_all_metaclass_instances = \&Mouse::Meta::Module::_get_all_metaclass_instances;
     *get_all_metaclass_names     = \&Mouse::Meta::Module::_get_all_metaclass_names;
+
+    *Mouse::load_class           = \&load_class;
+    *Mouse::is_class_loaded      = \&is_class_loaded;
 
     # is-a predicates
     #generate_isa_predicate_for('Mouse::Meta::TypeConstraint' => 'is_a_type_constraint');
@@ -117,7 +132,7 @@ BEGIN {
         require mro;
         $get_linear_isa = \&mro::get_linear_isa;
     } else {
-#       VVVVV   CODE TAKEN FROM MRO::COMPAT   VVVVV
+        # this code is based on MRO::Compat::__get_linear_isa
         my $_get_linear_isa_dfs; # this recurses so it isn't pretty
         $_get_linear_isa_dfs = sub {
             my($classname) = @_;
@@ -127,8 +142,7 @@ BEGIN {
 
             no strict 'refs';
             foreach my $parent (@{"$classname\::ISA"}) {
-                my $plin = $_get_linear_isa_dfs->($parent);
-                foreach  my $p(@$plin) {
+                foreach  my $p(@{ $_get_linear_isa_dfs->($parent) }) {
                     next if exists $stored{$p};
                     push(@lin, $p);
                     $stored{$p} = 1;
@@ -136,24 +150,29 @@ BEGIN {
             }
             return \@lin;
         };
-#       ^^^^^   CODE TAKEN FROM MRO::COMPAT   ^^^^^
 
-        eval{ require Class::C3 };
+        {
+            package # hide from PAUSE
+                Class::C3;
+            our %MRO; # work around 'once' warnings
+        }
 
         # MRO::Compat::__get_linear_isa has no prototype, so
         # we define a prototyped version for compatibility with core's
         # See also MRO::Compat::__get_linear_isa.
         $get_linear_isa = sub ($;$){
             my($classname, $type) = @_;
-            package # hide from PAUSE
-                Class::C3;
+
             if(!defined $type){
-                our %MRO;
-                $type = exists $MRO{$classname} ? 'c3' : 'dfs';
+                $type = exists $Class::C3::MRO{$classname} ? 'c3' : 'dfs';
             }
-            return $type eq 'c3'
-                ? [calculateMRO($classname)]
-                : $_get_linear_isa_dfs->($classname);
+            if($type eq 'c3'){
+                require Class::C3;
+                return [Class::C3::calculateMRO($classname)];
+            }
+            else{
+                return $_get_linear_isa_dfs->($classname);
+            }
         };
     }
 
@@ -193,17 +212,7 @@ BEGIN {
 sub get_code_info;
 sub get_code_package;
 
-# taken from Class/MOP.pm
-sub is_valid_class_name {
-    my $class = shift;
-
-    return 0 if ref($class);
-    return 0 unless defined($class);
-
-    return 1 if $class =~ /\A \w+ (?: :: \w+ )* \z/xms;
-
-    return 0;
-}
+sub is_valid_class_name;
 
 # taken from Class/MOP.pm
 sub load_first_existing_class {
@@ -244,12 +253,12 @@ sub _try_load_one_class {
 
     return undef if $is_class_loaded_cache{$class} ||= is_class_loaded($class);
 
-    my $file = $class . '.pm';
-    $file =~ s{::}{/}g;
+    $class  =~ s{::}{/}g;
+    $class .= '.pm';
 
     return do {
         local $@;
-        eval { require($file) };
+        eval { require $class };
         $@;
     };
 }
@@ -260,7 +269,7 @@ sub load_class {
     my $e = _try_load_one_class($class);
     Carp::confess "Could not load class ($class) because : $e" if $e;
 
-    return 1;
+    return $class;
 }
 
 sub is_class_loaded;
@@ -355,7 +364,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_03
+This document describes Mouse version 0.50_04
 
 =head1 IMPLEMENTATIONS FOR
 
