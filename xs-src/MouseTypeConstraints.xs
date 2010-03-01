@@ -24,13 +24,13 @@ mouse_tc_check(pTHX_ SV* const tc_code, SV* const sv) {
     CV* const cv = (CV*)SvRV(tc_code);
     assert(SvTYPE(cv) == SVt_PVCV);
 
-    SvGETMAGIC(sv);
     if(CvXSUB(cv) == XS_Mouse_constraint_check){ /* built-in type constraints */
         MAGIC* const mg = (MAGIC*)CvXSUBANY(cv).any_ptr;
 
         assert(CvXSUBANY(cv).any_ptr != NULL);
         assert(mg->mg_ptr            != NULL);
 
+        SvGETMAGIC(sv);
         /* call the check function directly, skipping call_sv() */
         return CALL_FPTR((check_fptr_t)mg->mg_ptr)(aTHX_ mg->mg_obj, sv);
     }
@@ -123,9 +123,10 @@ mouse_tc_Int(pTHX_ SV* const data PERL_UNUSED_DECL, SV* const sv) {
     if(SvIOKp(sv)){
         return TRUE;
     }
-    else if(SvNOKp(sv)){
+    else if(SvNOKp(sv)) {
         NV const nv = SvNVX(sv);
-        return nv > 0 ? (nv == (NV)(UV)nv) : (nv == (NV)(IV)nv);
+        NV mod = Perl_fmod( nv, 1 );
+        return mod == 0;
     }
     else if(SvPOKp(sv)){
         int const num_type = grok_number(SvPVX(sv), SvCUR(sv), NULL);
@@ -387,37 +388,28 @@ mouse_is_an_instance_of(pTHX_ HV* const stash, SV* const instance){
     if(IsObject(instance)){
         dMY_CXT;
         HV* const instance_stash = SvSTASH(SvRV(instance));
-        GV* const instance_isa   = find_method_pvs(instance_stash, "isa");
+        GV* const myisa          = find_method_pvs(instance_stash, "isa");
 
         /* the instance has no own isa method */
-        if(instance_isa == NULL || GvCV(instance_isa) == GvCV(MY_CXT.universal_isa)){
+        if(myisa == NULL || GvCV(myisa) == GvCV(MY_CXT.universal_isa)){
             return stash == instance_stash
                 || mouse_lookup_isa(aTHX_ instance_stash, HvNAME_get(stash));
         }
         /* the instance has its own isa method */
         else {
-            int retval;
-            dSP;
+            SV* package;
+            int ok;
 
             ENTER;
             SAVETMPS;
 
-            PUSHMARK(SP);
-            EXTEND(SP, 2);
-            PUSHs(instance);
-            mPUSHp(HvNAME_get(stash), HvNAMELEN_get(stash));
-            PUTBACK;
-
-            call_sv((SV*)instance_isa, G_SCALAR);
-
-            SPAGAIN;
-            retval = sv_true(POPs);
-            PUTBACK;
+            package = newSVpvn_share(HvNAME_get(stash), HvNAMELEN_get(stash), 0U);
+            ok = sv_true(mcall1s(instance, "isa", sv_2mortal(package)));
 
             FREETMPS;
             LEAVE;
 
-            return retval;
+            return ok;
         }
     }
     return FALSE;
@@ -448,22 +440,11 @@ mouse_can_methods(pTHX_ AV* const methods, SV* const instance){
             }
             else{
                 bool ok;
-                dSP;
 
                 ENTER;
                 SAVETMPS;
 
-                PUSHMARK(SP);
-                EXTEND(SP, 2);
-                PUSHs(instance);
-                PUSHs(sv_mortalcopy(name));
-                PUTBACK;
-
-                call_method("can", G_SCALAR);
-
-                SPAGAIN;
-                ok = sv_true(POPs);
-                PUTBACK;
+                ok = sv_true(mcall1s(instance, "can", sv_mortalcopy(name)));
 
                 FREETMPS;
                 LEAVE;
