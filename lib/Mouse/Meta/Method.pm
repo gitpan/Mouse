@@ -1,7 +1,10 @@
 package Mouse::Meta::Method;
 use Mouse::Util qw(:meta); # enables strict and warnings
+use Scalar::Util ();
 
 use overload
+    '=='  => '_equal',
+    'eq'  => '_equal',
     '&{}' => sub{ $_[0]->body },
     fallback => 1,
 ;
@@ -32,6 +35,16 @@ sub fully_qualified_name {
     return $self->package_name . '::' . $self->name;
 }
 
+# for Moose compat
+sub _equal {
+    my($l, $r) = @_;
+
+    return Scalar::Util::blessed($r)
+            && $l->body         == $r->body
+            && $l->name         eq $r->name
+            && $l->package_name eq $r->package_name;
+}
+
 1;
 __END__
 
@@ -41,7 +54,7 @@ Mouse::Meta::Method - A Mouse Method metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_07
+This document describes Mouse version 0.50_08
 
 =head1 SEE ALSO
 

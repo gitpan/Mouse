@@ -231,7 +231,7 @@ sub create {
     Scalar::Util::weaken $METAS{$package_name}
         if $mortal;
 
-    $meta->add_method(meta => sub{
+    $meta->add_method(meta => sub {
         $self->initialize(ref($_[0]) || $_[0]);
     });
 
@@ -323,7 +323,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_07
+This document describes Mouse version 0.50_08
 
 =head1 SEE ALSO
 

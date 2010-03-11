@@ -3,6 +3,7 @@ abstract: 'Moose minus the antlers'
 author:
   - 'Shawn M Moore <sartak at gmail.com>'
 build_requires:
+  Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.42
   ExtUtils::ParseXS: 2.21
   Test::Exception: 0.29
@@ -11,7 +12,7 @@ configure_requires:
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.94'
+generated_by: 'Module::Install version 0.95'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -30,4 +31,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Mouse.git
-version: 0.50_07
+version: 0.50_08

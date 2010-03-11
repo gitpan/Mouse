@@ -1,7 +1,5 @@
 package Mouse::Meta::Method::Accessor;
 use Mouse::Util qw(:meta); # enables strict and warnings
-use warnings FATAL => 'recursion';
-
 
 sub _inline_slot{
     my(undef, $self_var, $attr_name) = @_;
@@ -90,6 +88,7 @@ sub _generate_accessor_any{
             $value = '$default';
         }
 
+        $accessor .= "els" if $type eq 'rw' || $type eq 'wo';
         $accessor .= "if(!exists $slot){\n";
         if($should_coerce){
             $accessor .= "$slot = \$constraint->coerce($value)";
@@ -178,7 +177,7 @@ Mouse::Meta::Method::Accessor - A Mouse method generator for accessors
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_07
+This document describes Mouse version 0.50_08
 
 =head1 SEE ALSO
 

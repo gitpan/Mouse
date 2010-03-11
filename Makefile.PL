@@ -1,3 +1,11 @@
+# for developpers:
+BEGIN{
+    if(grep{ $_ eq '--author' } @ARGV){
+        print "^X -S cpanm < author/requires.cpanm\n";
+        system "$^X -S cpanm < author/requires.cpanm";
+    }
+}
+
 use strict;
 use warnings;
 use inc::Module::Install;
@@ -71,7 +79,7 @@ author_tests 'xt';
 
 repository 'git://git.moose.perl.org/Mouse.git';
 
-clean_files 'lib/Mouse/Tiny.pm $(O_FILES)';
+clean_files 'lib/Mouse/Tiny.pm $(O_FILES) test-mydeps-*.log';
 
 
 if (author_context()) {
