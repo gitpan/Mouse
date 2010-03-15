@@ -274,6 +274,9 @@ t/300_immutable/008_immutable_constructor_error.t
 t/300_immutable/009_buildargs.t
 t/300_immutable/101-immutable-default.t
 t/400_mouse_util/002_mouse_util_does_role.t
+t/800_with_external/001-pod-coverage-moose.t
+t/800_with_external/002-externals.t
+t/800_with_external/lib/Foo.pm
 t/810_with_moose/201-squirrel.t
 t/810_with_moose/202-squirrel-role.t
 t/810_with_moose/500_moose_extends_mouse.t
@@ -308,10 +311,9 @@ xs-src/MouseAccessor.xs
 xs-src/MouseAttribute.xs
 xs-src/MouseTypeConstraints.xs
 xs-src/MouseUtil.xs
-xt/01_pod.t
-xt/02_pod_spell.t
-xt/03_pod_coverage.t
-xt/04_fs_portability.t
-xt/05_dbsub.t
-xt/06_usermodules.t
-xt/07_perlcritic.t
+xt/001-pod.t
+xt/002-pod_spell.t
+xt/003-pod_coverage.t
+xt/004-fs_portability.t
+xt/005-dbsub.t
+xt/006-perlcritic.t
