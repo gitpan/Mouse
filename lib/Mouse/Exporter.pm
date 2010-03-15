@@ -55,7 +55,7 @@ sub setup_import_methods{
 }
 
 sub build_import_methods{
-    my($class, %args) = @_;
+    my($self, %args) = @_;
 
     my $exporting_package = $args{exporting_package} ||= caller();
 
@@ -272,7 +272,7 @@ Mouse::Exporter - make an import() and unimport() just like Mouse.pm
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_08
+This document describes Mouse version 0.50_09
 
 =head1 SYNOPSIS
 

@@ -82,13 +82,13 @@ $TYPE{HashRef} {constraint_generator} = \&_parameterize_HashRef_for;
 
 # sugars
 
-sub as          ($) { (as          => $_[0]) }
-sub where       (&) { (where       => $_[0]) }
-sub message     (&) { (message     => $_[0]) }
-sub optimize_as (&) { (optimize_as => $_[0]) }
+sub as          ($) { (as          => $_[0]) } ## no critic
+sub where       (&) { (where       => $_[0]) } ## no critic
+sub message     (&) { (message     => $_[0]) } ## no critic
+sub optimize_as (&) { (optimize_as => $_[0]) } ## no critic
 
 sub from    { @_ }
-sub via (&) { $_[0] }
+sub via (&) { $_[0] } ## no critic
 
 # type utilities
 
@@ -406,7 +406,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_08
+This document describes Mouse version 0.50_09
 
 =head2 SYNOPSIS
 

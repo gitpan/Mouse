@@ -314,3 +314,4 @@ xt/03_pod_coverage.t
 xt/04_fs_portability.t
 xt/05_dbsub.t
 xt/06_usermodules.t
+xt/07_perlcritic.t

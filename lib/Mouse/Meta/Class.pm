@@ -129,7 +129,7 @@ sub _collect_roles {
     }
 
     my %seen;
-    return sort grep { !$seen{$_}++ }
+    return sort grep { !$seen{$_}++ } ## no critic
         (map{ $_->name } map{ $_->meta->calculate_all_roles } @self_anon_supers),
         (map{ $_->name } map{ $_->meta->calculate_all_roles } @other_anon_supers),
     ;
@@ -486,7 +486,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_08
+This document describes Mouse version 0.50_09
 
 =head1 METHODS
 

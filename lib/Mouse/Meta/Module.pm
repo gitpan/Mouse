@@ -15,7 +15,7 @@ if(Mouse::Util::MOUSE_XS){
 }
 
 sub _metaclass_cache { # DEPRECATED
-    my($class, $name) = @_;
+    my($self, $name) = @_;
     Carp::cluck('_metaclass_cache() has been deprecated. Use Mouse::Util::get_metaclass_by_name() instead');
     return $METAS{$name};
 }
@@ -301,7 +301,7 @@ sub DESTROY{
 }
 
 sub throw_error{
-    my($class, $message, %args) = @_;
+    my($self, $message, %args) = @_;
 
     local $Carp::CarpLevel  = $Carp::CarpLevel + 1 + ($args{depth} || 0);
     local $Carp::MaxArgNums = 20; # default is 8, usually we use named args which gets messier though
@@ -323,7 +323,7 @@ Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Rol
 
 =head1 VERSION
 
-This document describes Mouse version 0.50_08
+This document describes Mouse version 0.50_09
 
 =head1 SEE ALSO
 
