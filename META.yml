@@ -8,6 +8,7 @@ build_requires:
   ExtUtils::ParseXS: 2.21
   Test::Exception: 0.29
   Test::More: 0.88
+  Test::Requires: 0.03
 configure_requires:
   Devel::PPPort: 3.19
   ExtUtils::MakeMaker: 6.42
@@ -31,4 +32,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Mouse.git
-version: 0.51
+version: 0.52

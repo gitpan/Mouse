@@ -52,7 +52,7 @@ BEGIN{
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
     # XS loader is placed here, not in Mouse.pm.
 
-    our $VERSION = '0.51';
+    our $VERSION = '0.52';
 
     my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL});
 
@@ -244,7 +244,6 @@ sub load_first_existing_class {
 }
 
 # taken from Class/MOP.pm
-my %is_class_loaded_cache;
 sub _try_load_one_class {
     my $class = shift;
 
@@ -253,7 +252,7 @@ sub _try_load_one_class {
         Carp::confess "Invalid class name ($display)";
     }
 
-    return undef if $is_class_loaded_cache{$class} ||= is_class_loaded($class);
+    return '' if is_class_loaded($class);
 
     $class  =~ s{::}{/}g;
     $class .= '.pm';
@@ -366,7 +365,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.51
+This document describes Mouse version 0.52
 
 =head1 IMPLEMENTATIONS FOR
 

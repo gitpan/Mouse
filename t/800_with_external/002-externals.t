@@ -15,6 +15,7 @@ use Cwd qw(abs_path);
 note("Testing user modules which depend on Mouse");
 
 $ENV{PERL_TEST_DM_LOG_DIR} = abs_path('.');
+delete $ENV{ANY_MOOSE}; # use Mouse by default
 
 my @modules = qw(
     MouseX::Types

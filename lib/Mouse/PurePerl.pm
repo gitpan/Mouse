@@ -617,6 +617,12 @@ sub compile_type_constraint{
     return;
 }
 
+sub check {
+    my $self = shift;
+    return $self->_compiled_type_constraint->(@_);
+}
+
+
 package Mouse::Object;
 
 sub BUILDARGS {
@@ -714,7 +720,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.51
+This document describes Mouse version 0.52
 
 =head1 SEE ALSO
 

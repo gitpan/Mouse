@@ -120,6 +120,28 @@ mouse_throw_error(SV* const metaobject, SV* const data /* not used */, const cha
     }
 }
 
+/* workaround RT #69939 */
+I32
+mouse_call_sv_safe(pTHX_ SV* const sv, I32 const flags) {
+    assert( (flags & G_EVAL) == 0 );
+
+    if(!PL_in_eval) {
+        I32 count;
+        SAVESPTR(ERRSV);
+        ERRSV = sv_newmortal();
+
+        count = Perl_call_sv(aTHX_ sv, flags | G_EVAL);
+
+        if(sv_true(ERRSV)){
+            croak(NULL); /* rethrow */
+        }
+        return count;
+    }
+    else {
+        return Perl_call_sv(aTHX_ sv, flags);
+    }
+}
+
 void
 mouse_must_defined(pTHX_ SV* const value, const char* const name) {
     assert(value);
@@ -199,7 +221,7 @@ mouse_call0 (pTHX_ SV* const self, SV* const method) {
     XPUSHs(self);
     PUTBACK;
 
-    call_sv(method, G_SCALAR | G_METHOD);
+    call_sv_safe(method, G_SCALAR | G_METHOD);
 
     SPAGAIN;
     ret = POPs;
@@ -219,7 +241,7 @@ mouse_call1 (pTHX_ SV* const self, SV* const method, SV* const arg1) {
     PUSHs(arg1);
     PUTBACK;
 
-    call_sv(method, G_SCALAR | G_METHOD);
+    call_sv_safe(method, G_SCALAR | G_METHOD);
 
     SPAGAIN;
     ret = POPs;
@@ -350,7 +372,9 @@ CODE:
     }
     {
         dMY_CXT;
-        if(MY_CXT.metas) croak("Cannot set metaclass storage more than once");
+        if(MY_CXT.metas && ckWARN(WARN_REDEFINE)){
+            Perl_warner(aTHX_ packWARN(WARN_REDEFINE), "Metaclass storage more than once");
+        }
         MY_CXT.metas = metas;
         SvREFCNT_inc_simple_void_NN(metas);
     }
