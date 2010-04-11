@@ -238,7 +238,7 @@ sub clone_object {
         || $class->throw_error("You must pass an instance of the metaclass (" . $class->name . "), not ($object)");
 
     my $cloned = bless { %$object }, ref $object;
-    $class->_initialize_object($cloned, $args);
+    $class->_initialize_object($cloned, $args, 1);
 
     return $cloned;
 }
@@ -486,7 +486,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.52
+This document describes Mouse version 0.53
 
 =head1 METHODS
 
