@@ -287,6 +287,7 @@ t/900_bug/003_RT50421.t
 t/900_bug/004_RT54203.t
 t/900_bug/005_large_int.t
 t/900_bug/006_RT69939.t
+t/900_bug/007_RT56523.t
 t/990_deprecated/001-export_to_level.t
 t/990_deprecated/044-attribute-metaclass.t
 t/990_deprecated/047-attribute-metaclass-role.t
