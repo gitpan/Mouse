@@ -289,6 +289,7 @@ t/900_mouse_bugs/005_large_int.t
 t/900_mouse_bugs/006_RT69939.t
 t/900_mouse_bugs/007_RT56523.t
 t/900_mouse_bugs/008_RT56837.t
+t/900_mouse_bugs/009_RT57144.t
 t/990_deprecated/001-export_to_level.t
 t/990_deprecated/044-attribute-metaclass.t
 t/990_deprecated/047-attribute-metaclass-role.t
