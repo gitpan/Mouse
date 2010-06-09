@@ -270,13 +270,36 @@ sub get_all_attributes {
 }
 
 sub new_object {
-    my $self = shift;
+    my $meta = shift;
     my %args = (@_ == 1 ? %{$_[0]} : @_);
 
-    my $object = bless {}, $self->name;
+    my $object = bless {}, $meta->name;
 
-    $self->_initialize_object($object, \%args);
+    $meta->_initialize_object($object, \%args);
+    # BUILDALL
+    if( $object->can('BUILD') ) {
+        for my $class (reverse $meta->linearized_isa) {
+            my $build = Mouse::Util::get_code_ref($class, 'BUILD')
+                || next;
+
+            $object->$build(\%args);
+        }
+    }
     return $object;
+}
+
+sub clone_object {
+    my $class  = shift;
+    my $object = shift;
+    my $args   = $object->Mouse::Object::BUILDARGS(@_);
+
+    (blessed($object) && $object->isa($class->name))
+        || $class->throw_error("You must pass an instance of the metaclass (" . $class->name . "), not ($object)");
+
+    my $cloned = bless { %$object }, ref $object;
+    $class->_initialize_object($cloned, $args, 1);
+
+    return $cloned;
 }
 
 sub _initialize_object{
@@ -647,19 +670,7 @@ sub new {
     my $args = $class->BUILDARGS(@_);
 
     my $meta = Mouse::Meta::Class->initialize($class);
-    my $self = $meta->new_object($args);
-
-    # BUILDALL
-    if( $self->can('BUILD') ) {
-        for my $class (reverse $meta->linearized_isa) {
-            my $build = Mouse::Util::get_code_ref($class, 'BUILD')
-                || next;
-
-            $self->$build($args);
-        }
-    }
-
-    return $self;
+    return $meta->new_object($args);
 }
 
 sub DESTROY {
@@ -720,7 +731,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.59
+This document describes Mouse version 0.60
 
 =head1 SEE ALSO
 
