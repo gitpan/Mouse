@@ -29,6 +29,7 @@
 #define no_mro_get_linear_isa
 #define mro_get_linear_isa(stash) mouse_mro_get_linear_isa(aTHX_ stash)
 AV* mouse_mro_get_linear_isa(pTHX_ HV* const stash);
+#define mro_method_changed_in(stash) ((void)++PL_sub_generation)
 #endif /* !mro_get_linear_isa */
 
 #ifndef mro_get_pkg_gen
@@ -181,7 +182,6 @@ void mouse_instance_weaken_slot(pTHX_ SV* const instance, SV* const slot);
 
 CV* mouse_simple_accessor_generate(pTHX_ const char* const fq_name, const char* const key, I32 const keylen, XSUBADDR_t const accessor_impl, void* const dptr, I32 const dlen);
 
-XS(XS_Mouse_simple_accessor);
 XS(XS_Mouse_simple_reader);
 XS(XS_Mouse_simple_writer);
 XS(XS_Mouse_simple_clearer);
