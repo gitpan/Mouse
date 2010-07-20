@@ -1,9 +1,11 @@
 package Mouse::Meta::TypeConstraint;
 use Mouse::Util qw(:meta); # enables strict and warnings
+use Scalar::Util ();
 
 use overload
     'bool'   => sub (){ 1 },           # always true
     '""'     => sub { $_[0]->name },   # stringify to tc name
+    '0+'     => sub { Scalar::Util::refaddr($_[0]) },
     '|'      => sub {                  # or-combination
         require Mouse::Util::TypeConstraints;
         return Mouse::Util::TypeConstraints::find_or_parse_type_constraint(
@@ -14,7 +16,8 @@ use overload
     fallback => 1;
 
 sub new {
-    my($class, %args) = @_;
+    my $class = shift;
+    my %args  = @_ == 1 ? %{$_[0]} : @_;
 
     $args{name} = '__ANON__' if !defined $args{name};
 
@@ -236,7 +239,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.62
+This document describes Mouse version 0.63
 
 =head1 DESCRIPTION
 
