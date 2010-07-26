@@ -209,8 +209,12 @@ sub add_attribute {
 
     weaken( $attr->{associated_class} = $self );
 
-    $self->{attributes}{$attr->name} = $attr;
+    # install accessors first
     $attr->install_accessors();
+
+    # then register the attribute to the metaclass
+    $attr->{insertion_order} = keys %{ $self->{attributes} };
+    $self->{attributes}{$attr->name} = $attr;
 
     if(!$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
         Carp::carp(qq{Attribute ($name) of class }.$self->name
@@ -486,7 +490,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.63
+This document describes Mouse version 0.64
 
 =head1 METHODS
 

@@ -177,12 +177,15 @@ t/010_basics/018_methods.t
 t/010_basics/019-destruction.t
 t/010_basics/020-global-destruction-helper.pl
 t/010_basics/020-global-destruction.t
+t/020_attributes/001_attribute_reader_generation.t
 t/020_attributes/002_attribute_writer_generation.t
 t/020_attributes/003_attribute_accessor_generation.t
+t/020_attributes/004_attribute_triggers.t
 t/020_attributes/005_attribute_does.t
 t/020_attributes/006_attribute_required.t
 t/020_attributes/007_attribute_custom_metaclass.t
 t/020_attributes/008_attribute_type_unions.t
+t/020_attributes/009_attribute_inherited_slot_specs.t
 t/020_attributes/011_more_attr_delegation.t
 t/020_attributes/012_misc_attribute_tests.t
 t/020_attributes/013_attr_dereference_test.t
@@ -192,6 +195,7 @@ t/020_attributes/016_attribute_traits_registered.t
 t/020_attributes/017_attribute_traits_n_meta.t
 t/020_attributes/018_no_init_arg.t
 t/020_attributes/020_trigger_and_coerce.t
+t/020_attributes/022_illegal_options_for_inheritance.t
 t/020_attributes/024_attribute_traits_parameterized.t
 t/020_attributes/025_chained_coercion.t
 t/020_attributes/026_attribute_without_any_methods.t
@@ -291,8 +295,6 @@ t/900_mouse_bugs/007_RT56523.t
 t/900_mouse_bugs/008_RT56837.t
 t/900_mouse_bugs/009_RT57144.t
 t/990_deprecated/001-export_to_level.t
-t/990_deprecated/044-attribute-metaclass.t
-t/990_deprecated/047-attribute-metaclass-role.t
 t/lib/Bar.pm
 t/lib/BaseClass.pm
 t/lib/ClassType_Foo.pm
