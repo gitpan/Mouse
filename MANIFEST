@@ -56,6 +56,7 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
 mouse.h
+perlxs.h
 README
 t/000-load.t
 t/000_recipes/002_schwartz_tutorial.t

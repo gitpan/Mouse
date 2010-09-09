@@ -5,7 +5,7 @@ Mouse::XS - A Mouse guts in XS
 
 =head1 VERSION
 
-This document describes Mouse version 0.64
+This document describes Mouse version 0.65
 
 =head1 DESCRIPTION
 
@@ -25,9 +25,10 @@ option to F<Makefile.PL>.
 
     perl Makefile.PL --pp
 
-=head2 The MOUSE_PUREPERL environment variable
+=head2 The MOUSE_PUREPERL (or PERL_ONLY) environment variable
 
-It can be used to enable the use of Mouse::PurePerl.
+It can be used to enable the use of Mouse::PurePerl in order to test
+and debug programs that use Mouse.
 
 =head1 DEPENDENCIES
 

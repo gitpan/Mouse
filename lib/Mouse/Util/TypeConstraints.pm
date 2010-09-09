@@ -150,9 +150,18 @@ sub _create_type{
 
         if($TYPE{$name}){
             my $that = $TYPE{$name}->{package_defined_in} || __PACKAGE__;
-            ($this eq $that) or Carp::croak(
-                "The type constraint '$name' has already been created in $that and cannot be created again in $this"
-            );
+            if($this ne $that) {
+                my $note = '';
+                if($that eq __PACKAGE__) {
+                    $note = sprintf " ('%s' is %s type constraint)",
+                        $name,
+                        scalar(grep { $name eq $_ } list_all_builtin_type_constraints())
+                            ? 'a builtin'
+                            : 'an implicitly created';
+                }
+                Carp::croak("The type constraint '$name' has already been created in $that"
+                          . " and cannot be created again in $this" . $note);
+            }
         }
     }
     else{
@@ -417,7 +426,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.64
+This document describes Mouse version 0.65
 
 =head2 SYNOPSIS
 

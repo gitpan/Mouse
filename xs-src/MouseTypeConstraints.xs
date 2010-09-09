@@ -4,12 +4,6 @@
 
 #include "mouse.h"
 
-#if PERL_BCDVERSION >= 0x5008005
-#define LooksLikeNumber(sv) looks_like_number(sv)
-#else
-#define LooksLikeNumber(sv) ( SvPOKp(sv) ? looks_like_number(sv) : (I32)SvNIOKp(sv) )
-#endif
-
 #ifndef SvRXOK
 #define SvRXOK(sv) (SvROK(sv) && SvMAGICAL(SvRV(sv)) && mg_find(SvRV(sv), PERL_MAGIC_qr))
 #endif
@@ -125,7 +119,7 @@ S_nv_is_integer(pTHX_ NV const nv) {
     else {
         char buf[64];  /* Must fit sprintf/Gconvert of longest NV */
         char* p;
-        Gconvert(nv, NV_DIG, 0, buf);
+        (void)Gconvert(nv, NV_DIG, 0, buf);
         p = &buf[0];
 
         /* -?[0-9]+ */
@@ -392,7 +386,7 @@ mouse_lookup_isa(pTHX_ HV* const instance_stash, const char* const klass_pv){
 #define find_method_pvn(a, b, c) mouse_stash_find_method(aTHX_ a, b, c)
 #define find_method_pvs(a, b)    mouse_stash_find_method(aTHX_ a, STR_WITH_LEN(b))
 
-static inline GV*
+STATIC_INLINE GV*
 mouse_stash_find_method(pTHX_ HV* const stash, const char* const name, I32 const namelen){
     GV** const gvp = (GV**)hv_fetch(stash, name, namelen, FALSE);
     if(gvp && isGV(*gvp) && GvCV(*gvp)){ /* shortcut */

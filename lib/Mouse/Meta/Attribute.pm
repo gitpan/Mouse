@@ -91,11 +91,6 @@ sub new {
 sub has_read_method      { $_[0]->has_reader || $_[0]->has_accessor }
 sub has_write_method     { $_[0]->has_writer || $_[0]->has_accessor }
 
-sub _create_args { # DEPRECATED
-    $_[0]->{_create_args} = $_[1] if @_ > 1;
-    $_[0]->{_create_args}
-}
-
 sub interpolate_class{
     my($class, $args) = @_;
 
@@ -167,7 +162,7 @@ sub _throw_type_constraint_error {
 }
 
 sub illegal_options_for_inheritance {
-    return qw(is reader writer accessor clearer predicate);
+    return qw(reader writer accessor clearer predicate);
 }
 
 sub clone_and_inherit_options{
@@ -361,7 +356,7 @@ Mouse::Meta::Attribute - The Mouse attribute metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.64
+This document describes Mouse version 0.65
 
 =head1 METHODS
 
