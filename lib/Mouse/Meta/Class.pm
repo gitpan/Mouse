@@ -276,7 +276,7 @@ sub _install_modifier_pp{
     my $into = $self->name;
 
     my $original = $into->can($name)
-        or $self->throw_error("The method '$name' is not found in the inheritance hierarchy for class $into");
+        or $self->throw_error("The method '$name' was not found in the inheritance hierarchy for $into");
 
     my $modifier_table = $self->{modifiers}{$name};
 
@@ -361,7 +361,7 @@ sub _install_modifier {
             if ( !$method || !Data::Util::subroutine_modifier($method) ) {
                 unless ($method) {
                     $method = $into->can($name)
-                        or Carp::confess("The method '$name' is not found in the inheritance hierarchy for class $into");
+                        or $self->throw_error("The method '$name' was not found in the inheritance hierarchy for $into");
                 }
                 $method = Data::Util::modify_subroutine( $method,
                     $type => [$code] );
@@ -375,6 +375,12 @@ sub _install_modifier {
 
             return;
         };
+    }
+
+    # workaround older Perl's bug that caused segv :(
+    {
+        no warnings 'once';
+        our $__not_used = \&_install_modifier; # keep the CV not to be released
     }
 
     # replace this method itself :)
@@ -473,7 +479,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.65
+This document describes Mouse version 0.66
 
 =head1 METHODS
 
