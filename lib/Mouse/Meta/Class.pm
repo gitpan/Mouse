@@ -271,7 +271,7 @@ sub make_mutable {
 sub is_immutable;
 sub is_mutable   { !$_[0]->is_immutable }
 
-sub _install_modifier_pp{
+sub _install_modifier {
     my( $self, $type, $name, $code ) = @_;
     my $into = $self->name;
 
@@ -281,11 +281,17 @@ sub _install_modifier_pp{
     my $modifier_table = $self->{modifiers}{$name};
 
     if(!$modifier_table){
-        my(@before, @after, @around, $cache, $modified);
+        my(@before, @after, $cache);
 
         $cache = $original;
 
-        $modified = sub {
+        my $around_only = ($type eq 'around');
+
+        my $modified = sub {
+            if($around_only) {
+                return $cache->(@_);
+            }
+
             for my $c (@before) { $c->(@_) }
 
             if(wantarray){ # list context
@@ -313,7 +319,8 @@ sub _install_modifier_pp{
 
             before   => \@before,
             after    => \@after,
-            around   => \@around,
+            around   => \my @around,
+            around_only => \$around_only,
 
             cache    => \$cache, # cache for around modifiers
         };
@@ -322,9 +329,11 @@ sub _install_modifier_pp{
     }
 
     if($type eq 'before'){
+        ${$modifier_table->{around_only}} = 0;
         unshift @{$modifier_table->{before}}, $code;
     }
     elsif($type eq 'after'){
+        ${$modifier_table->{around_only}} = 0;
         push @{$modifier_table->{after}}, $code;
     }
     else{ # around
@@ -335,61 +344,6 @@ sub _install_modifier_pp{
     }
 
     return;
-}
-
-sub _install_modifier {
-    my ( $self, $type, $name, $code ) = @_;
-
-    # load Data::Util first
-    my $no_cmm_fast = do{
-        local $@;
-        eval q{ use Data::Util 0.55 () };
-        $@;
-    };
-
-    my $impl;
-    if($no_cmm_fast){
-        $impl = \&_install_modifier_pp;
-    }
-    else{
-        $impl = sub {
-            my ( $self, $type, $name, $code ) = @_;
-            my $into = $self->name;
-
-            my $method = Mouse::Util::get_code_ref( $into, $name );
-
-            if ( !$method || !Data::Util::subroutine_modifier($method) ) {
-                unless ($method) {
-                    $method = $into->can($name)
-                        or $self->throw_error("The method '$name' was not found in the inheritance hierarchy for $into");
-                }
-                $method = Data::Util::modify_subroutine( $method,
-                    $type => [$code] );
-
-                $self->add_method($name => $method);
-            }
-            else {
-                Data::Util::subroutine_modifier( $method, $type => $code );
-                $self->add_method($name => Mouse::Util::get_code_ref($into, $name));
-            }
-
-            return;
-        };
-    }
-
-    # workaround older Perl's bug that caused segv :(
-    {
-        no warnings 'once';
-        our $__not_used = \&_install_modifier; # keep the CV not to be released
-    }
-
-    # replace this method itself :)
-    {
-        no warnings 'redefine';
-        *_install_modifier = $impl;
-    }
-
-    $self->$impl( $type, $name, $code );
 }
 
 sub add_before_method_modifier {
@@ -479,7 +433,12 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.67
+This document describes Mouse version 0.68
+
+=head1 DESCRIPTION
+
+This class is a meta object protocol for Mouse classes,
+which is a subset of Moose::Meta:::Class.
 
 =head1 METHODS
 
