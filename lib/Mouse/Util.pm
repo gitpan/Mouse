@@ -48,21 +48,18 @@ BEGIN{
         },
     );
 
+    our $VERSION = '0.69';
+
+    my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
     # Because Mouse::Util is loaded first in all the Mouse sub-modules,
-    # XS loader is placed here, not in Mouse.pm.
-
-    our $VERSION = '0.68';
-
-    my $xs = !(exists $INC{'Mouse/PurePerl.pm'} || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
-
+    # XSLoader must be placed here, not in Mouse.pm.
     if($xs){
         # XXX: XSLoader tries to get the object path from caller's file name
         #      $hack_mouse_file fools its mechanism
-
         (my $hack_mouse_file = __FILE__) =~ s/.Util//; # .../Mouse/Util.pm -> .../Mouse.pm
         $xs = eval sprintf("#line %d %s\n", __LINE__, $hack_mouse_file) . q{
-            local $^W = 0; # work around 'redefine' warning to &install_subroutines
+            local $^W = 0; # workaround 'redefine' warning to &install_subroutines
             require XSLoader;
             XSLoader::load('Mouse', $VERSION);
             Mouse::Util->import({ into => 'Mouse::Meta::Method::Constructor::XS' }, ':meta');
@@ -156,7 +153,7 @@ BEGIN {
         {
             package # hide from PAUSE
                 Class::C3;
-            our %MRO; # work around 'once' warnings
+            our %MRO; # avoid 'once' warnings
         }
 
         # MRO::Compat::__get_linear_isa has no prototype, so
@@ -365,7 +362,7 @@ Mouse::Util - Features, with or without their dependencies
 
 =head1 VERSION
 
-This document describes Mouse version 0.68
+This document describes Mouse version 0.69
 
 =head1 IMPLEMENTATIONS FOR
 

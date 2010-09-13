@@ -370,8 +370,7 @@ sub _parse_type {
 
 sub find_type_constraint {
     my($spec) = @_;
-    return $spec if Mouse::Util::is_a_type_constraint($spec);
-    return undef if !defined $spec;
+    return $spec if Mouse::Util::is_a_type_constraint($spec) or not defined $spec;
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec};
@@ -389,8 +388,7 @@ sub register_type_constraint {
 
 sub find_or_parse_type_constraint {
     my($spec) = @_;
-    return $spec if Mouse::Util::is_a_type_constraint($spec);
-    return undef if !defined $spec;
+    return $spec if Mouse::Util::is_a_type_constraint($spec) or not defined $spec;
 
     $spec =~ s/\s+//g;
     return $TYPE{$spec} || do{
@@ -426,7 +424,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.68
+This document describes Mouse version 0.69
 
 =head2 SYNOPSIS
 

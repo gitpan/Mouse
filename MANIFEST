@@ -294,6 +294,7 @@ t/900_mouse_bugs/006_RT69939.t
 t/900_mouse_bugs/007_RT56523.t
 t/900_mouse_bugs/008_RT56837.t
 t/900_mouse_bugs/009_RT57144.t
+t/900_mouse_bugs/010_use_mouse_before_tb2.t
 t/990_deprecated/001-export_to_level.t
 t/lib/Bar.pm
 t/lib/BaseClass.pm
@@ -317,6 +318,7 @@ xs-src/MouseAccessor.xs
 xs-src/MouseAttribute.xs
 xs-src/MouseTypeConstraints.xs
 xs-src/MouseUtil.xs
+xshelper.h
 xt/001-pod.t
 xt/002-pod_spell.t
 xt/003-pod_coverage.t

@@ -53,8 +53,10 @@ lib/Mouse/Tiny\.pm$
 Mouse-
 
 ppport\.h$
-xshelper\.h$
 
 \.o(?:bj)?$
 \.c$
 \.bs$
+
+MYMETA\.yml$
+
