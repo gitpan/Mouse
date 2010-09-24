@@ -38,17 +38,17 @@ BEGIN{
 
             not_supported
 
-            does meta dump
+            does meta throw_error dump
         )],
         groups => {
             default => [], # export no functions by default
 
             # The ':meta' group is 'use metaclass' for Mouse
-            meta    => [qw(does meta dump)],
+            meta    => [qw(does meta dump throw_error)],
         },
     );
 
-    our $VERSION = '0.70';
+    our $VERSION = '0.71';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -67,7 +67,7 @@ BEGIN{
             Mouse::Util->import({ into => 'Mouse::Meta::Method::Accessor::XS'    }, ':meta');
             return 1;
         } || 0;
-        #warn $@ if $@;
+        warn $@ if $@ && $ENV{MOUSE_XS};
     }
 
     if(!$xs){
@@ -274,29 +274,37 @@ sub is_class_loaded;
 
 sub apply_all_roles {
     my $consumer = Scalar::Util::blessed($_[0])
-        ?                                shift   # instance
-        : Mouse::Meta::Class->initialize(shift); # class or role name
+        ?                                $_[0]   # instance
+        : Mouse::Meta::Class->initialize($_[0]); # class or role name
 
     my @roles;
 
     # Basis of Data::OptList
     my $max = scalar(@_);
-    for (my $i = 0; $i < $max ; $i++) {
-        if ($i + 1 < $max && ref($_[$i + 1])) {
-            push @roles, [ $_[$i] => $_[++$i] ];
-        } else {
-            push @roles, [ $_[$i] => undef ];
+    for (my $i = 1; $i < $max ; $i++) {
+        my $role = $_[$i];
+        my $role_name;
+        if(ref $role) {
+            $role_name = $role->name;
         }
-        my $role_name = $roles[-1][0];
-        load_class($role_name);
+        else {
+            $role_name = $role;
+            load_class($role_name);
+            $role = get_metaclass_by_name($role_name);
+        }
 
-        is_a_metarole( get_metaclass_by_name($role_name) )
+        if ($i + 1 < $max && ref($_[$i + 1]) eq 'HASH') {
+            push @roles, [ $role => $_[++$i] ];
+        } else {
+            push @roles, [ $role => undef ];
+        }
+        is_a_metarole($role)
             || $consumer->meta->throw_error("You can only consume roles, $role_name is not a Mouse role");
     }
 
     if ( scalar @roles == 1 ) {
-        my ( $role_name, $params ) = @{ $roles[0] };
-        get_metaclass_by_name($role_name)->apply( $consumer, defined $params ? $params : () );
+        my ( $role, $params ) = @{ $roles[0] };
+        $role->apply( $consumer, defined $params ? $params : () );
     }
     else {
         Mouse::Meta::Role->combine(@roles)->apply($consumer);
@@ -337,6 +345,22 @@ sub meta :method{
     return Mouse::Meta::Class->initialize(ref($_[0]) || $_[0]);
 }
 
+# general throw_error() method
+# $o->throw_error($msg, depth => $leve, longmess => $croak_or_confess)
+sub throw_error :method {
+    my($self, $message, %args) = @_;
+
+    local $Carp::CarpLevel  = $Carp::CarpLevel + 1 + ($args{depth} || 0);
+    local $Carp::MaxArgNums = 20; # default is 8, usually we use named args which gets messier though
+
+    if(exists $args{longmess} && !$args{longmess}) {
+        Carp::croak($message);
+    }
+    else{
+        Carp::confess($message);
+    }
+}
+
 # general dump() method
 sub dump :method {
     my($self, $maxdepth) = @_;
@@ -345,6 +369,8 @@ sub dump :method {
     my $dd = Data::Dumper->new([$self]);
     $dd->Maxdepth(defined($maxdepth) ? $maxdepth : 3);
     $dd->Indent(1);
+    $dd->Sortkeys(1);
+    $dd->Quotekeys(0);
     return $dd->Dump();
 }
 
@@ -358,47 +384,63 @@ __END__
 
 =head1 NAME
 
-Mouse::Util - Features, with or without their dependencies
+Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
+
+=head1 SYNOPSIS
+
+    use Mouse::Util; # turns on strict and warnings
+
+=head1 DESCRIPTION
+
+This module provides a set of utility functions. Many of these
+functions are intended for use in Mouse itself or MouseX modules, but
+some of them may be useful for use in your own code.
 
 =head1 IMPLEMENTATIONS FOR
 
-=head2 Moose::Util
+=head2 Moose::Util functions
 
-=head3 C<find_meta>
+The following functions are exportable.
 
-=head3 C<does_role>
+=head3 C<find_meta($class_or_obj)>
 
-=head3 C<resolve_metaclass_alias>
+The same as C<Mouse::Util::class_of()>.
 
-=head3 C<apply_all_roles>
+=head3 C<does_role($class_or_obj, $role_or_obj)>
 
-=head3 C<english_list>
+=head3 C<resolve_metaclass_alias($category, $name, %options)>
 
-=head2 Class::MOP
+=head3 C<apply_all_roles($applicant, @roles)>
 
-=head3 C<< is_class_loaded(ClassName) -> Bool >>
+=head3 C<english_listi(@items)>
 
-Returns whether C<ClassName> is actually loaded or not. It uses a heuristic which
-involves checking for the existence of C<$VERSION>, C<@ISA>, and any
-locally-defined method.
+=head2 Class::MOP functions
 
-=head3 C<< load_class(ClassName) >>
+The following functions are not exportable.
 
-This will load a given C<ClassName> (or die if it is not loadable).
+=head3 C<< Mouse::Util::is_class_loaded($classname) -> Bool >>
+
+Returns whether I<$classname> is actually loaded or not.
+It uses a heuristic which involves checking for the existence of
+C<$VERSION>, C<@ISA>, and any locally-defined method.
+
+=head3 C<< Mouse::Util::load_class($classname) -> ClassName >>
+
+This will load a given I<$classname> (or die if it is not loadable).
 This function can be used in place of tricks like
-C<eval "use $module"> or using C<require>.
+C<eval "use $module ()"> or using C<require>.
 
-=head3 C<< Mouse::Util::class_of(ClassName or Object) >>
+=head3 C<< Mouse::Util::class_of($classname_or_object) -> MetaClass >>
 
-=head3 C<< Mouse::Util::get_metaclass_by_name(ClassName) >>
+=head3 C<< Mouse::Util::get_metaclass_by_name($classname) -> MetaClass >>
 
-=head3 C<< Mouse::Util::get_all_metaclass_instances() >>
+=head3 C<< Mouse::Util::get_all_metaclass_instances() -> (MetaClasses) >>
 
-=head3 C<< Mouse::Util::get_all_metaclass_names() >>
+=head3 C<< Mouse::Util::get_all_metaclass_names() -> (ClassNames) >>
 
 =head2 MRO::Compat
 

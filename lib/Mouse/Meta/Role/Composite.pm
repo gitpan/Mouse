@@ -1,9 +1,10 @@
 package Mouse::Meta::Role::Composite;
 use Mouse::Util; # enables strict and warnings
 use Mouse::Meta::Role;
+use Mouse::Meta::Role::Application;
 our @ISA = qw(Mouse::Meta::Role);
 
-sub get_method_list{
+sub get_method_list {
     my($self) = @_;
     return keys %{ $self->{methods} };
 }
@@ -38,20 +39,20 @@ sub get_method_body {
 
 sub has_method {
     # my($self, $method_name) = @_;
-    return 0; # to fool _apply_methods() in combine()
+    return 0; # to fool apply_methods() in combine()
 }
 
-sub has_attribute{
+sub has_attribute {
     # my($self, $method_name) = @_;
-    return 0; # to fool _appply_attributes() in combine()
+    return 0; # to fool appply_attributes() in combine()
 }
 
-sub has_override_method_modifier{
+sub has_override_method_modifier {
     # my($self, $method_name) = @_;
-    return 0; # to fool _apply_modifiers() in combine()
+    return 0; # to fool apply_modifiers() in combine()
 }
 
-sub add_attribute{
+sub add_attribute {
     my $self      = shift;
     my $attr_name = shift;
     my $spec      = (@_ == 1 ? $_[0] : {@_});
@@ -65,7 +66,7 @@ sub add_attribute{
     return;
 }
 
-sub add_override_method_modifier{
+sub add_override_method_modifier {
     my($self, $method_name, $code) = @_;
 
     my $existing = $self->{override_method_modifiers}{$method_name};
@@ -78,44 +79,55 @@ sub add_override_method_modifier{
     return;
 }
 
-# components of apply()
+sub apply {
+    my $self     = shift;
+    my $consumer = shift;
 
-sub _apply_methods{
-    my($self, $consumer, $args) = @_;
+    Mouse::Meta::Role::Application::RoleSummation->new(@_)->apply($self, $consumer);
+    return;
+}
 
-    if(exists $self->{conflicting_methods}){
+package Mouse::Meta::Role::Application::RoleSummation;
+our @ISA = qw(Mouse::Meta::Role::Application);
+
+sub apply_methods {
+    my($self, $role, $consumer, @extra) = @_;
+
+    if(exists $role->{conflicting_methods}){
         my $consumer_class_name = $consumer->name;
 
-        my @conflicting = grep{ !$consumer_class_name->can($_) } keys %{ $self->{conflicting_methods} };
+        my @conflicting = grep{ !$consumer_class_name->can($_) }
+            keys %{ $role->{conflicting_methods} };
 
-        if(@conflicting == 1){
-            my $method_name = $conflicting[0];
-            my $roles       = Mouse::Util::quoted_english_list(map{ $_->name } @{ $self->{composed_roles_by_method}{$method_name} });
-            $self->throw_error(
-               sprintf q{Due to a method name conflict in roles %s, the method '%s' must be implemented or excluded by '%s'},
-                   $roles, $method_name, $consumer_class_name
-            );
-        }
-        elsif(@conflicting > 1){
+        if(@conflicting) {
+            my $method_name_conflict = (@conflicting == 1
+                ? 'a method name conflict'
+                : 'method name conflicts');
+
             my %seen;
             my $roles = Mouse::Util::quoted_english_list(
                 grep{ !$seen{$_}++ } # uniq
                 map { $_->name }
-                map { @{$_} } @{ $self->{composed_roles_by_method} }{@conflicting}
+                map { @{$_} }
+                @{ $role->{composed_roles_by_method} }{@conflicting}
             );
 
-            $self->throw_error(
-               sprintf q{Due to method name conflicts in roles %s, the methods %s must be implemented or excluded by '%s'},
-                   $roles,
-                   Mouse::Util::quoted_english_list(@conflicting),
-                   $consumer_class_name
-            );
+            $self->throw_error(sprintf
+                  q{Due to %s in roles %s,}
+                . q{ the method%s %s must be implemented or excluded by '%s'},
+                    $method_name_conflict,
+                    $roles,
+                    (@conflicting > 1 ? 's' : ''),
+                    Mouse::Util::quoted_english_list(@conflicting),
+                    $consumer_class_name);
         }
     }
 
-    $self->SUPER::_apply_methods($consumer, $args);
+    $self->SUPER::apply_methods($role, $consumer, @extra);
     return;
 }
+
+package Mouse::Meta::Role::Composite;
 1;
 __END__
 
@@ -125,7 +137,7 @@ Mouse::Meta::Role::Composite - An object to represent the set of roles
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 SEE ALSO
 

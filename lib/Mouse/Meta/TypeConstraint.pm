@@ -2,19 +2,6 @@ package Mouse::Meta::TypeConstraint;
 use Mouse::Util qw(:meta); # enables strict and warnings
 use Scalar::Util ();
 
-use overload
-    'bool'   => sub (){ 1 },           # always true
-    '""'     => sub { $_[0]->name },   # stringify to tc name
-    '0+'     => sub { Scalar::Util::refaddr($_[0]) },
-    '|'      => sub {                  # or-combination
-        require Mouse::Util::TypeConstraints;
-        return Mouse::Util::TypeConstraints::find_or_parse_type_constraint(
-            "$_[0] | $_[1]",
-        );
-    },
-
-    fallback => 1;
-
 sub new {
     my $class = shift;
     my %args  = @_ == 1 ? %{$_[0]} : @_;
@@ -31,11 +18,13 @@ sub new {
     $check = $args{constraint};
 
     if(defined($check) && ref($check) ne 'CODE'){
-        $class->throw_error("Constraint for $args{name} is not a CODE reference");
+        $class->throw_error(
+            "Constraint for $args{name} is not a CODE reference");
     }
 
     my $self = bless \%args, $class;
-    $self->compile_type_constraint() if !$self->{hand_optimized_type_constraint};
+    $self->compile_type_constraint()
+        if !$self->{hand_optimized_type_constraint};
 
     $self->_compile_union_type_coercion() if $self->{type_constraints};
     return $self;
@@ -47,7 +36,8 @@ sub create_child_type{
         # a child inherits its parent's attributes
         %{$self},
 
-        # but does not inherit 'compiled_type_constraint' and 'hand_optimized_type_constraint'
+        # but does not inherit 'compiled_type_constraint'
+        # and 'hand_optimized_type_constraint'
         compiled_type_constraint       => undef,
         hand_optimized_type_constraint => undef,
 
@@ -75,7 +65,7 @@ sub _compiled_type_coercion;
 sub compile_type_constraint;
 
 
-sub _add_type_coercions{
+sub _add_type_coercions { # ($self, @pairs)
     my $self = shift;
 
     my $coercions = ($self->{coercion_map} ||= []);
@@ -90,14 +80,16 @@ sub _add_type_coercions{
         }
 
         my $type = Mouse::Util::TypeConstraints::find_or_parse_type_constraint($from)
-            or $self->throw_error("Could not find the type constraint ($from) to coerce from");
+            or $self->throw_error(
+                "Could not find the type constraint ($from) to coerce from");
 
         push @{$coercions}, [ $type => $action ];
     }
 
     # compile
     if(exists $self->{type_constraints}){ # union type
-        $self->throw_error("Cannot add additional type coercions to Union types");
+        $self->throw_error(
+            "Cannot add additional type coercions to Union types");
     }
     else{
         $self->_compile_type_coercion();
@@ -166,7 +158,12 @@ sub get_message {
         return $msg->($value);
     }
     else {
-        $value = ( defined $value ? overload::StrVal($value) : 'undef' );
+        if(not defined $value) {
+            $value = 'undef';
+        }
+        elsif( ref($value) && defined(&overload::StrVal) ) {
+            $value = overload::StrVal($value);
+        }
         return "Validation failed for '$self' with value $value";
     }
 }
@@ -182,13 +179,13 @@ sub is_a_type_of{
     return 1 if $self->name eq $other_name;
 
     if(exists $self->{type_constraints}){ # union
-        foreach my $type(@{$self->{type_constraints}}){
+        foreach my $type(@{$self->{type_constraints}}) {
             return 1 if $type->name eq $other_name;
         }
     }
 
-    for(my $parent = $self->parent; defined $parent; $parent = $parent->parent){
-        return 1 if $parent->name eq $other_name;
+    for(my $p = $self->parent; defined $p; $p = $p->parent) {
+        return 1 if $p->name eq $other_name;
     }
 
     return 0;
@@ -206,7 +203,8 @@ sub parameterize{
     $name ||= sprintf '%s[%s]', $self->name, $param->name;
 
     my $generator = $self->{constraint_generator}
-        || $self->throw_error("The $name constraint cannot be used, because $param doesn't subtype from a parameterizable type");
+        || $self->throw_error("The $name constraint cannot be used,"
+            . " because $param doesn't subtype from a parameterizable type");
 
     return Mouse::Meta::TypeConstraint->new(
         name           => $name,
@@ -225,9 +223,15 @@ sub assert_valid {
     return 1;
 }
 
-sub throw_error {
-    require Mouse::Meta::Module;
-    goto &Mouse::Meta::Module::throw_error;
+sub _as_string { $_[0]->name                  } # overload ""
+sub _identity  { Scalar::Util::refaddr($_[0]) } # overload 0+
+
+sub _unite { # overload infix:<|>
+    my($lhs, $rhs) = @_;
+    require Mouse::Util::TypeConstraints;
+    return Mouse::Util::TypeConstraints::find_or_parse_type_constraint(
+       " $lhs | $rhs",
+    );
 }
 
 1;
@@ -239,25 +243,42 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 DESCRIPTION
 
-For the most part, the only time you will ever encounter an
-instance of this class is if you are doing some serious deep
-introspection. This API should not be considered final, but
-it is B<highly unlikely> that this will matter to a regular
-Mouse user.
-
-Don't use this.
+This class represents a type constraint, including built-in
+type constraints, union type constraints, parameterizable/
+parameterized type constraints, as well as custom type
+constraints
 
 =head1 METHODS
 
-=over 4
+=over
 
-=item B<new>
+=item C<< Mouse::Meta::TypeConstraint->new(%options) >>
 
-=item B<name>
+=item C<< $constraint->name >>
+
+=item C<< $constraint->parent >>
+
+=item C<< $constraint->constraint >>
+
+=item C<< $constraint->has_coercion >>
+
+=item C<< $constraint->message >>
+
+=item C<< $constraint->is_a_subtype_of($name or $object) >>
+
+=item C<< $constraint->coerce($value) >>
+
+=item C<< $constraint->check($value) >>
+
+=item C<< $constraint->assert_valid($value) >>
+
+=item C<< $constraint->get_message($value) >>
+
+=item C<< $constraint->create_child_type(%options) >>
 
 =back
 

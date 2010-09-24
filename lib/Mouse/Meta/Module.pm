@@ -38,6 +38,9 @@ sub reinitialize {
     ($package_name && !ref($package_name))
         || $class->throw_error("You must pass a package name and it cannot be blessed");
 
+    if(exists $METAS{$package_name}) {
+        unshift @args, %{ $METAS{$package_name} };
+    }
     delete $METAS{$package_name};
     return $class->initialize($package_name, @args);
 }
@@ -150,7 +153,8 @@ sub _collect_methods { # Mouse specific
                 my $subname = ( caller(1) )[3];
                 $meta->throw_error(
                     sprintf(
-                        'Methods passed to %s must be provided as a list, ArrayRef or regular expression, not %s',
+                        'Methods passed to %s must be provided as a list,'
+                        . ' ArrayRef or regular expression, not %s',
                         $subname,
                         $type,
                     )
@@ -279,18 +283,18 @@ sub DESTROY{
     return if $Mouse::Util::in_global_destruction;
 
     my $serial_id = $self->{anon_serial_id};
-
     return if !$serial_id;
-    # mortal anonymous class
 
-    # XXX: cleaning stash with threads causes panic/SEGV.
+    # XXX: cleaning stash with threads causes panic/SEGV on legacy perls.
     if(exists $INC{'threads.pm'}) {
         # (caller)[2] indicates the caller's line number,
-        # which is zero when the current thread is joining.
+        # which is zero when the current thread is joining (destroying).
         return if( (caller)[2] == 0);
     }
 
-    # @ISA is a magical variable, so we clear it manually.
+    # clean up mortal anonymous class stuff
+
+    # @ISA is a magical variable, so we must clear it manually.
     @{$self->{superclasses}} = () if exists $self->{superclasses};
 
     # Then, clear the symbol table hash
@@ -302,39 +306,24 @@ sub DESTROY{
     $name =~ s/ $serial_id \z//xms;
     no strict 'refs';
     delete ${$name}{ $serial_id . '::' };
-
     return;
 }
 
-sub throw_error{
-    my($self, $message, %args) = @_;
-
-    local $Carp::CarpLevel  = $Carp::CarpLevel + 1 + ($args{depth} || 0);
-    local $Carp::MaxArgNums = 20; # default is 8, usually we use named args which gets messier though
-
-    if(exists $args{longmess} && !$args{longmess}){ # intentionaly longmess => 0
-        Carp::croak($message);
-    }
-    else{
-        Carp::confess($message);
-    }
-}
 
 1;
 __END__
 
 =head1 NAME
 
-Mouse::Meta::Module - The base class for Mouse::Meta::Class and Mouse::Meta::Role
+Mouse::Meta::Module - The common base class of Mouse::Meta::Class and Mouse::Meta::Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 DESCRIPTION
 
-This class is a base class of Mouse classes and roles,
-which is a subset of Class::MOP::Class.
+This class is an abstract base class of meta classes and meta roles.
 
 =head1 SEE ALSO
 

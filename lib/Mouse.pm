@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.70';
+our $VERSION = '0.71';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -48,13 +48,8 @@ sub has {
     $meta->throw_error(q{Usage: has 'name' => ( key => value, ... )})
         if @_ % 2; # odd number of arguments
 
-    if(ref $name){ # has [qw(foo bar)] => (...)
-        for (@{$name}){
-            $meta->add_attribute($_ => @_);
-        }
-    }
-    else{ # has foo => (...)
-        $meta->add_attribute($name => @_);
+    for my $n(ref($name) ? @{$name} : $name){
+        $meta->add_attribute($n => @_);
     }
     return;
 }
@@ -130,7 +125,7 @@ sub init_meta {
     my %args = @_;
 
     my $class = $args{for_class}
-                    or confess("Cannot call init_meta without specifying a for_class");
+        or confess("Cannot call init_meta without specifying a for_class");
 
     my $base_class = $args{base_class} || 'Mouse::Object';
     my $metaclass  = $args{metaclass}  || 'Mouse::Meta::Class';
@@ -160,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 SYNOPSIS
 

@@ -1,3 +1,4 @@
+# COMPAT_TEST=1 genrates Moose compatible tests
 # for developpers:
 BEGIN{
     if(grep{ $_ eq '--author' } @ARGV){
@@ -13,9 +14,6 @@ use inc::Module::Install 1.00;
 # for co-developpers
 use Module::Install::XSUtil 0.30;
 use Module::Install::AuthorTests;
-
-system($^X, 'tool/generate-mouse-tiny.pl', 'lib/Mouse/Tiny.pm') == 0
-    or warn "Cannot generate Mouse::Tiny: $!";
 
 name     'Mouse';
 all_from 'lib/Mouse.pm';
@@ -58,44 +56,45 @@ CHECK
 my $use_xs = ($] >= 5.008_001 && want_xs());
 
 if($use_xs){
-    print "Mouse configured with XS.\n",
-          "NOTE: You can try --pp option to configure Mouse with Pure Perl.\n";
+    print "Mouse configured with XS.\n";
 
-    cc_warnings();
     use_ppport(3.19);
     use_xshelper();
+    cc_warnings();
     cc_src_paths('xs-src');
 }
 else{
     print "Mouse configured with Pure Perl.\n";
 }
 
-
 tests 't/*.t t/*/*.t';
 author_tests 'xt';
 
 repository 'git://git.moose.perl.org/Mouse.git';
 
+system($^X, 'tool/generate-mouse-tiny.pl', 'lib/Mouse/Tiny.pm') == 0
+    or warn "Cannot generate Mouse::Tiny: $!";
+makemaker_args PL_FILES => {
+    'tool/generate-mouse-tiny.pl' => 'lib/Mouse/Tiny.pm',
+};
+
 if ($Module::Install::AUTHOR) {
     require 'lib/Mouse/Spec.pm'; # for the version
     my $require_version = Mouse::Spec->MooseVersion;
 
-    if (eval { require Moose; Moose->VERSION($require_version) }) {
+    if ($ENV{COMPAT_TEST}
+            && eval { require Moose; Moose->VERSION($require_version) }) {
         print "You have Moose ", Moose->VERSION, ".\n";
-        if (eval { require Module::Install::AuthorTests }) {
-            do 'tool/create-moose-compatibility-tests.pl';
-            # repeat testing
-            # see also ExtUtils::MM_Any::test_via_harness()
-            my $t_moose =  q{$(FULLPERLRUN) -MExtUtils::Command::MM -e}
-                          .q{ "test_harness($(TEST_VERBOSE), '$(INST_LIB)', '$(INST_ARCHLIB)')"}
-                          .q{ xt/compatibility/t/*/*.t } . "\n";
+        do 'tool/create-moose-compatibility-tests.pl';
+        # repeat testing
+        # see also ExtUtils::MM_Any::test_via_harness()
+        my $t_moose =  q{$(FULLPERLRUN) -MExtUtils::Command::MM -e}
+                      .q{ "test_harness($(TEST_VERBOSE), '$(INST_LIB)', '$(INST_ARCHLIB)')"}
+                      .q{ xt/compat/t/*/*.t } . "\n";
 
-            postamble qq{test_dynamic :: test_moose\n\n}
-                    . qq{test_moose :: pure_all\n}
-                    . qq{\t} . $t_moose;
-        } else {
-            print "You don't have a M::I::AuthorTests.\n";
-        }
+        postamble qq{test :: test_moose\n\n}
+                . qq{test_moose :: pure_all\n}
+                . qq{\t} . $t_moose;
     } else {
         print "You don't have Moose $require_version. skipping moose compatibility test\n";
     }
@@ -107,7 +106,7 @@ if ($Module::Install::AUTHOR) {
                    .q{ "do 'tool/force-pp.pl'; test_harness($(TEST_VERBOSE), '$(INST_LIB)', '$(INST_ARCHLIB)')"}
                    .q{ $(TEST_FILES)} . "\n";
 
-        postamble qq{test_dynamic :: test_pp\n\n}
+        postamble qq{test :: test_pp\n\n}
                 . qq{test_pp :: pure_all\n}
                 . qq{\t} . $t_pp;
     }

@@ -13,7 +13,8 @@ for (<DATA>) {
 }
 
 add_stopwords(@stopwords);
-set_spell_cmd('aspell list -l en');
+#set_spell_cmd('aspell list -l en');
+$ENV{LC_ALL} = 'C';
 all_pod_files_spelling_ok();
 
 __DATA__
@@ -87,6 +88,8 @@ SVN
 CGI
 FastCGI
 DateTime
+pm
+XS
 
 ## Moose
 AttributeHelpers
@@ -160,6 +163,7 @@ destructuring
 dev
 DWIM
 DUCKTYPE
+exportable
 GitHub
 hashrefs
 hotspots
@@ -182,6 +186,7 @@ namespaces
 namespacing
 transformability
 redispatch
+MISC
 
 # as in required-ness
 ness

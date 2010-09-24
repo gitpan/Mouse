@@ -9,9 +9,9 @@ use overload
     fallback => 1,
 ;
 
-sub wrap{
+sub wrap {
     my $class = shift;
-
+    unshift @_, 'body' if @_ % 2 != 0;
     return $class->_new(@_);
 }
 
@@ -54,7 +54,7 @@ Mouse::Meta::Method - A Mouse Method metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 DESCRIPTION
 

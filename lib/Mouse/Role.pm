@@ -1,7 +1,7 @@
 package Mouse::Role;
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.70';
+our $VERSION = '0.71';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -30,9 +30,8 @@ sub extends  {
     Carp::croak "Roles do not support 'extends'";
 }
 
-sub with     {
-    my $meta = Mouse::Meta::Role->initialize(scalar caller);
-    Mouse::Util::apply_all_roles($meta->name, @_);
+sub with {
+    Mouse::Util::apply_all_roles(scalar(caller), @_);
     return;
 }
 
@@ -43,13 +42,8 @@ sub has {
     $meta->throw_error(q{Usage: has 'name' => ( key => value, ... )})
         if @_ % 2; # odd number of arguments
 
-    if(ref $name){ # has [qw(foo bar)] => (...)
-        for (@{$name}){
-            $meta->add_attribute($_ => @_);
-        }
-    }
-    else{ # has foo => (...)
-        $meta->add_attribute($name => @_);
+    for my $n(ref($name) ? @{$name} : $name){
+        $meta->add_attribute($n => @_);
     }
     return;
 }
@@ -145,7 +139,7 @@ Mouse::Role - The Mouse Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 SYNOPSIS
 

@@ -242,6 +242,27 @@ sub add_method {
     return;
 }
 
+my $generate_class_accessor = sub {
+    my($name) = @_;
+    return sub {
+        my $self = shift;
+        if(@_) {
+            return $self->{$name} = shift;
+        }
+
+        foreach my $class($self->linearized_isa) {
+            my $meta = Mouse::Util::get_metaclass_by_name($class)
+                or next;
+
+            if(exists $meta->{$name}) {
+                return $meta->{$name};
+            }
+        }
+        return undef;
+    };
+};
+
+
 package Mouse::Meta::Class;
 
 use Mouse::Meta::Method::Constructor;
@@ -259,7 +280,7 @@ sub is_anon_class{
 
 sub roles { $_[0]->{roles} }
 
-sub linearized_isa { @{ get_linear_isa($_[0]->{package}) } }
+sub linearized_isa { @{ Mouse::Util::get_linear_isa($_[0]->{package}) } }
 
 sub get_all_attributes {
     my($self) = @_;
@@ -363,23 +384,8 @@ sub _initialize_object{
 
 sub is_immutable {  $_[0]->{is_immutable} }
 
-sub strict_constructor{
-    my $self = shift;
-    if(@_) {
-        $self->{strict_constructor} = shift;
-    }
-
-    foreach my $class($self->linearized_isa) {
-        my $meta = Mouse::Util::get_metaclass_by_name($class)
-            or next;
-
-        if(exists $meta->{strict_constructor}) {
-            return $meta->{strict_constructor};
-        }
-    }
-
-    return 0; # false
-}
+sub strict_constructor;
+*strict_constructor = $generate_class_accessor->('strict_constructor');
 
 sub _report_unknown_args {
     my($metaclass, $attrs, $args) = @_;
@@ -445,6 +451,12 @@ sub get_around_method_modifiers {
 sub get_after_method_modifiers {
     my ($self, $method_name) = @_;
     return @{ $self->{after_method_modifiers}{$method_name} ||= [] }
+}
+
+sub add_metaclass_accessor { # for meta roles (a.k.a. traits)
+    my($meta, $name) = @_;
+    $meta->add_method($name => $generate_class_accessor->($name));
+    return;
 }
 
 package Mouse::Meta::Attribute;
@@ -628,6 +640,13 @@ sub _process_options{
 
 package Mouse::Meta::TypeConstraint;
 
+use overload
+    '""' => '_as_string',
+    '0+' => '_identity',
+    '|'  => '_unite',
+
+    fallback => 1;
+
 sub name    { $_[0]->{name}    }
 sub parent  { $_[0]->{parent}  }
 sub message { $_[0]->{message} }
@@ -777,7 +796,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 SEE ALSO
 

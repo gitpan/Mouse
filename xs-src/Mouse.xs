@@ -445,6 +445,16 @@ mouse_get_modifier_storage(pTHX_
     return (AV*)SvRV(storage_ref);
 }
 
+static void
+XS_Mouse_value_holder(pTHX_ CV* const cv PERL_UNUSED_DECL) {
+    dVAR; dXSARGS;
+    SV* const value = (SV*)XSANY.any_ptr;
+    assert(value);
+    PERL_UNUSED_VAR(items);
+    ST(0) = value;
+    XSRETURN(1);
+}
+
 DECL_BOOT(Mouse__Util);
 DECL_BOOT(Mouse__Util__TypeConstraints);
 DECL_BOOT(Mouse__Meta__Method__Accessor__XS);
@@ -455,6 +465,7 @@ MODULE = Mouse  PACKAGE = Mouse
 PROTOTYPES: DISABLE
 
 BOOT:
+{
     mouse_package   = newSVpvs_share("package");
     mouse_namespace = newSVpvs_share("namespace");
     mouse_methods   = newSVpvs_share("methods");
@@ -468,7 +479,7 @@ BOOT:
     CALL_BOOT(Mouse__Util__TypeConstraints);
     CALL_BOOT(Mouse__Meta__Method__Accessor__XS);
     CALL_BOOT(Mouse__Meta__Attribute);
-
+}
 
 MODULE = Mouse  PACKAGE = Mouse::Meta::Module
 
@@ -526,19 +537,31 @@ CODE:
 MODULE = Mouse  PACKAGE = Mouse::Meta::Class
 
 BOOT:
+{
+    CV* xsub;
+
     INSTALL_SIMPLE_READER(Class, roles);
     INSTALL_SIMPLE_PREDICATE_WITH_KEY(Class, is_anon_class, anon_serial_id);
     INSTALL_SIMPLE_READER(Class, is_immutable);
+
+    INSTALL_INHERITABLE_CLASS_ACCESSOR(strict_constructor);
 
     INSTALL_CLASS_HOLDER(Class, method_metaclass,     "Mouse::Meta::Method");
     INSTALL_CLASS_HOLDER(Class, attribute_metaclass,  "Mouse::Meta::Attribute");
     INSTALL_CLASS_HOLDER(Class, constructor_class,    "Mouse::Meta::Method::Constructor::XS");
     INSTALL_CLASS_HOLDER(Class, destructor_class,     "Mouse::Meta::Method::Destructor::XS");
 
-    newCONSTSUB(gv_stashpvs("Mouse::Meta::Method::Constructor::XS", TRUE), "_generate_constructor",
-        newRV_inc((SV*)get_cvs("Mouse::Object::new", TRUE)));
-    newCONSTSUB(gv_stashpvs("Mouse::Meta::Method::Destructor::XS", TRUE), "_generate_destructor",
-        newRV_inc((SV*)get_cvs("Mouse::Object::DESTROY", TRUE)));
+    xsub = newXS("Mouse::Meta::Method::Constructor::XS::_generate_constructor",
+        XS_Mouse_value_holder, file);
+    CvXSUBANY(xsub).any_ptr
+        = newRV_inc((SV*)get_cvs("Mouse::Object::new", GV_ADD));
+
+    xsub = newXS("Mouse::Meta::Method::Destructor::XS::_generate_destructor",
+        XS_Mouse_value_holder, file);
+    CvXSUBANY(xsub).any_ptr
+        = newRV_inc((SV*)get_cvs("Mouse::Object::DESTROY", GV_ADD));
+}
+
 
 void
 linearized_isa(SV* self)
@@ -616,45 +639,6 @@ CODE:
     mouse_class_initialize_object(aTHX_ meta, object, args, is_cloning);
 }
 
-void
-strict_constructor(SV* self, SV* value = NULL)
-CODE:
-{
-    SV* const slot      = sv_2mortal(newSVpvs_share("strict_constructor"));
-    SV* const stash_ref = mcall0(self, mouse_namespace);
-    HV* stash;
-
-    if(!(SvROK(stash_ref) && SvTYPE(SvRV(stash_ref)) == SVt_PVHV)) {
-        croak("namespace() didn't return a HASH reference");
-    }
-    stash = (HV*)SvRV(stash_ref);
-
-    if(value) { /* setter */
-        set_slot(self, slot, value);
-        mro_method_changed_in(stash);
-    }
-
-    value = get_slot(self, slot);
-
-    if(!value) {
-        AV* const isa   = mro_get_linear_isa(stash);
-        I32 const len   = av_len(isa) + 1;
-        I32 i;
-        for(i = 1; i < len; i++) {
-            SV* const klass = MOUSE_av_at(isa, i);
-            SV* const meta  = get_metaclass(klass);
-            if(!SvOK(meta)){
-                continue; /* skip non-Mouse classes */
-            }
-            value = get_slot(meta, slot);
-            if(value) {
-                break;
-            }
-        }
-    }
-    ST(0) = value ? value : &PL_sv_no;
-}
-
 MODULE = Mouse  PACKAGE = Mouse::Meta::Role
 
 BOOT:
@@ -694,6 +678,18 @@ PPCODE:
     else{
         mPUSHi(len);
     }
+}
+
+void
+add_metaclass_accessor(SV* self, SV* name)
+CODE:
+{
+    SV* const klass = mouse_call0(self, mouse_name);
+    const char* fq_name = form("%"SVf"::%"SVf, klass, name);
+    STRLEN keylen;
+    const char* const key = SvPV_const(name, keylen);
+    mouse_simple_accessor_generate(aTHX_ fq_name, key, keylen,
+        XS_Mouse_inheritable_class_accessor, NULL, 0);
 }
 
 MODULE = Mouse  PACKAGE = Mouse::Object

@@ -1,5 +1,5 @@
 package Mouse::Meta::Class;
-use Mouse::Util qw/:meta get_linear_isa not_supported/; # enables strict and warnings
+use Mouse::Util qw/:meta/; # enables strict and warnings
 
 use Scalar::Util qw/blessed weaken/;
 
@@ -56,16 +56,25 @@ sub superclasses {
     if (@_) {
         foreach my $super(@_){
             Mouse::Util::load_class($super);
-            my $meta = Mouse::Util::get_metaclass_by_name($super);
 
-            next if not defined $meta;
+            my $meta = Mouse::Util::get_metaclass_by_name($super);
+            unless(defined $meta) {
+                # checks if $super is a foreign class (i.e. non-Mouse class)
+                my $mm = $super->can('meta');
+                if(!($mm && $mm == \&Mouse::Util::meta)) {
+                    if($super->can('new') or $super->can('DESTROY')) {
+                        $self->inherit_from_foreign_class($super);
+                    }
+                }
+                next;
+            }
 
             if(Mouse::Util::is_a_metarole($meta)){
                 $self->throw_error("You cannot inherit from a Mouse Role ($super)");
             }
 
+            # checks and fixes in metaclass compatiility
             next if $self->isa(ref $meta); # _superclass_meta_is_compatible
-
             $self->_reconcile_with_superclass_meta($meta);
         }
         @{ $self->{superclasses} } = @_;
@@ -73,6 +82,15 @@ sub superclasses {
 
     return @{ $self->{superclasses} };
 }
+
+sub inherit_from_foreign_class {
+    my($class, $super) = @_;
+    Carp::carp("You inherit from non-Mouse class ($super),"
+        . " but it is unlikely to work correctly."
+        . " Please concider to use MouseX::Foreign");
+    return;
+}
+
 my @MetaClassTypes = (
     'attribute',   # Mouse::Meta::Attribute
     'method',      # Mouse::Meta::Method
@@ -257,8 +275,8 @@ sub make_immutable {
                 ->_generate_destructor($self, \%args));
     }
 
-    # Moose's make_immutable returns true allowing calling code to skip setting an explicit true value
-    # at the end of a source file. 
+    # Moose's make_immutable returns true allowing calling code to skip
+    # setting an explicit true value at the end of a source file.
     return 1;
 }
 
@@ -427,7 +445,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.70
+This document describes Mouse version 0.71
 
 =head1 DESCRIPTION
 
