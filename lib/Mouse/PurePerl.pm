@@ -156,7 +156,7 @@ sub Str        {
 sub Ref        { ref($_[0]) }
 sub ScalarRef  {
     my($value) = @_;
-    return ref($value) eq 'SCALAR'
+    return ref($value) eq 'SCALAR' || ref($value) eq 'REF';
 }
 sub ArrayRef   { ref($_[0]) eq 'ARRAY'  }
 sub HashRef    { ref($_[0]) eq 'HASH'   }
@@ -294,7 +294,7 @@ sub new_object {
 
     my $object = bless {}, $meta->name;
 
-    $meta->_initialize_object($object, \%args);
+    $meta->_initialize_object($object, \%args, 0);
     # BUILDALL
     if( $object->can('BUILD') ) {
         for my $class (reverse $meta->linearized_isa) {
@@ -317,69 +317,18 @@ sub clone_object {
 
     my $cloned = bless { %$object }, ref $object;
     $class->_initialize_object($cloned, $args, 1);
-
     return $cloned;
 }
 
 sub _initialize_object{
     my($self, $object, $args, $is_cloning) = @_;
-
-    my @triggers_queue;
-
-    my $used = 0;
-
-    foreach my $attribute ($self->get_all_attributes) {
-        my $init_arg = $attribute->init_arg;
-        my $slot     = $attribute->name;
-
-        if (defined($init_arg) && exists($args->{$init_arg})) {
-            $object->{$slot} = $attribute->_coerce_and_verify($args->{$init_arg}, $object);
-
-            weaken($object->{$slot})
-                if ref($object->{$slot}) && $attribute->is_weak_ref;
-
-            if ($attribute->has_trigger) {
-                push @triggers_queue, [ $attribute->trigger, $object->{$slot} ];
-            }
-            $used++;
-        }
-        else { # no init arg
-            if ($attribute->has_default || $attribute->has_builder) {
-                if (!$attribute->is_lazy && !exists $object->{$slot}) {
-                    my $default = $attribute->default;
-                    my $builder = $attribute->builder;
-                    my $value =   $builder                ? $object->$builder()
-                                : ref($default) eq 'CODE' ? $object->$default()
-                                :                           $default;
-
-                    $object->{$slot} = $attribute->_coerce_and_verify($value, $object);
-
-                    weaken($object->{$slot})
-                        if ref($object->{$slot}) && $attribute->is_weak_ref;
-                }
-            }
-            elsif(!$is_cloning && $attribute->is_required) {
-                $self->throw_error("Attribute (".$attribute->name.") is required");
-            }
-        }
-    }
-
-    if($used < keys %{$args} && $self->strict_constructor) {
-        $self->_report_unknown_args([ $self->get_all_attributes ], $args);
-    }
-
-    if(@triggers_queue){
-        foreach my $trigger_and_value(@triggers_queue){
-            my($trigger, $value) = @{$trigger_and_value};
-            $trigger->($object, $value);
-        }
-    }
-
-    if($self->is_anon_class){
-        $object->{__METACLASS__} = $self;
-    }
-
-    return;
+    # The initializer, which is used everywhere, must be clear
+    # when an attribute is added. See Mouse::Meta::Class::add_attribute.
+    my $initializer = $self->{_initialize_object} ||= do {
+        Mouse::Util::load_class($self->constructor_class)
+            ->_generate_initialize_object($self);
+    };
+    goto &{$initializer};
 }
 
 sub is_immutable {  $_[0]->{is_immutable} }
@@ -729,13 +678,8 @@ sub BUILDARGS {
 
 sub new {
     my $class = shift;
-
-    $class->meta->throw_error('Cannot call new() on an instance') if ref $class;
-
-    my $args = $class->BUILDARGS(@_);
-
-    my $meta = Mouse::Meta::Class->initialize($class);
-    return $meta->new_object($args);
+    my $args  = $class->BUILDARGS(@_);
+    return $class->meta->new_object($args);
 }
 
 sub DESTROY {
@@ -743,9 +687,8 @@ sub DESTROY {
 
     return unless $self->can('DEMOLISH'); # short circuit
 
-    local $?;
-
     my $e = do{
+        local $?;
         local $@;
         eval{
             # DEMOLISHALL
@@ -796,7 +739,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.71
+This document describes Mouse version 0.72
 
 =head1 SEE ALSO
 

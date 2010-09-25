@@ -4,6 +4,25 @@ use Mouse::Meta::Role;
 use Mouse::Meta::Role::Application;
 our @ISA = qw(Mouse::Meta::Role);
 
+# FIXME: Mouse::Meta::Role::Composite does things in different way from Moose's
+# Moose: creates a new class for the consumer, and applies roles to it.
+# Mouse: creates a coposite role and apply roles to the role,
+#        and then applies it to the consumer.
+
+sub new {
+    my $class = shift;
+    my $args  = $class->Mouse::Object::BUILDARGS(@_);
+    my $roles = delete $args->{roles};
+    my $self  = $class->create_anon_role(%{$args});
+    foreach my $role_spec(@{$roles}) {
+        my($role, $args) = ref($role_spec) eq 'ARRAY'
+            ? @{$role_spec}
+            : ($role_spec, {});
+        $role->apply($self, %{$args});
+    }
+    return $self;
+}
+
 sub get_method_list {
     my($self) = @_;
     return keys %{ $self->{methods} };
@@ -137,7 +156,7 @@ Mouse::Meta::Role::Composite - An object to represent the set of roles
 
 =head1 VERSION
 
-This document describes Mouse version 0.71
+This document describes Mouse version 0.72
 
 =head1 SEE ALSO
 
