@@ -48,7 +48,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '0.74';
+    our $VERSION = '0.75';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -334,7 +334,7 @@ sub quoted_english_list {
 sub not_supported{
     my($feature) = @_;
 
-    $feature ||= ( caller(1) )[3]; # subroutine name
+    $feature ||= ( caller(1) )[3] . '()'; # subroutine name
 
     local $Carp::CarpLevel = $Carp::CarpLevel + 1;
     Carp::confess("Mouse does not currently support $feature");
@@ -388,7 +388,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 SYNOPSIS
 

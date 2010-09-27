@@ -134,7 +134,7 @@ sub generate_can_predicate_for {
 
 package Mouse::Util::TypeConstraints;
 
-use Scalar::Util qw(blessed looks_like_number openhandle);
+use Scalar::Util ();
 
 sub Any        { 1 }
 sub Item       { 1 }
@@ -143,14 +143,17 @@ sub Bool       { $_[0] ? $_[0] eq '1' : 1 }
 sub Undef      { !defined($_[0]) }
 sub Defined    {  defined($_[0])  }
 sub Value      {  defined($_[0]) && !ref($_[0]) }
-sub Num        {  looks_like_number($_[0]) }
-sub Int        {
-    my($value) = @_;
-    looks_like_number($value) && $value =~ /\A [+-]? [0-9]+  \z/xms;
-}
+sub Num        {  Scalar::Util::looks_like_number($_[0]) }
 sub Str        {
+    # We need to use a copy here to flatten MAGICs, for instance as in
+    # Str( substr($_, 0, 42) ).
     my($value) = @_;
     return defined($value) && ref(\$value) eq 'SCALAR';
+}
+sub Int        {
+    # We need to use a copy here to save the original internal SV flags.
+    my($value) = @_;
+    return defined($value) && $value =~ /\A -? [0-9]+  \z/xms;
 }
 
 sub Ref        { ref($_[0]) }
@@ -165,10 +168,12 @@ sub RegexpRef  { ref($_[0]) eq 'Regexp' }
 sub GlobRef    { ref($_[0]) eq 'GLOB'   }
 
 sub FileHandle {
-    return openhandle($_[0])  || (blessed($_[0]) && $_[0]->isa("IO::Handle"))
+    my($value) = @_;
+    return Scalar::Util::openhandle($value)
+        || (Scalar::Util::blessed($value) && $value->isa("IO::Handle"))
 }
 
-sub Object     { blessed($_[0]) && blessed($_[0]) ne 'Regexp' }
+sub Object     { Scalar::Util::blessed($_[0]) && ref($_[0]) ne 'Regexp' }
 
 sub ClassName  { Mouse::Util::is_class_loaded($_[0]) }
 sub RoleName   { (Mouse::Util::class_of($_[0]) || return 0)->isa('Mouse::Meta::Role') }
@@ -282,12 +287,6 @@ sub roles { $_[0]->{roles} }
 
 sub linearized_isa { @{ Mouse::Util::get_linear_isa($_[0]->{package}) } }
 
-sub get_all_attributes {
-    my($self) = @_;
-    my %attrs = map { %{ $self->initialize($_)->{attributes} } } reverse $self->linearized_isa;
-    return values %attrs;
-}
-
 sub new_object {
     my $meta = shift;
     my %args = (@_ == 1 ? %{$_[0]} : @_);
@@ -312,7 +311,7 @@ sub clone_object {
     my $object = shift;
     my $args   = $object->Mouse::Object::BUILDARGS(@_);
 
-    (blessed($object) && $object->isa($class->name))
+    (Scalar::Util::blessed($object) && $object->isa($class->name))
         || $class->throw_error("You must pass an instance of the metaclass (" . $class->name . "), not ($object)");
 
     my $cloned = bless { %$object }, ref $object;
@@ -324,11 +323,16 @@ sub _initialize_object{
     my($self, $object, $args, $is_cloning) = @_;
     # The initializer, which is used everywhere, must be clear
     # when an attribute is added. See Mouse::Meta::Class::add_attribute.
-    my $initializer = $self->{_initialize_object} ||= do {
+    my $initializer = $self->{_mouse_cache}{_initialize_object} ||=
         Mouse::Util::load_class($self->constructor_class)
             ->_generate_initialize_object($self);
-    };
     goto &{$initializer};
+}
+
+sub get_all_attributes {
+    my($self) = @_;
+    return @{ $self->{_mouse_cache}{all_attributes}
+        ||= $self->_calculate_all_attributes };
 }
 
 sub is_immutable {  $_[0]->{is_immutable} }
@@ -600,6 +604,8 @@ sub name    { $_[0]->{name}    }
 sub parent  { $_[0]->{parent}  }
 sub message { $_[0]->{message} }
 
+sub _identity  { Scalar::Util::refaddr($_[0]) } # overload 0+
+
 sub type_parameter           { $_[0]->{type_parameter} }
 sub _compiled_type_constraint{ $_[0]->{compiled_type_constraint} }
 sub _compiled_type_coercion  { $_[0]->{_compiled_type_coercion}  }
@@ -739,7 +745,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 SEE ALSO
 

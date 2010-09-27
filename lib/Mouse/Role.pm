@@ -1,13 +1,11 @@
 package Mouse::Role;
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.74';
+our $VERSION = '0.75';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
 
-use Mouse::Util  qw(not_supported);
-use Mouse::Meta::Role;
 use Mouse ();
 
 Mouse::Exporter->setup_import_methods(
@@ -104,7 +102,7 @@ sub requires {
 }
 
 sub excludes {
-    not_supported;
+    Mouse::Util::not_supported();
 }
 
 sub init_meta{
@@ -139,7 +137,7 @@ Mouse::Role - The Mouse Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 SYNOPSIS
 

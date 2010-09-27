@@ -1,7 +1,7 @@
 package Mouse::Meta::Class;
 use Mouse::Util qw/:meta/; # enables strict and warnings
 
-use Scalar::Util qw/blessed weaken/;
+use Scalar::Util ();
 
 use Mouse::Meta::Module;
 our @ISA = qw(Mouse::Meta::Module);
@@ -87,7 +87,7 @@ sub inherit_from_foreign_class {
     my($class, $super) = @_;
     Carp::carp("You inherit from non-Mouse class ($super),"
         . " but it is unlikely to work correctly."
-        . " Please concider to use MouseX::Foreign");
+        . " Please consider using MouseX::Foreign");
     return;
 }
 
@@ -154,7 +154,7 @@ sub _collect_roles {
 }
 
 
-sub find_method_by_name{
+sub find_method_by_name {
     my($self, $method_name) = @_;
     defined($method_name)
         or $self->throw_error('You must define a method name to find');
@@ -179,14 +179,14 @@ sub get_all_method_names {
             $self->linearized_isa;
 }
 
-sub find_attribute_by_name{
+sub find_attribute_by_name {
     my($self, $name) = @_;
-    my $attr;
-    foreach my $class($self->linearized_isa){
-        my $meta = Mouse::Util::get_metaclass_by_name($class) or next;
-        $attr = $meta->get_attribute($name) and last;
+    defined($name)
+        or $self->throw_error('You must define an attribute name to find');
+    foreach my $attr($self->get_all_attributes) {
+        return $attr if $attr->name eq $name;
     }
-    return $attr;
+    return undef;
 }
 
 sub add_attribute {
@@ -194,7 +194,7 @@ sub add_attribute {
 
     my($attr, $name);
 
-    if(blessed $_[0]){
+    if(Scalar::Util::blessed($_[0])){
         $attr = $_[0];
 
         $attr->isa('Mouse::Meta::Attribute')
@@ -225,26 +225,36 @@ sub add_attribute {
         }
     }
 
-    weaken( $attr->{associated_class} = $self );
+    Scalar::Util::weaken( $attr->{associated_class} = $self );
 
     # install accessors first
     $attr->install_accessors();
 
     # then register the attribute to the metaclass
-    $attr->{insertion_order} = keys %{ $self->{attributes} };
-    $self->{attributes}{$attr->name} = $attr;
+    $attr->{insertion_order}   = keys %{ $self->{attributes} };
+    $self->{attributes}{$name} = $attr;
+    delete $self->{_mouse_cache}; # clears internal cache
 
     if(!$attr->{associated_methods} && ($attr->{is} || '') ne 'bare'){
         Carp::carp(qq{Attribute ($name) of class }.$self->name
             .qq{ has no associated methods (did you mean to provide an "is" argument?)});
     }
-
-    if(!Mouse::Util::MOUSE_XS) {
-        # in Mouse::PurePerl, attribute initialization code is cached, so it
-        # must be clear here. See _initialize_object() in Mouse::PurePerl.
-        delete $self->{_initialize_object};
-    }
     return $attr;
+}
+
+sub _calculate_all_attributes {
+    my($self) = @_;
+    my %seen;
+    my @all_attrs;
+    foreach my $class($self->linearized_isa) {
+        my $meta  = Mouse::Util::get_metaclass_by_name($class) or next;
+        my @attrs = grep { !$seen{$_->name}++ } values %{$meta->{attributes}};
+        @attrs = sort {
+                $b->{insertion_order} <=> $a->{insertion_order}
+            } @attrs;
+        push @all_attrs, @attrs;
+    }
+    return [reverse @all_attrs];
 }
 
 sub linearized_isa;
@@ -451,7 +461,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 DESCRIPTION
 

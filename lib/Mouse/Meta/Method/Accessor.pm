@@ -97,7 +97,6 @@ sub _generate_accessor_any{
         }
         elsif(defined $constraint){
             $accessor .= "my \$tmp = $value;\n";
-
             $accessor .= "\$compiled_type_constraint->(\$tmp)";
             $accessor .= " || \$attribute->_throw_type_constraint_error(\$tmp, \$constraint);\n";
             $accessor .= "$slot = \$tmp;\n";
@@ -184,7 +183,7 @@ Mouse::Meta::Method::Accessor - A Mouse method generator for accessors
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 SEE ALSO
 

@@ -15,9 +15,8 @@ sub _generate_constructor {
 
     my $buildall      = $class->_generate_BUILDALL($metaclass);
     my $buildargs     = $class->_generate_BUILDARGS($metaclass);
-    my $initializer   = $metaclass->{_initialize_object} ||= do {
+    my $initializer   = $metaclass->{_mouse_cache}{_initialize_object} ||=
        $class->_generate_initialize_object($metaclass);
-    };
     my $source = sprintf(<<'EOT', __FILE__, $metaclass->name, $buildargs, $buildall);
 #line 1 "%s"
         package %s;
@@ -233,7 +232,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 SEE ALSO
 

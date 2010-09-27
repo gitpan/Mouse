@@ -1,6 +1,5 @@
 package Mouse::Meta::TypeConstraint;
 use Mouse::Util qw(:meta); # enables strict and warnings
-use Scalar::Util ();
 
 sub new {
     my $class = shift;
@@ -8,7 +7,7 @@ sub new {
 
     $args{name} = '__ANON__' if !defined $args{name};
 
-    if($args{parent}) {
+    if(defined $args{parent}) {
         %args = (%{$args{parent}}, %args);
         # a child type must not inherit 'compiled_type_constraint'
         # and 'hand_optimized_type_constraint' from the parent
@@ -72,6 +71,11 @@ sub compile_type_constraint;
 sub _add_type_coercions { # ($self, @pairs)
     my $self = shift;
 
+    if(exists $self->{type_constraints}){ # union type
+        $self->throw_error(
+            "Cannot add additional type coercions to Union types '$self'");
+    }
+
     my $coercions = ($self->{coercion_map} ||= []);
     my %has       = map{ $_->[0] => undef } @{$coercions};
 
@@ -90,14 +94,7 @@ sub _add_type_coercions { # ($self, @pairs)
         push @{$coercions}, [ $type => $action ];
     }
 
-    # compile
-    if(exists $self->{type_constraints}){ # union type
-        $self->throw_error(
-            "Cannot add additional type coercions to Union types");
-    }
-    else{
-        $self->_compile_type_coercion();
-    }
+    $self->_compile_type_coercion();
     return;
 }
 
@@ -144,14 +141,10 @@ sub _compile_union_type_coercion {
 
 sub coerce {
     my $self = shift;
-
-    my $coercion = $self->_compiled_type_coercion;
-    if(!$coercion){
-        $self->throw_error("Cannot coerce without a type coercion");
-    }
-
     return $_[0] if $self->check(@_);
 
+    my $coercion = $self->{_compiled_type_coercion}
+        or $self->throw_error("Cannot coerce without a type coercion");
     return  $coercion->(@_);
 }
 
@@ -172,7 +165,7 @@ sub get_message {
     }
 }
 
-sub is_a_type_of{
+sub is_a_type_of {
     my($self, $other) = @_;
 
     # ->is_a_type_of('__ANON__') is always false
@@ -222,7 +215,7 @@ sub assert_valid {
 }
 
 sub _as_string { $_[0]->name                  } # overload ""
-sub _identity  { Scalar::Util::refaddr($_[0]) } # overload 0+
+sub _identity;                                  # overload 0+
 
 sub _unite { # overload infix:<|>
     my($lhs, $rhs) = @_;
@@ -241,7 +234,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.74
+This document describes Mouse version 0.75
 
 =head1 DESCRIPTION
 
