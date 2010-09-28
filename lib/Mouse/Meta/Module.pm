@@ -232,7 +232,7 @@ sub create {
 
     my $meta = $self->initialize( $package_name, %options);
 
-    Scalar::Util::weaken $METAS{$package_name}
+    Scalar::Util::weaken($METAS{$package_name})
         if $mortal;
 
     $meta->add_method(meta => sub {
@@ -319,7 +319,7 @@ Mouse::Meta::Module - The common base class of Mouse::Meta::Class and Mouse::Met
 
 =head1 VERSION
 
-This document describes Mouse version 0.75
+This document describes Mouse version 0.76
 
 =head1 DESCRIPTION
 
