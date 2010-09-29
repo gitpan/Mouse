@@ -315,6 +315,11 @@ t/300_immutable/101-immutable-default.t
 t/400_mouse_util/001_moose_util.t
 t/400_mouse_util/002_moose_util_does_role.t
 t/400_mouse_util/007_apply_roles.t
+t/500_test_moose/001_test_moose.t
+t/500_test_moose/002_test_moose_does_ok.t
+t/500_test_moose/003_test_moose_has_attribute_ok.t
+t/500_test_moose/004_test_moose_meta_ok.t
+t/500_test_moose/005_with_immutable.t
 t/800_with_external/001-pod-coverage-moose.t
 t/800_with_external/002-externals.t
 t/800_with_external/lib/Foo.pm

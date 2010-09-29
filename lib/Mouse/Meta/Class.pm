@@ -56,31 +56,39 @@ sub superclasses {
     if (@_) {
         foreach my $super(@_){
             Mouse::Util::load_class($super);
-
             my $meta = Mouse::Util::get_metaclass_by_name($super);
-            unless(defined $meta) {
-                # checks if $super is a foreign class (i.e. non-Mouse class)
-                my $mm = $super->can('meta');
-                if(!($mm && $mm == \&Mouse::Util::meta)) {
-                    if($super->can('new') or $super->can('DESTROY')) {
-                        $self->inherit_from_foreign_class($super);
-                    }
-                }
-                next;
-            }
-
-            if(Mouse::Util::is_a_metarole($meta)){
-                $self->throw_error("You cannot inherit from a Mouse Role ($super)");
-            }
-
-            # checks and fixes in metaclass compatiility
-            next if $self->isa(ref $meta); # _superclass_meta_is_compatible
+            next if $self->verify_superclass($super, $meta);
             $self->_reconcile_with_superclass_meta($meta);
         }
-        @{ $self->{superclasses} } = @_;
+        return @{ $self->{superclasses} } = @_;
     }
 
     return @{ $self->{superclasses} };
+}
+
+sub verify_superclass {
+    my($self, $super, $super_meta) = @_;
+
+    if(defined $super_meta) {
+        if(Mouse::Util::is_a_metarole($super_meta)){
+            $self->throw_error("You cannot inherit from a Mouse Role ($super)");
+        }
+    }
+    else {
+        # The metaclass of $super is not initialized.
+        # i.e. it might be Mouse::Object, a mixin package (e.g. Exporter),
+        # or a foreign class including Moose classes.
+        # See also Mouse::Foreign::Meta::Role::Class.
+        my $mm = $super->can('meta');
+        if(!($mm && $mm == \&Mouse::Util::meta)) {
+            if($super->can('new') or $super->can('DESTROY')) {
+                $self->inherit_from_foreign_class($super);
+            }
+        }
+        return 1; # always ok
+    }
+
+    return $self->isa(ref $super_meta); # checks metaclass compatibility
 }
 
 sub inherit_from_foreign_class {
@@ -405,8 +413,7 @@ sub add_override_method_modifier {
         local $Mouse::SUPER_PACKAGE = $package;
         local $Mouse::SUPER_BODY    = $super_body;
         local @Mouse::SUPER_ARGS    = @_;
-
-        $code->(@_);
+        &{$code};
     });
     return;
 }
@@ -423,10 +430,10 @@ sub add_augment_method_modifier {
     my $super_package = $super->package_name;
     my $super_body    = $super->body;
 
-    $self->add_method($name => sub{
+    $self->add_method($name => sub {
         local $Mouse::INNER_BODY{$super_package} = $code;
         local $Mouse::INNER_ARGS{$super_package} = [@_];
-        $super_body->(@_);
+        &{$super_body};
     });
     return;
 }
@@ -461,7 +468,7 @@ Mouse::Meta::Class - The Mouse class metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.76
+This document describes Mouse version 0.77
 
 =head1 DESCRIPTION
 

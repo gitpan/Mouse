@@ -5,10 +5,10 @@ use strict;
 use warnings;
 use warnings FATAL => 'redefine'; # to avoid to load Mouse::PurePerl twice
 
+use Scalar::Util ();
 use B ();
 
 require Mouse::Util;
-
 
 # taken from Class/MOP.pm
 sub is_valid_class_name {
@@ -134,12 +134,11 @@ sub generate_can_predicate_for {
 
 package Mouse::Util::TypeConstraints;
 
-use Scalar::Util ();
 
 sub Any        { 1 }
 sub Item       { 1 }
 
-sub Bool       { $_[0] ? $_[0] eq '1' : 1 }
+sub Bool       { !$_[0] || $_[0] eq '1' }
 sub Undef      { !defined($_[0]) }
 sub Defined    {  defined($_[0])  }
 sub Value      {  defined($_[0]) && !ref($_[0]) }
@@ -534,7 +533,7 @@ sub _process_options{
         if(defined $tc){ # both isa and does supplied
             my $does_ok = do{
                 local $@;
-                eval{ "$tc"->does($args) };
+                eval{ "$tc"->does($args->{does}) };
             };
             if(!$does_ok){
                 $class->throw_error("Cannot have both an isa option and a does option because '$tc' does not do '$args->{does}' on attribute ($name)");
@@ -745,7 +744,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.76
+This document describes Mouse version 0.77
 
 =head1 SEE ALSO
 
