@@ -337,6 +337,7 @@ t/900_mouse_bugs/007_RT56523.t
 t/900_mouse_bugs/008_RT56837.t
 t/900_mouse_bugs/009_RT57144.t
 t/900_mouse_bugs/010_use_mouse_before_tb2.t
+t/900_mouse_bugs/011_RT61852.t
 t/990_deprecated/001-export_to_level.t
 t/lib/Bar.pm
 t/lib/Bar7/Meta/Trait.pm

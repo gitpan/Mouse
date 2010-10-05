@@ -3,7 +3,7 @@ package Module::Install::XSUtil;
 
 use 5.005_03;
 
-$VERSION = '0.34';
+$VERSION = '0.35';
 
 use Module::Install::Base;
 @ISA     = qw(Module::Install::Base);
@@ -219,6 +219,8 @@ sub c99_available {
     my $tmpfile = File::Temp->new(SUFFIX => '.c');
 
     $tmpfile->print(<<'C99');
+// include a C99 header
+#include <stdbool.h>
 inline // a C99 keyword with C99 style comments
 int test_c99() {
     int i = 0;
@@ -767,4 +769,4 @@ sub const_cccmd {
 1;
 __END__
 
-#line 978
+#line 980

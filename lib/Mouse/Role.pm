@@ -1,7 +1,7 @@
 package Mouse::Role;
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.77';
+our $VERSION = '0.78';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -137,12 +137,34 @@ Mouse::Role - The Mouse Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.77
+This document describes Mouse version 0.78
 
 =head1 SYNOPSIS
 
-    package MyRole;
-    use Mouse::Role;
+    package Comparable;
+    use Mouse::Role; # the package is now a Mouse role
+
+    # Declare methods that are required by this role
+    requires qw(compare);
+
+    # Define methods this role provides
+    sub equals {
+        my($self, $other) = @_;
+        return $self->compare($other) == 0;
+    }
+
+    # and later
+    package MyObject;
+    use Mouse;
+    with qw(Comparable); # Now MyObject can equals()
+
+    sub compare {
+        # ...
+    }
+
+    my $foo = MyObject->new();
+    my $bar = MyObject->new();
+    $obj->equals($bar); # yes, it is comparable
 
 =head1 KEYWORDS
 
