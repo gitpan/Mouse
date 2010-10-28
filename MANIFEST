@@ -139,6 +139,7 @@ t/001_mouse/066-magic.t
 t/001_mouse/067-traits.t
 t/001_mouse/068-strict-constructor.t
 t/001_mouse/069-add-modifier.t
+t/001_mouse/070-inherit-role-attr.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t

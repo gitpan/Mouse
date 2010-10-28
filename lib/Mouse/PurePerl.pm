@@ -339,6 +339,12 @@ sub is_immutable {  $_[0]->{is_immutable} }
 sub strict_constructor;
 *strict_constructor = $generate_class_accessor->('strict_constructor');
 
+sub _invalidate_metaclass_cache {
+    my($self) = @_;
+    delete $self->{_mouse_cache};
+    return;
+}
+
 sub _report_unknown_args {
     my($metaclass, $attrs, $args) = @_;
 
@@ -744,7 +750,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.80
+This document describes Mouse version 0.81
 
 =head1 SEE ALSO
 
