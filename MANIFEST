@@ -247,6 +247,7 @@ t/040_type_constraints/009_union_types_and_coercions.t
 t/040_type_constraints/010_misc_type_tests.t
 t/040_type_constraints/011_container_type_constraint.t
 t/040_type_constraints/015_enum.t
+t/040_type_constraints/016_subtyping_parameterized_types.t
 t/040_type_constraints/017_subtyping_union_types.t
 t/040_type_constraints/018_custom_parameterized_types.t
 t/040_type_constraints/022_custom_type_errors.t

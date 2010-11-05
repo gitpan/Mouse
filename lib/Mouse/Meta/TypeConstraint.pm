@@ -7,31 +7,54 @@ sub new {
 
     $args{name} = '__ANON__' if !defined $args{name};
 
-    if(defined $args{parent}) {
+    my $type_parameter;
+    if(defined $args{parent}) { # subtyping
         %args = (%{$args{parent}}, %args);
+
         # a child type must not inherit 'compiled_type_constraint'
         # and 'hand_optimized_type_constraint' from the parent
-        delete $args{compiled_type_constraint};
-        delete $args{hand_optimized_type_constraint};
+        delete $args{compiled_type_constraint};       # don't inherit it
+        delete $args{hand_optimized_type_constraint}; # don't inherit it
+
+        $type_parameter = $args{type_parameter};
         if(defined(my $parent_tp = $args{parent}{type_parameter})) {
-            delete $args{type_parameter} if $parent_tp == $args{type_parameter};
+            if($parent_tp != $type_parameter) {
+                $type_parameter->is_a_type_of($parent_tp)
+                    or $class->throw_error(
+                        "$type_parameter is not a subtype of $parent_tp",
+                    );
+            }
+            else {
+                $type_parameter = undef;
+            }
         }
     }
 
     my $check;
 
-    if($check = delete $args{optimized}) {
+    if($check = delete $args{optimized}) { # likely to be builtins
         $args{hand_optimized_type_constraint} = $check;
         $args{compiled_type_constraint}       = $check;
     }
-    elsif(my $param = $args{type_parameter}) {
+    elsif(defined $type_parameter) { # parameterizing
         my $generator = $args{constraint_generator}
-            || $class->throw_error("The $args{name} constraint cannot be used,"
-                . " because $param doesn't subtype from a parameterizable type");
-        # it must be 'constraint'
-        $check = $args{constraint} = $generator->($param);
+            || $class->throw_error(
+                  "The $args{name} constraint cannot be used,"
+                . " because $type_parameter doesn't subtype"
+                . " from a parameterizable type");
+
+        my $parameterized_check = $generator->($type_parameter);
+        if(defined(my $my_check = $args{constraint})) {
+            $check = sub {
+                return $parameterized_check->($_) && $my_check->($_);
+            };
+        }
+        else {
+            $check = $parameterized_check;
+        }
+        $args{constraint} = $check;
     }
-    else {
+    else { # common cases
         $check = $args{constraint};
     }
 
@@ -237,7 +260,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.81
+This document describes Mouse version 0.82
 
 =head1 DESCRIPTION
 
@@ -262,7 +285,7 @@ constraints
 
 =item C<< $constraint->message >>
 
-=item C<< $constraint->is_a_subtype_of($name or $object) >>
+=item C<< $constraint->is_a_type_of($name or $object) >>
 
 =item C<< $constraint->coerce($value) >>
 
