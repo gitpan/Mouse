@@ -240,8 +240,10 @@ sub assert_valid {
     return 1;
 }
 
-sub _as_string { $_[0]->name                  } # overload ""
-sub _identity;                                  # overload 0+
+# overloading stuff
+
+sub _as_string { $_[0]->name } # overload ""
+sub _identity;                 # overload 0+
 
 sub _unite { # overload infix:<|>
     my($lhs, $rhs) = @_;
@@ -260,7 +262,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.82
+This document describes Mouse version 0.83
 
 =head1 DESCRIPTION
 

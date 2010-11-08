@@ -1,7 +1,7 @@
 package Mouse::Meta::Method::Constructor;
 use Mouse::Util qw(:meta); # enables strict and warnings
 
-use constant _MOUSE_DEBUG => !!$ENV{MOUSE_DEBUG};
+use constant _MOUSE_DEBUG => $ENV{MOUSE_DEBUG} ? 1 : 0;
 
 sub _inline_slot{
     my(undef, $self_var, $attr_name) = @_;
@@ -232,7 +232,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.82
+This document describes Mouse version 0.83
 
 =head1 SEE ALSO
 

@@ -186,7 +186,7 @@ sub subtype {
 sub coerce { # coerce $type, from $from, via { ... }, ...
     my $type_name = shift;
     my $type = find_type_constraint($type_name)
-        or Carp::croak("Cannot find type '$type_name', perhaps you forgot to load it.");
+        or Carp::croak("Cannot find type '$type_name', perhaps you forgot to load it");
 
     $type->_add_type_coercions(@_);
     return;
@@ -383,39 +383,43 @@ sub register_type_constraint {
     my($constraint) = @_;
     Carp::croak("No type supplied / type is not a valid type constraint")
         unless Mouse::Util::is_a_type_constraint($constraint);
-    my $name = $constraint->name;
-    Carp::croak("Can't register an unnamed type constraint")
-        unless defined $name;
-    return $TYPE{$name} = $constraint;
+    return $TYPE{$constraint->name} = $constraint;
 }
 
 sub find_or_parse_type_constraint {
     my($spec) = @_;
     return $spec if Mouse::Util::is_a_type_constraint($spec) or not defined $spec;
 
-    $spec =~ s/\s+//g;
-    return $TYPE{$spec} || do{
-        my $context = {
-            spec => $spec,
-            orig => $spec,
-        };
-        my $type = _parse_type($context);
+    $spec =~ tr/ \t\r\n//d;
 
-        if($context->{spec}){
-            Carp::croak("Syntax error: extra elements '$context->{spec}' in '$context->{orig}'");
-        }
-        $type;
-    };
+    my $tc = $TYPE{$spec};
+    if(defined $tc) {
+        return $tc;
+    }
+
+    my %context = (
+        spec => $spec,
+        orig => $spec,
+    );
+    $tc = _parse_type(\%context);
+
+    if($context{spec}){
+        Carp::croak("Syntax error: extra elements '$context{spec}' in '$context{orig}'");
+    }
+
+    return $TYPE{$spec} = $tc;
 }
 
 sub find_or_create_does_type_constraint{
     # XXX: Moose does not register a new role_type, but Mouse does.
-    return find_or_parse_type_constraint(@_) || role_type(@_);
+    my $tc = find_or_parse_type_constraint(@_);
+    return defined($tc) ? $tc : role_type(@_);
 }
 
 sub find_or_create_isa_type_constraint {
     # XXX: Moose does not register a new class_type, but Mouse does.
-    return find_or_parse_type_constraint(@_) || class_type(@_);
+    my $tc = find_or_parse_type_constraint(@_);
+    return defined($tc) ? $tc : class_type(@_);
 }
 
 1;
@@ -427,7 +431,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.82
+This document describes Mouse version 0.83
 
 =head2 SYNOPSIS
 
