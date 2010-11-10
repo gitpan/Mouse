@@ -16,6 +16,7 @@ license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
+module_name: Mouse
 name: Mouse
 no_index:
   directory:
@@ -30,4 +31,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Mouse.git
-version: 0.83
+version: 0.84

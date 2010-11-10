@@ -9,22 +9,36 @@ BEGIN{
 
 use strict;
 use warnings;
-use inc::Module::Install 1.00;
+BEGIN {
+	# author requires, or bundled modules
+    my @devmods = qw(
+        inc::Module::Install             1.00
+        Module::Install::TestTarget      0.13
+        Module::Install::AuthorTests     0.002
+        Module::Install::XSUtil          0.36
+		Test::Exception::LessClever      0.005
+		Test::Requires                   0.06
+    );
+    my @not_available;
+	while(my($mod, $ver) = splice @devmods, 0, 2) {
+        eval qq{use $mod $ver (); 1} or push @not_available, $mod;
+    }
+    if(@not_available) {
+        print qq{# The following modules are not available.\n};
+        print qq{# `perl $0 | cpanm` will install them:\n};
+        print $_, "\n" for @not_available;
+		exit 1;
+     }
+}
+use inc::Module::Install;
 
-# for co-developpers
-use Module::Install::XSUtil 0.30;
-use Module::Install::AuthorTests;
-
-name     'Mouse';
 all_from 'lib/Mouse.pm';
 
 # Scalar::Util < 1.14 has a bug.
 # > Fixed looks_like_number(undef) to return false for perl >= 5.009002
 requires 'Scalar::Util' => 1.14;
 
-test_requires 'Test::More'                  => 0.88;
-test_requires 'Test::Requires'              => 0.06; # works on 5.6.0
-test_requires 'Test::Exception::LessClever' => 0.005;
+test_requires 'Test::More' => 0.88;
 
 # to keep zero-dependencies
 include 'Test::Exception::LessClever';
@@ -68,20 +82,13 @@ if($use_xs){
     use_xshelper();
     cc_warnings();
     cc_src_paths('xs-src');
-}
     if($use_xs){
-        # repeat testing
-        # see also ExtUtils::MM_Any::test_via_harness()
-        my $t_pp =  q{$(FULLPERLRUN) -MExtUtils::Command::MM -e}
-                   .q{ "do 'tool/force-pp.pl'; test_harness($(TEST_VERBOSE), 'inc', '$(INST_LIB)', '$(INST_ARCHLIB)')"}
-                   .q{ $(TEST_FILES)} . "\n";
-
-        postamble qq{test_pp :: pure_all\n}
-                . qq{\t} . $t_pp;
-        if($Module::Install::AUTHOR) {
-            postamble qq{test :: test_pp };
-        }
+		test_target test_pp => (
+			env => { PERL_ONLY => 1 },
+			($Module::Install::AUTHOR ? (alias => 'test') : ()),
+		);
     }
+}
 else{
     print "Mouse configured with Pure Perl.\n";
 }
@@ -105,15 +112,10 @@ if ($Module::Install::AUTHOR) {
             && eval { require Moose; Moose->VERSION($require_version) }) {
         print "You have Moose ", Moose->VERSION, ".\n";
         do 'tool/create-moose-compatibility-tests.pl';
-        # repeat testing
-        # see also ExtUtils::MM_Any::test_via_harness()
-        my $t_moose =  q{$(FULLPERLRUN) -MExtUtils::Command::MM -e}
-                      .q{ "test_harness($(TEST_VERBOSE), 'inc', '$(INST_LIB)', '$(INST_ARCHLIB)')"}
-                      .q{ xt/compat/t/*/*.t } . "\n";
-
-        postamble qq{test :: test_moose\n\n}
-                . qq{test_moose :: pure_all\n}
-                . qq{\t} . $t_moose;
+        test_target test_moose => (
+            tests => ['xt/compat/t/*/*.t'],
+            alias => 'test',
+        );
     } else {
         print "You don't have Moose $require_version. skipping moose compatibility test\n";
     }

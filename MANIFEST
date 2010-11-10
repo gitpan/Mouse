@@ -22,6 +22,7 @@ inc/Module/Install/Can.pm
 inc/Module/Install/Include.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
+inc/Module/Install/TestTarget.pm
 inc/Module/Install/WriteAll.pm
 inc/Module/Install/XSUtil.pm
 inc/Test/Exception.pm
@@ -365,7 +366,6 @@ t/lib/Role/Parent.pm
 t/lib/SyntaxError.pm
 t/lib/Unsweetened.pm
 tool/create-moose-compatibility-tests.pl
-tool/force-pp.pl
 tool/generate-mouse-tiny.pl
 xs-src/Mouse.xs
 xs-src/MouseAccessor.xs
