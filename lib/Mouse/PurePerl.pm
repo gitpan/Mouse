@@ -589,7 +589,7 @@ sub _process_options{
 
     if ($args->{lazy}) {
         (exists $args->{default} || defined $args->{builder})
-            || $class->throw_error("You cannot have lazy attribute ($name) without specifying a default value for it");
+            || $class->throw_error("You cannot have a lazy attribute ($name) without specifying a default value for it");
     }
 
     return;
@@ -750,7 +750,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 0.84
+This document describes Mouse version 0.85
 
 =head1 SEE ALSO
 
