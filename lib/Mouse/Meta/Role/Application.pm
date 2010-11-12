@@ -56,7 +56,10 @@ sub apply {
         $consumer = (Mouse::Util::class_of($instance) || 'Mouse::Meta::Class')
             ->create_anon_class(
                 superclasses => [ref $instance],
+                roles        => [$role],
                 cache        => 1,
+
+                in_application_to_instance => 1, # suppress to apply roles
             );
     }
 
@@ -206,7 +209,7 @@ Mouse::Meta::Role::Application - The Mouse role application class
 
 =head1 VERSION
 
-This document describes Mouse version 0.85
+This document describes Mouse version 0.86
 
 =head1 SEE ALSO
 

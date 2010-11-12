@@ -214,6 +214,7 @@ sub create {
         $package_name = $class . '::__ANON__::' . $ANON_SERIAL;
     }
 
+
     # instantiate a module
     {
         no strict 'refs';
@@ -257,7 +258,7 @@ sub create {
             $meta->add_method($method_name, $method_body);
         }
     }
-    if (defined $roles){
+    if (defined $roles and !$options{in_application_to_instance}){
         Mouse::Util::apply_all_roles($package_name, @{$roles});
     }
 
@@ -310,7 +311,7 @@ Mouse::Meta::Module - The common base class of Mouse::Meta::Class and Mouse::Met
 
 =head1 VERSION
 
-This document describes Mouse version 0.85
+This document describes Mouse version 0.86
 
 =head1 DESCRIPTION
 
