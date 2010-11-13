@@ -99,6 +99,8 @@ tests 't/*.t t/*/*.t';
 author_tests 'xt';
 
 repository 'git://git.moose.perl.org/Mouse.git';
+# or web interface:
+# http://git.shadowcat.co.uk/gitweb/gitweb.cgi?p=gitmo/Mouse.git;a=summary
 
 system($^X, 'tool/generate-mouse-tiny.pl', 'lib/Mouse/Tiny.pm') == 0
     or warn "Cannot generate Mouse::Tiny: $!";
@@ -141,6 +143,7 @@ EOT
 
 clean_files q{
     lib/Mouse/Tiny.pm $(O_FILES) test-mydeps-*.log
+    xshelper.h
     *.out
     cover_db xs-src/*.gc{v,no,da}
 };

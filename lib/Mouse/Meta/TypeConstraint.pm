@@ -67,9 +67,16 @@ sub new {
     $self->compile_type_constraint()
         if !$args{hand_optimized_type_constraint};
 
-    if($args{type_constraints}) {
-        $self->_compile_union_type_coercion();
+    if($args{type_constraints}) { # union types
+        foreach my $type(@{$self->{type_constraints}}){
+            if($type->has_coercion){
+                # set undef for has_coercion()
+                $self->{_compiled_type_coercion} = undef;
+                last;
+            }
+        }
     }
+
     return $self;
 }
 
@@ -102,8 +109,8 @@ sub _add_type_coercions { # ($self, @pairs)
             "Cannot add additional type coercions to Union types '$self'");
     }
 
-    my $coercions = ($self->{coercion_map} ||= []);
-    my %has       = map{ $_->[0] => undef } @{$coercions};
+    my $coercion_map = ($self->{coercion_map} ||= []);
+    my %has          = map{ $_->[0]->name => undef } @{$coercion_map};
 
     for(my $i = 0; $i < @_; $i++){
         my $from   = $_[  $i];
@@ -117,59 +124,65 @@ sub _add_type_coercions { # ($self, @pairs)
             or $self->throw_error(
                 "Could not find the type constraint ($from) to coerce from");
 
-        push @{$coercions}, [ $type => $action ];
+        push @{$coercion_map}, [ $type => $action ];
     }
 
-    $self->_compile_type_coercion();
+    $self->{_compiled_type_coercion} = undef;
     return;
 }
 
-sub _compile_type_coercion {
+sub _compiled_type_coercion {
     my($self) = @_;
 
-    my @coercions = @{$self->{coercion_map}};
+    my $coercion = $self->{_compiled_type_coercion};
+    return $coercion if defined $coercion;
 
-    $self->{_compiled_type_coercion} = sub {
-       my($thing) = @_;
-       foreach my $pair (@coercions) {
-            #my ($constraint, $converter) = @$pair;
-            if ($pair->[0]->check($thing)) {
-              local $_ = $thing;
-              return $pair->[1]->($thing);
-            }
-       }
-       return $thing;
-    };
-    return;
-}
-
-sub _compile_union_type_coercion {
-    my($self) = @_;
-
-    my @coercions;
-    foreach my $type(@{$self->{type_constraints}}){
-        if($type->has_coercion){
-            push @coercions, $type;
+    if(!$self->{type_constraints}) {
+        my @coercions;
+        foreach my $pair(@{$self->{coercion_map}}) {
+            push @coercions,
+                [ $pair->[0]->_compiled_type_constraint, $pair->[1] ];
         }
-    }
-    if(@coercions){
-        $self->{_compiled_type_coercion} = sub {
-            my($thing) = @_;
-            foreach my $type(@coercions){
-                my $value = $type->coerce($thing);
-                return $value if $self->check($value);
-            }
-            return $thing;
+
+        $coercion = sub {
+           my($thing) = @_;
+           foreach my $pair (@coercions) {
+                #my ($constraint, $converter) = @$pair;
+                if ($pair->[0]->($thing)) {
+                  local $_ = $thing;
+                  return $pair->[1]->($thing);
+                }
+           }
+           return $thing;
         };
     }
-    return;
+    else { # for union type
+        my @coercions;
+        foreach my $type(@{$self->{type_constraints}}){
+            if($type->has_coercion){
+                push @coercions, $type;
+            }
+        }
+        if(@coercions){
+            $coercion = sub {
+                my($thing) = @_;
+                foreach my $type(@coercions){
+                    my $value = $type->coerce($thing);
+                    return $value if $self->check($value);
+                }
+                return $thing;
+            };
+        }
+    }
+
+    return( $self->{_compiled_type_coercion} = $coercion );
 }
 
 sub coerce {
     my $self = shift;
     return $_[0] if $self->check(@_);
 
-    my $coercion = $self->{_compiled_type_coercion}
+    my $coercion = $self->_compiled_type_coercion
         or $self->throw_error("Cannot coerce without a type coercion");
     return  $coercion->(@_);
 }
@@ -248,8 +261,9 @@ sub _identity;                 # overload 0+
 sub _unite { # overload infix:<|>
     my($lhs, $rhs) = @_;
     require Mouse::Util::TypeConstraints;
-    return Mouse::Util::TypeConstraints::find_or_parse_type_constraint(
-       " $lhs | $rhs",
+    return Mouse::Util::TypeConstraints::_find_or_create_union_type(
+        $lhs,
+        Mouse::Util::TypeConstraints::find_or_create_isa_type_constraint($rhs),
     );
 }
 
@@ -262,7 +276,7 @@ Mouse::Meta::TypeConstraint - The Mouse Type Constraint metaclass
 
 =head1 VERSION
 
-This document describes Mouse version 0.86
+This document describes Mouse version 0.87
 
 =head1 DESCRIPTION
 

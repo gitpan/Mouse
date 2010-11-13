@@ -372,7 +372,6 @@ xs-src/MouseAccessor.xs
 xs-src/MouseAttribute.xs
 xs-src/MouseTypeConstraints.xs
 xs-src/MouseUtil.xs
-xshelper.h
 xt/001-pod.t
 xt/002-pod_spell.t
 xt/003-pod_coverage.t

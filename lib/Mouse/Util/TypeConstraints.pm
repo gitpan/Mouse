@@ -290,8 +290,9 @@ sub _find_or_create_parameterized_type{
 }
 
 sub _find_or_create_union_type{
-    return if grep{ not defined } @_;
-    my @types = sort map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
+    return if grep{ not defined } @_; # all things must be defined
+    my @types = sort
+        map{ $_->{type_constraints} ? @{$_->{type_constraints}} : $_ } @_;
 
     my $name = join '|', @types;
 
@@ -431,7 +432,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 0.86
+This document describes Mouse version 0.87
 
 =head2 SYNOPSIS
 
