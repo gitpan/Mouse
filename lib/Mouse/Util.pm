@@ -48,7 +48,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '0.87';
+    our $VERSION = '0.88';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -127,10 +127,10 @@ sub does_role{
 
 BEGIN {
     my $get_linear_isa;
-    if ($] >= 5.009_005) {
-        require mro;
+    if (eval { require mro }) {
         $get_linear_isa = \&mro::get_linear_isa;
-    } else {
+    }
+    else {
         # this code is based on MRO::Compat::__get_linear_isa
         my $_get_linear_isa_dfs; # this recurses so it isn't pretty
         $_get_linear_isa_dfs = sub {
@@ -388,7 +388,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.87
+This document describes Mouse version 0.88
 
 =head1 SYNOPSIS
 
@@ -442,7 +442,7 @@ C<eval "use $module ()"> or using C<require>.
 
 =head3 C<< Mouse::Util::get_all_metaclass_names() -> (ClassNames) >>
 
-=head2 MRO::Compat
+=head2 mro (or MRO::Compat)
 
 =head3 C<get_linear_isa>
 
@@ -465,6 +465,8 @@ L<Moose::Util>
 L<Class::MOP>
 
 L<Sub::Identify>
+
+L<mro>
 
 L<MRO::Compat>
 

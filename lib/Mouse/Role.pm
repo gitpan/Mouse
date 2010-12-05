@@ -1,7 +1,7 @@
 package Mouse::Role;
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.87';
+our $VERSION = '0.88';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -137,7 +137,7 @@ Mouse::Role - The Mouse Role
 
 =head1 VERSION
 
-This document describes Mouse version 0.87
+This document describes Mouse version 0.88
 
 =head1 SYNOPSIS
 
@@ -237,6 +237,10 @@ ordering.
 L<Mouse>
 
 L<Moose::Role>
+
+L<Moose::Manual::Roles>
+
+L<Moose::Spec::Role>
 
 =cut
 

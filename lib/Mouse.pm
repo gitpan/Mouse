@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.87';
+our $VERSION = '0.88';
 
 use Carp         qw(confess);
 use Scalar::Util qw(blessed);
@@ -155,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.87
+This document describes Mouse version 0.88
 
 =head1 SYNOPSIS
 
@@ -407,6 +407,8 @@ We have a public git repository:
 Perl 5.6.2 or later.
 
 =head1 SEE ALSO
+
+L<Mouse::Role>
 
 L<Mouse::Spec>
 
