@@ -3,10 +3,10 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.88';
+our $VERSION = '0.89';
 
-use Carp         qw(confess);
-use Scalar::Util qw(blessed);
+use Carp         ();
+use Scalar::Util ();
 
 use Mouse::Util ();
 
@@ -155,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.88
+This document describes Mouse version 0.89
 
 =head1 SYNOPSIS
 

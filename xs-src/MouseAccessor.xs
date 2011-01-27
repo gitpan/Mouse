@@ -2,7 +2,9 @@
 
 #define CHECK_INSTANCE(instance) STMT_START{                           \
         assert(instance);                                              \
-        if(!(SvROK(instance) && SvTYPE(SvRV(instance)) == SVt_PVHV)){  \
+        if(UNLIKELY(                                                   \
+                !(SvROK(instance)                                      \
+                && SvTYPE(SvRV(instance)) == SVt_PVHV) )){             \
             croak("Invalid object instance: '%"SVf"'", instance);      \
         }                                                              \
     } STMT_END
@@ -14,16 +16,87 @@ static MGVTBL mouse_accessor_vtbl; /* MAGIC identity */
 
 #define dMOUSE_self  SV* const self = mouse_accessor_get_self(aTHX_ ax, items, cv)
 
+/* simple instance slot accessor (or Mouse::Meta::Instance) */
+
+SV*
+mouse_instance_create(pTHX_ HV* const stash) {
+    SV* instance;
+    assert(stash);
+    assert(SvTYPE(stash) == SVt_PVHV);
+    instance = sv_bless( newRV_noinc((SV*)newHV()), stash );
+    return sv_2mortal(instance);
+}
+
+SV*
+mouse_instance_clone(pTHX_ SV* const instance) {
+    SV* proto;
+    CHECK_INSTANCE(instance);
+    assert(SvOBJECT(SvRV(instance)));
+
+    proto = newRV_noinc((SV*)newHVhv((HV*)SvRV(instance)));
+    sv_bless(proto, SvSTASH(SvRV(instance)));
+    return sv_2mortal(proto);
+}
+
+bool
+mouse_instance_has_slot(pTHX_ SV* const instance, SV* const slot) {
+    assert(slot);
+    CHECK_INSTANCE(instance);
+    return hv_exists_ent((HV*)SvRV(instance), slot, 0U);
+}
+
+SV*
+mouse_instance_get_slot(pTHX_ SV* const instance, SV* const slot) {
+    HE* he;
+    assert(slot);
+    CHECK_INSTANCE(instance);
+    he = hv_fetch_ent((HV*)SvRV(instance), slot, FALSE, 0U);
+    return he ? HeVAL(he) : NULL;
+}
+
+SV*
+mouse_instance_set_slot(pTHX_ SV* const instance, SV* const slot, SV* const value) {
+    HE* he;
+    SV* sv;
+    assert(slot);
+    assert(value);
+    CHECK_INSTANCE(instance);
+    he = hv_fetch_ent((HV*)SvRV(instance), slot, TRUE, 0U);
+    sv = HeVAL(he);
+    sv_setsv(sv, value);
+    SvSETMAGIC(sv);
+    return sv;
+}
+
+SV*
+mouse_instance_delete_slot(pTHX_ SV* const instance, SV* const slot) {
+    assert(instance);
+    assert(slot);
+    CHECK_INSTANCE(instance);
+    return hv_delete_ent((HV*)SvRV(instance), slot, 0, 0U);
+}
+
+void
+mouse_instance_weaken_slot(pTHX_ SV* const instance, SV* const slot) {
+    HE* he;
+    assert(slot);
+    CHECK_INSTANCE(instance);
+    he = hv_fetch_ent((HV*)SvRV(instance), slot, FALSE, 0U);
+    if(he){
+        sv_rvweaken(HeVAL(he));
+    }
+}
+
+/* utilities */
+
 STATIC_INLINE SV*
 mouse_accessor_get_self(pTHX_ I32 const ax, I32 const items, CV* const cv) {
-    if(items < 1){
+    if(UNLIKELY( items < 1 )){
         croak("Too few arguments for %s", GvNAME(CvGV(cv)));
     }
-
     /* NOTE: If self has GETMAGIC, $self->accessor will invoke GETMAGIC
-     *       before calling methods, so SvGETMAGIC(self) is not necessarily needed here.
+     *       before calling methods, so SvGETMAGIC(self) is not required here.
      */
-
     return ST(0);
 }
 
@@ -51,17 +124,6 @@ mouse_accessor_generate(pTHX_ SV* const attr, XSUBADDR_t const accessor_impl){
     return xsub;
 }
 
-
-#define PUSH_VALUE(value, flags) STMT_START { \
-        if((flags) & MOUSEf_ATTR_SHOULD_AUTO_DEREF && GIMME_V == G_ARRAY){ \
-            mouse_push_values(aTHX_ value, (flags));                       \
-        }                                                                  \
-        else{                                                              \
-            dSP;                                                           \
-            XPUSHs(value ? value : &PL_sv_undef);                          \
-            PUTBACK;                                                       \
-        }                                                                  \
-    } STMT_END                                                             \
 
 /* pushes return values, does auto-deref if needed */
 static void
@@ -113,7 +175,19 @@ mouse_push_values(pTHX_ SV* const value, U16 const flags){
     PUTBACK;
 }
 
-static void
+STATIC_INLINE void
+mouse_push_value(pTHX_ SV* const value, U16 const flags) {
+    if(flags & MOUSEf_ATTR_SHOULD_AUTO_DEREF && GIMME_V == G_ARRAY){
+        mouse_push_values(aTHX_ value, flags);
+    }
+    else{
+        dSP;
+        XPUSHs(value ? value : &PL_sv_undef);
+        PUTBACK;
+    }
+}
+
+STATIC_INLINE void
 mouse_attr_get(pTHX_ SV* const self, MAGIC* const mg){
     U16 const flags = MOUSE_mg_flags(mg);
     SV* value;
@@ -125,7 +199,7 @@ mouse_attr_get(pTHX_ SV* const self, MAGIC* const mg){
         value = mouse_xa_set_default(aTHX_ MOUSE_mg_xa(mg), self);
     }
 
-    PUSH_VALUE(value, flags);
+    mouse_push_value(aTHX_ value, flags);
 }
 
 static void
@@ -165,7 +239,7 @@ mouse_attr_set(pTHX_ SV* const self, MAGIC* const mg, SV* value){
         assert(SvTYPE(value) != SVTYPEMASK);
     }
 
-    PUSH_VALUE(value, flags);
+    mouse_push_value(aTHX_ value, flags);
 }
 
 XS(XS_Mouse_accessor)
@@ -394,76 +468,6 @@ XS(XS_Mouse_inheritable_class_accessor) {
     XSRETURN(1);
 }
 
-/* simple instance slot accessor (or Mouse::Meta::Instance) */
-
-SV*
-mouse_instance_create(pTHX_ HV* const stash) {
-    SV* instance;
-    assert(stash);
-    assert(SvTYPE(stash) == SVt_PVHV);
-    instance = sv_bless( newRV_noinc((SV*)newHV()), stash );
-    return sv_2mortal(instance);
-}
-
-SV*
-mouse_instance_clone(pTHX_ SV* const instance) {
-    SV* proto;
-    CHECK_INSTANCE(instance);
-    assert(SvOBJECT(SvRV(instance)));
-
-    proto = newRV_noinc((SV*)newHVhv((HV*)SvRV(instance)));
-    sv_bless(proto, SvSTASH(SvRV(instance)));
-    return sv_2mortal(proto);
-}
-
-bool
-mouse_instance_has_slot(pTHX_ SV* const instance, SV* const slot) {
-    assert(slot);
-    CHECK_INSTANCE(instance);
-    return hv_exists_ent((HV*)SvRV(instance), slot, 0U);
-}
-
-SV*
-mouse_instance_get_slot(pTHX_ SV* const instance, SV* const slot) {
-    HE* he;
-    assert(slot);
-    CHECK_INSTANCE(instance);
-    he = hv_fetch_ent((HV*)SvRV(instance), slot, FALSE, 0U);
-    return he ? HeVAL(he) : NULL;
-}
-
-SV*
-mouse_instance_set_slot(pTHX_ SV* const instance, SV* const slot, SV* const value) {
-    HE* he;
-    SV* sv;
-    assert(slot);
-    assert(value);
-    CHECK_INSTANCE(instance);
-    he = hv_fetch_ent((HV*)SvRV(instance), slot, TRUE, 0U);
-    sv = HeVAL(he);
-    sv_setsv(sv, value);
-    SvSETMAGIC(sv);
-    return sv;
-}
-
-SV*
-mouse_instance_delete_slot(pTHX_ SV* const instance, SV* const slot) {
-    assert(instance);
-    assert(slot);
-    CHECK_INSTANCE(instance);
-    return hv_delete_ent((HV*)SvRV(instance), slot, 0, 0U);
-}
-
-void
-mouse_instance_weaken_slot(pTHX_ SV* const instance, SV* const slot) {
-    HE* he;
-    assert(slot);
-    CHECK_INSTANCE(instance);
-    he = hv_fetch_ent((HV*)SvRV(instance), slot, FALSE, 0U);
-    if(he){
-        sv_rvweaken(HeVAL(he));
-    }
-}
 
 MODULE = Mouse::Meta::Method::Accessor::XS  PACKAGE = Mouse::Meta::Method::Accessor::XS
 
