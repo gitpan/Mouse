@@ -1,6 +1,12 @@
 package Mouse::Object;
 use Mouse::Util qw(does dump meta); # enables strict and warnings
 # all the stuff are defined in XS or PP
+
+sub DOES {
+    my($self, $class_or_role_name) = @_;
+    return $self->isa($class_or_role_name) || $self->does($class_or_role_name);
+}
+
 1;
 __END__
 
@@ -10,7 +16,7 @@ Mouse::Object - The base object for Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.89
+This document describes Mouse version 0.90
 
 =head1 METHODS
 
