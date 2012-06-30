@@ -149,7 +149,7 @@ sub _generate_initialize_object {
 
         if($is_weak_ref){
             $code .= "Scalar::Util::weaken($instance_slot) "
-                   . "if ref $instance_slot;\n";
+                   . "if ref $instance_slot and not Scalar::Util::isweak($instance_slot);\n";
         }
 
         push @res, $code;
@@ -233,7 +233,7 @@ Mouse::Meta::Method::Constructor - A Mouse method generator for constructors
 
 =head1 VERSION
 
-This document describes Mouse version 0.98
+This document describes Mouse version 0.99
 
 =head1 SEE ALSO
 
