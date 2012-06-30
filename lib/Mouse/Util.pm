@@ -50,7 +50,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '0.97';
+    our $VERSION = '0.98';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -169,7 +169,7 @@ sub find_meta{
     return class_of( $_[0] );
 }
 
-sub does_role{
+sub _does_role_impl {
     my ($class_or_obj, $role_name) = @_;
 
     my $meta = class_of($class_or_obj);
@@ -178,6 +178,16 @@ sub does_role{
         || ($meta || 'Mouse::Meta::Class')->throw_error("You must supply a role name to does()");
 
     return defined($meta) && $meta->does_role($role_name);
+}
+
+sub does_role {
+    my($thing, $role_name) = @_;
+
+    if( (Scalar::Util::blessed($thing) || is_class_loaded($thing))
+            && $thing->can('does')) {
+        return $thing->does($role_name);
+    }
+    goto &_does_role_impl;
 }
 
 # taken from Mouse::Util (0.90)
@@ -377,7 +387,7 @@ sub dump :method {
 
 # general does() method
 sub does :method {
-    goto &does_role;
+    goto &_does_role_impl;
 }
 
 1;
@@ -389,7 +399,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.97
+This document describes Mouse version 0.98
 
 =head1 SYNOPSIS
 

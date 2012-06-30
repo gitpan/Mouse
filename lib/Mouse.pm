@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '0.97';
+our $VERSION = '0.98';
 
 use Carp         ();
 use Scalar::Util ();
@@ -155,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 0.97
+This document describes Mouse version 0.98
 
 =head1 SYNOPSIS
 
@@ -347,7 +347,7 @@ Use of this feature requires L<Scalar::Util>!
 
 =item C<< trigger => CodeRef >>
 
-Any time the attribute's value is set (either through the accessor or the constructor), the trigger is called on it. The trigger receives as arguments the instance, the new value, and the attribute instance.
+Any time the attribute's value is set (either through the accessor or the constructor), the trigger is called on it. The trigger receives as arguments the instance, and the new value.
 
 =item C<< builder => Str >>
 
@@ -398,9 +398,9 @@ keywords (such as L</extends>) it will break loudly instead breaking subtly.
 
 =head1 SOURCE CODE ACCESS
 
-We have a public git repository:
+We have a public git repository L<https://github.com/gfx/p5-Mouse>:.
 
- git clone git://git.moose.perl.org/Mouse.git
+    git clone git://github.com/gfx/p5-Mouse.git
 
 =head1 DEPENDENCIES
 

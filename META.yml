@@ -4,14 +4,15 @@ author:
   - 'Shawn M Moore <sartak at gmail.com>'
 build_requires:
   Devel::PPPort: 3.19
-  ExtUtils::MakeMaker: 6.42
+  ExtUtils::MakeMaker: 6.59
   Test::More: 0.88
 configure_requires:
   Devel::PPPort: 3.19
-  ExtUtils::MakeMaker: 6.42
+  ExtUtils::MakeMaker: 6.59
   ExtUtils::ParseXS: 2.21
 distribution_type: module
-generated_by: 'Module::Install version 1.02'
+dynamic_config: 1
+generated_by: 'Module::Install version 1.06'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -30,5 +31,5 @@ requires:
   perl: 5.6.2
 resources:
   license: http://dev.perl.org/licenses/
-  repository: git://git.moose.perl.org/Mouse.git
-version: 0.97
+  repository: git://github.com/gfx/p5-Mouse.git
+version: 0.98

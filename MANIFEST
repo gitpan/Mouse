@@ -22,6 +22,7 @@ inc/Module/Install/Can.pm
 inc/Module/Install/Include.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
+inc/Module/Install/Repository.pm
 inc/Module/Install/TestTarget.pm
 inc/Module/Install/WriteAll.pm
 inc/Module/Install/XSUtil.pm
@@ -143,6 +144,7 @@ t/001_mouse/069-add-modifier.t
 t/001_mouse/070-inherit-role-attr.t
 t/001_mouse/071_tc_dualvar.t
 t/001_mouse/072_tc_extra_args.t
+t/001_mouse/073_errsv.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
