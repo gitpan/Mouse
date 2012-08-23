@@ -50,7 +50,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '0.99';
+    our $VERSION = '1.00';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -160,8 +160,20 @@ require Mouse::Meta::Module; # for the entities of metaclass cache utilities
     generate_can_predicate_for(['create_anon_role']           => 'is_a_metarole');
 }
 
-our $in_global_destruction = 0;
-END{ $in_global_destruction = 1 }
+sub in_global_destruction;
+
+if (defined ${^GLOBAL_PHASE}) {
+    *in_global_destruction = sub {
+        return ${^GLOBAL_PHASE} eq 'DESTRUCT';
+    };
+}
+else {
+    my $in_global_destruction = 0;
+    END { $in_global_destruction = 1 }
+    *in_global_destruction = sub {
+        return $in_global_destruction;
+    };
+}
 
 # Moose::Util compatible utilities
 
@@ -399,7 +411,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 0.99
+This document describes Mouse version 1.00
 
 =head1 SYNOPSIS
 

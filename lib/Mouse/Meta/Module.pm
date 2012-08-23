@@ -272,7 +272,7 @@ sub create {
 sub DESTROY{
     my($self) = @_;
 
-    return if $Mouse::Util::in_global_destruction;
+    return if Mouse::Util::in_global_destruction();
 
     my $serial_id = $self->{anon_serial_id};
     return if !$serial_id;
@@ -311,7 +311,7 @@ Mouse::Meta::Module - The common base class of Mouse::Meta::Class and Mouse::Met
 
 =head1 VERSION
 
-This document describes Mouse version 0.99
+This document describes Mouse version 1.00
 
 =head1 DESCRIPTION
 
