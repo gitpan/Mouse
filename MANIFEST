@@ -145,6 +145,7 @@ t/001_mouse/070-inherit-role-attr.t
 t/001_mouse/071_tc_dualvar.t
 t/001_mouse/072_tc_extra_args.t
 t/001_mouse/073_errsv.t
+t/001_mouse/074_default_errsv.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/301-bugs-non-mouse.t
