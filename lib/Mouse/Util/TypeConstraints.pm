@@ -12,7 +12,7 @@ Mouse::Exporter->setup_import_methods(
         as where message optimize_as
         from via
 
-        type subtype class_type role_type duck_type
+        type subtype class_type role_type maybe_type duck_type
         enum
         coerce
 
@@ -217,6 +217,11 @@ sub role_type {
         },
         role         => $role,
     );
+}
+
+sub maybe_type {
+    my $param = shift;
+    return _find_or_create_parameterized_type($TYPE{Maybe}, $param);
 }
 
 sub duck_type {
@@ -432,7 +437,7 @@ Mouse::Util::TypeConstraints - Type constraint system for Mouse
 
 =head1 VERSION
 
-This document describes Mouse version 1.02
+This document describes Mouse version 1.03
 
 =head2 SYNOPSIS
 

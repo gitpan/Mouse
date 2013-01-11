@@ -257,6 +257,7 @@ t/040_type_constraints/015_enum.t
 t/040_type_constraints/016_subtyping_parameterized_types.t
 t/040_type_constraints/017_subtyping_union_types.t
 t/040_type_constraints/018_custom_parameterized_types.t
+t/040_type_constraints/021_maybe_type_constraint.t
 t/040_type_constraints/022_custom_type_errors.t
 t/040_type_constraints/023_types_and_undef.t
 t/040_type_constraints/025_type_coersion_on_lazy_attributes.t
