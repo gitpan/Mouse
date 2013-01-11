@@ -437,7 +437,12 @@ sub handles              { $_[0]->{handles}                }
 
 sub _is_metadata         { $_[0]->{is}                     }
 sub is_required          { $_[0]->{required}               }
-sub default              { $_[0]->{default}                }
+sub default {
+    my($self, $instance) = @_;
+    my $value = $self->{default};
+    $value = $value->($instance) if defined($instance) and ref($value) eq "CODE";
+    return $value;
+}
 sub is_lazy              { $_[0]->{lazy}                   }
 sub is_lazy_build        { $_[0]->{lazy_build}             }
 sub is_weak_ref          { $_[0]->{weak_ref}               }
@@ -750,7 +755,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 1.03
+This document describes Mouse version 1.04
 
 =head1 SEE ALSO
 
