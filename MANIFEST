@@ -149,6 +149,7 @@ t/001_mouse/074_default_errsv.t
 t/001_mouse/100-meta-class.t
 t/001_mouse/101-meta-attribute.t
 t/001_mouse/102-attr-default-with-instance.t
+t/001_mouse/103-attr-default-with-instance-leak.t
 t/001_mouse/301-bugs-non-mouse.t
 t/001_mouse/400-define-role.t
 t/001_mouse/401-meta-role.t
