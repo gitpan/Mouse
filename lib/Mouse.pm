@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '1.07';
+our $VERSION = '1.08';
 
 use Carp         ();
 use Scalar::Util ();
@@ -155,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 1.07
+This document describes Mouse version 1.08
 
 =head1 SYNOPSIS
 
@@ -432,7 +432,7 @@ Yappo
 
 wu-lee
 
-Goro Fuji (gfx) E<lt>gfuji at cpan.orgE<gt>
+Goro Fuji (gfx) E<lt>gfuji@cpan.orgE<gt>
 
 with plenty of code borrowed from L<Class::MOP> and L<Moose>
 
