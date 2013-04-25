@@ -28,6 +28,7 @@ inc/Module/Install/WriteAll.pm
 inc/Module/Install/XSUtil.pm
 inc/Test/Exception.pm
 inc/Test/Exception/LessClever.pm
+inc/Test/Fatal.pm
 inc/Test/Requires.pm
 lib/Mouse.pm
 lib/Mouse/Exporter.pm
