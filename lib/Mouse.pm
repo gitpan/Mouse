@@ -3,7 +3,7 @@ use 5.006_002;
 
 use Mouse::Exporter; # enables strict and warnings
 
-our $VERSION = '1.09';
+our $VERSION = '1.10';
 
 use Carp         ();
 use Scalar::Util ();
@@ -155,7 +155,7 @@ Mouse - Moose minus the antlers
 
 =head1 VERSION
 
-This document describes Mouse version 1.09
+This document describes Mouse version 1.10
 
 =head1 SYNOPSIS
 
@@ -166,7 +166,7 @@ This document describes Mouse version 1.09
     has 'y' => (is => 'rw', isa => 'Int');
 
     sub clear {
-        my $self = shift;
+        my($self) = @_;
         $self->x(0);
         $self->y(0);
     }
@@ -182,7 +182,7 @@ This document describes Mouse version 1.09
     has 'z' => (is => 'rw', isa => 'Int');
 
     after 'clear' => sub {
-        my $self = shift;
+        my($self) = @_;
         $self->z(0);
     };
 
@@ -419,6 +419,8 @@ L<Moose::Manual>
 L<Moose::Cookbook>
 
 L<Class::MOP>
+
+L<Moo>
 
 =head1 AUTHORS
 
