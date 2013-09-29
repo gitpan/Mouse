@@ -2,7 +2,7 @@
 package Test::Requires;
 use strict;
 use warnings;
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 use base 'Test::Builder::Module';
 use 5.006000;
 
@@ -59,11 +59,17 @@ sub test_requires {
                 exit 0;
             }
         };
+        
+        my $msg = "$e";
         if ( $e =~ /^Can't locate/ ) {
-            $skip_all->("Test requires module '$mod' but it's not found");
+            $msg = "Test requires module '$mod' but it's not found";
+        }
+        
+        if ($ENV{RELEASE_TESTING}) {
+            __PACKAGE__->builder->BAIL_OUT($msg);
         }
         else {
-            $skip_all->("$e");
+            $skip_all->($msg);
         }
     }
 }
@@ -71,4 +77,4 @@ sub test_requires {
 1;
 __END__
 
-#line 128
+#line 147
