@@ -30,6 +30,7 @@ requires:
   XSLoader: 0.02
   perl: 5.6.2
 resources:
+  bugtracker: https://github.com/gfx/p5-Mouse/issues
   license: http://dev.perl.org/licenses/
-  repository: git://github.com/gfx/p5-Mouse.git
-version: 1.12
+  repository: https://github.com/gfx/p5-Mouse
+version: 1.13
