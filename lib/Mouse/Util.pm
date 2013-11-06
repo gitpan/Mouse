@@ -3,7 +3,7 @@ use Mouse::Exporter; # enables strict and warnings
 
 # Note that those which don't exist here are defined in XS or Mouse::PurePerl
 
-# must be here because it will be refered by other modules loaded
+# must be here because it will be referred by other modules loaded
 sub get_linear_isa($;$); ## no critic
 
 # must be here because it will called in Mouse::Exporter
@@ -50,7 +50,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '1.13';
+    our $VERSION = '2.0.0';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -411,7 +411,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 1.13
+This document describes Mouse version 2.0.0
 
 =head1 SYNOPSIS
 

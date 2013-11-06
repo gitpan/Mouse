@@ -485,7 +485,7 @@ sub _process_options{
         $args->{init_arg} = $name;
     }
 
-    # 'required' requires eigher 'init_arg', 'builder', or 'default'
+    # 'required' requires either 'init_arg', 'builder', or 'default'
     my $can_be_required = defined( $args->{init_arg} );
 
     if(exists $args->{builder}){
@@ -755,7 +755,7 @@ Mouse::PurePerl - A Mouse guts in pure Perl
 
 =head1 VERSION
 
-This document describes Mouse version 1.13
+This document describes Mouse version 2.0.0
 
 =head1 SEE ALSO
 

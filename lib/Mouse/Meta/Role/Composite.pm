@@ -1,4 +1,5 @@
 package Mouse::Meta::Role::Composite;
+use Carp ();
 use Mouse::Util; # enables strict and warnings
 use Mouse::Meta::Role;
 use Mouse::Meta::Role::Application;
@@ -6,7 +7,7 @@ our @ISA = qw(Mouse::Meta::Role);
 
 # FIXME: Mouse::Meta::Role::Composite does things in different way from Moose's
 # Moose: creates a new class for the consumer, and applies roles to it.
-# Mouse: creates a coposite role and apply roles to the role,
+# Mouse: creates a composite role and apply roles to the role,
 #        and then applies it to the consumer.
 
 sub new {
@@ -25,7 +26,8 @@ sub new {
 
 sub get_method_list {
     my($self) = @_;
-    return keys %{ $self->{methods} };
+    return grep { ! $self->{conflicting_methods}{$_} }
+                                                    keys %{ $self->{methods} };
 }
 
 sub add_method {
@@ -140,6 +142,33 @@ sub apply_methods {
                     Mouse::Util::quoted_english_list(@conflicting),
                     $consumer_class_name);
         }
+
+        my @changed_in_v2_0_0 = grep {
+            $consumer_class_name->can($_) && ! $consumer->has_method($_)
+        } keys %{ $role->{conflicting_methods} };
+        if (@changed_in_v2_0_0) {
+            my $method_name_conflict = (@changed_in_v2_0_0 == 1
+                ? 'a method name conflict'
+                : 'method name conflicts');
+
+            my %seen;
+            my $roles = Mouse::Util::quoted_english_list(
+                grep{ !$seen{$_}++ } # uniq
+                map { $_->name }
+                map { @{$_} }
+                @{ $role->{composed_roles_by_method} }{@changed_in_v2_0_0}
+            );
+
+            Carp::cluck(sprintf
+                  q{Due to %s in roles %s,}
+                . q{ the behavior of method%s %s might be changed}
+                . q{ in Mouse-2.00, check it out},
+                    $method_name_conflict,
+                    $roles,
+                    (@changed_in_v2_0_0 > 1 ? 's' : ''),
+                    Mouse::Util::quoted_english_list(@changed_in_v2_0_0),
+                    $consumer_class_name);
+        }
     }
 
     $self->SUPER::apply_methods($role, $consumer, @extra);
@@ -156,7 +185,7 @@ Mouse::Meta::Role::Composite - An object to represent the set of roles
 
 =head1 VERSION
 
-This document describes Mouse version 1.13
+This document describes Mouse version 2.0.0
 
 =head1 SEE ALSO
 
