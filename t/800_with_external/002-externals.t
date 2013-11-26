@@ -24,14 +24,6 @@ my @modules = qw(
     MouseX::AttributeHelpers
     MouseX::Getopt
     MouseX::ConfigFromFile
-
-    Any::Moose
-
-    HTTP::Engine
-    HTTP::Engine::Middleware
-
-    HTML::Shakan
-    Net::Google::DataAPI
 );
 
 test_module($_) for @modules;

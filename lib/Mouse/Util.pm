@@ -50,7 +50,7 @@ BEGIN{
         },
     );
 
-    our $VERSION = '2.0.0';
+    our $VERSION = '2.1.0';
 
     my $xs = !(defined(&is_valid_class_name) || $ENV{MOUSE_PUREPERL} || $ENV{PERL_ONLY});
 
@@ -81,7 +81,7 @@ BEGIN{
     # definition of mro::get_linear_isa()
     my $get_linear_isa;
     if ($] >= 5.010_000) {
-        require mro;
+        require 'mro.pm';
         $get_linear_isa = \&mro::get_linear_isa;
     }
     else {
@@ -411,7 +411,7 @@ Mouse::Util - Utilities for working with Mouse classes
 
 =head1 VERSION
 
-This document describes Mouse version 2.0.0
+This document describes Mouse version 2.1.0
 
 =head1 SYNOPSIS
 
