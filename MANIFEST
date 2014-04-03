@@ -293,6 +293,7 @@ t/100_bugs/026_create_anon_recursion.t
 t/100_bugs/027_constructor_object_overload.t
 t/100_bugs/029_instance_application_role_args.t
 t/100_bugs/030_coerce_without_coercion.t
+t/101_issues/016_Bool.t
 t/200_examples/001_example.t
 t/200_examples/003_example.t
 t/200_examples/004_example_w_DCS.t
