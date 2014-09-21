@@ -4,7 +4,7 @@
       "Shawn M Moore <sartak at gmail.com>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "Minilla/v1.0.0",
+   "generated_by" : "Minilla/v2.1.1",
    "license" : [
       "perl_5"
    ],
@@ -27,8 +27,6 @@
    "prereqs" : {
       "configure" : {
          "requires" : {
-            "CPAN::Meta" : "0",
-            "CPAN::Meta::Prereqs" : "0",
             "Devel::PPPort" : "3.19",
             "ExtUtils::ParseXS" : "3.22",
             "Module::Build" : "0.4005",
@@ -79,7 +77,7 @@
    "provides" : {
       "Mouse" : {
          "file" : "lib/Mouse.pm",
-         "version" : "v2.3.0"
+         "version" : "v2.4.0"
       },
       "Mouse::Exporter" : {
          "file" : "lib/Mouse/Exporter.pm"
@@ -134,11 +132,11 @@
       },
       "Mouse::Role" : {
          "file" : "lib/Mouse/Role.pm",
-         "version" : "v2.3.0"
+         "version" : "v2.4.0"
       },
       "Mouse::Spec" : {
          "file" : "lib/Mouse/Spec.pm",
-         "version" : "v2.3.0"
+         "version" : "v2.4.0"
       },
       "Mouse::Tiny" : {
          "file" : "lib/Mouse/Tiny.pm",
@@ -149,7 +147,7 @@
       },
       "Mouse::Util" : {
          "file" : "lib/Mouse/Util.pm",
-         "version" : "v2.3.0"
+         "version" : "v2.4.0"
       },
       "Mouse::Util::MetaRole" : {
          "file" : "lib/Mouse/Util/MetaRole.pm"
@@ -181,7 +179,7 @@
          "web" : "https://github.com/gfx/p5-Mouse"
       }
    },
-   "version" : "2.3.0",
+   "version" : "v2.4.0",
    "x_contributors" : [
       "Ricardo SIGNES <rjbs@cpan.org>",
       "大沢 和宏 <yappo@shibuya.pl>",
@@ -218,7 +216,7 @@
       "Fuji, Goro <goro-fuji@cookpad.com>",
       "Sergiy Zuban <s.zuban@trackingsoft.com>",
       "Tokuhiro Matsuno <tokuhirom@gmail.com>",
-      "Syohei YOSHIDA <syohex@gmail.com>",
-      "Fuji, Goro <gfuji@cpan.org>"
+      "FUJI Goro (gfx) <gfuji@cpan.org>",
+      "Syohei YOSHIDA <syohex@gmail.com>"
    ]
 }

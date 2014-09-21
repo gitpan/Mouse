@@ -12,14 +12,12 @@ build_requires:
   Test::Requires: 0
   Try::Tiny: 0
 configure_requires:
-  CPAN::Meta: 0
-  CPAN::Meta::Prereqs: 0
   Devel::PPPort: 3.19
   ExtUtils::ParseXS: 3.22
   Module::Build: 0.4005
   Module::Build::XSUtil: 0
 dynamic_config: 0
-generated_by: 'Minilla/v1.0.0, CPAN::Meta::Converter version 2.133380'
+generated_by: 'Minilla/v2.1.1, CPAN::Meta::Converter version 2.133380'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -37,7 +35,7 @@ no_index:
 provides:
   Mouse:
     file: lib/Mouse.pm
-    version: v2.3.0
+    version: v2.4.0
   Mouse::Exporter:
     file: lib/Mouse/Exporter.pm
   Mouse::Meta::Attribute:
@@ -74,10 +72,10 @@ provides:
     file: lib/Mouse/PurePerl.pm
   Mouse::Role:
     file: lib/Mouse/Role.pm
-    version: v2.3.0
+    version: v2.4.0
   Mouse::Spec:
     file: lib/Mouse/Spec.pm
-    version: v2.3.0
+    version: v2.4.0
   Mouse::Tiny:
     file: lib/Mouse/Tiny.pm
     version: v2.2.0
@@ -85,7 +83,7 @@ provides:
     file: lib/Mouse/TypeRegistry.pm
   Mouse::Util:
     file: lib/Mouse/Util.pm
-    version: v2.3.0
+    version: v2.4.0
   Mouse::Util::MetaRole:
     file: lib/Mouse/Util/MetaRole.pm
   Mouse::Util::TypeConstraints:
@@ -106,7 +104,7 @@ resources:
   bugtracker: https://github.com/gfx/p5-Mouse/issues
   homepage: https://github.com/gfx/p5-Mouse
   repository: git://github.com/gfx/p5-Mouse.git
-version: 2.3.0
+version: v2.4.0
 x_contributors:
   - 'Ricardo SIGNES <rjbs@cpan.org>'
   - '大沢 和宏 <yappo@shibuya.pl>'
@@ -143,5 +141,5 @@ x_contributors:
   - 'Fuji, Goro <goro-fuji@cookpad.com>'
   - 'Sergiy Zuban <s.zuban@trackingsoft.com>'
   - 'Tokuhiro Matsuno <tokuhirom@gmail.com>'
+  - 'FUJI Goro (gfx) <gfuji@cpan.org>'
   - 'Syohei YOSHIDA <syohex@gmail.com>'
-  - 'Fuji, Goro <gfuji@cpan.org>'
