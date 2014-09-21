@@ -35,7 +35,7 @@ no_index:
 provides:
   Mouse:
     file: lib/Mouse.pm
-    version: v2.4.0
+    version: v2.4.1
   Mouse::Exporter:
     file: lib/Mouse/Exporter.pm
   Mouse::Meta::Attribute:
@@ -72,10 +72,10 @@ provides:
     file: lib/Mouse/PurePerl.pm
   Mouse::Role:
     file: lib/Mouse/Role.pm
-    version: v2.4.0
+    version: v2.4.1
   Mouse::Spec:
     file: lib/Mouse/Spec.pm
-    version: v2.4.0
+    version: v2.4.1
   Mouse::Tiny:
     file: lib/Mouse/Tiny.pm
     version: v2.2.0
@@ -83,7 +83,7 @@ provides:
     file: lib/Mouse/TypeRegistry.pm
   Mouse::Util:
     file: lib/Mouse/Util.pm
-    version: v2.4.0
+    version: v2.4.1
   Mouse::Util::MetaRole:
     file: lib/Mouse/Util/MetaRole.pm
   Mouse::Util::TypeConstraints:
@@ -104,7 +104,7 @@ resources:
   bugtracker: https://github.com/gfx/p5-Mouse/issues
   homepage: https://github.com/gfx/p5-Mouse
   repository: git://github.com/gfx/p5-Mouse.git
-version: v2.4.0
+version: 2.4.1
 x_contributors:
   - 'Ricardo SIGNES <rjbs@cpan.org>'
   - '大沢 和宏 <yappo@shibuya.pl>'
@@ -141,5 +141,5 @@ x_contributors:
   - 'Fuji, Goro <goro-fuji@cookpad.com>'
   - 'Sergiy Zuban <s.zuban@trackingsoft.com>'
   - 'Tokuhiro Matsuno <tokuhirom@gmail.com>'
-  - 'FUJI Goro (gfx) <gfuji@cpan.org>'
   - 'Syohei YOSHIDA <syohex@gmail.com>'
+  - 'FUJI Goro (gfx) <gfuji@cpan.org>'

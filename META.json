@@ -77,7 +77,7 @@
    "provides" : {
       "Mouse" : {
          "file" : "lib/Mouse.pm",
-         "version" : "v2.4.0"
+         "version" : "v2.4.1"
       },
       "Mouse::Exporter" : {
          "file" : "lib/Mouse/Exporter.pm"
@@ -132,11 +132,11 @@
       },
       "Mouse::Role" : {
          "file" : "lib/Mouse/Role.pm",
-         "version" : "v2.4.0"
+         "version" : "v2.4.1"
       },
       "Mouse::Spec" : {
          "file" : "lib/Mouse/Spec.pm",
-         "version" : "v2.4.0"
+         "version" : "v2.4.1"
       },
       "Mouse::Tiny" : {
          "file" : "lib/Mouse/Tiny.pm",
@@ -147,7 +147,7 @@
       },
       "Mouse::Util" : {
          "file" : "lib/Mouse/Util.pm",
-         "version" : "v2.4.0"
+         "version" : "v2.4.1"
       },
       "Mouse::Util::MetaRole" : {
          "file" : "lib/Mouse/Util/MetaRole.pm"
@@ -179,7 +179,7 @@
          "web" : "https://github.com/gfx/p5-Mouse"
       }
    },
-   "version" : "v2.4.0",
+   "version" : "2.4.1",
    "x_contributors" : [
       "Ricardo SIGNES <rjbs@cpan.org>",
       "大沢 和宏 <yappo@shibuya.pl>",
@@ -216,7 +216,7 @@
       "Fuji, Goro <goro-fuji@cookpad.com>",
       "Sergiy Zuban <s.zuban@trackingsoft.com>",
       "Tokuhiro Matsuno <tokuhirom@gmail.com>",
-      "FUJI Goro (gfx) <gfuji@cpan.org>",
-      "Syohei YOSHIDA <syohex@gmail.com>"
+      "Syohei YOSHIDA <syohex@gmail.com>",
+      "FUJI Goro (gfx) <gfuji@cpan.org>"
    ]
 }
